@@ -1,0 +1,146 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Nightmare Machine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'blood-red': '#4a0404',
+              'fresh-blood': '#880808',
+              'void': '#050505',
+              'terminal': '#1a1a1a',
+              'system-green': '#10b981',
+              'system-cyan': '#00FFFF',
+              'haunt-gold': '#b45309',
+              'haunt-dust': '#C0C0C0',
+              'psych-indigo': '#4B0082',
+              'psych-lavender': '#E6E6FA',
+              'blasphemy-purple': '#550055',
+              'blasphemy-sulfur': '#FFD700',
+              'survival-ice': '#A5F2F3',
+              'survival-slate': '#2F4F4F',
+            },
+            fontFamily: {
+              serif: ['"Crimson Text"', 'serif'],
+              mono: ['"JetBrains Mono"', 'monospace'],
+            },
+            animation: {
+              'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'glitch': 'glitch 1s linear infinite',
+              'flesh-pulse': 'fleshPulse 6s ease-in-out infinite',
+              'system-scan': 'scanline 4s linear infinite',
+              'haunt-pulse': 'hauntPulse 5s ease-in-out infinite',
+              'rain-fall': 'rainFall 0.7s linear infinite',
+              'snow-fall': 'rainFall 3s linear infinite',
+              'fog-flow': 'fogFlow 20s linear infinite',
+              'heartbeat': 'heartbeat 1.5s ease-in-out infinite',
+              'heartbeat-fast': 'heartbeat 0.8s ease-in-out infinite',
+              'particle-float': 'particleFloat 20s ease-in-out infinite',
+              'particle-rise': 'particleRise 15s linear infinite',
+            },
+            keyframes: {
+              glitch: {
+                '2%, 64%': { transform: 'translate(2px,0) skew(0deg)' },
+                '4%, 60%': { transform: 'translate(-2px,0) skew(0deg)' },
+                '62%': { transform: 'translate(0,0) skew(5deg)' },
+              },
+              fleshPulse: {
+                '0%, 100%': { opacity: '0.05' },
+                '50%': { opacity: '0.2' },
+              },
+              scanline: {
+                '0%': { transform: 'translateY(-100%)' },
+                '100%': { transform: 'translateY(500%)' },
+              },
+              hauntPulse: {
+                '0%, 100%': { opacity: '0.02' },
+                '50%': { opacity: '0.15' },
+              },
+              rainFall: {
+                '0%': { transform: 'translateY(-100%)', opacity: '0' },
+                '50%': { opacity: '1' },
+                '100%': { transform: 'translateY(100%)', opacity: '0.3' },
+              },
+              fogFlow: {
+                '0%': { backgroundPosition: '0% 0%' },
+                '100%': { backgroundPosition: '200% 0%' },
+              },
+              heartbeat: {
+                 '0%, 100%': { opacity: '0', transform: 'scale(1)' },
+                 '15%': { opacity: '0.4', transform: 'scale(1.02)' },
+                 '30%': { opacity: '0', transform: 'scale(1)' },
+                 '45%': { opacity: '0.2', transform: 'scale(1.01)' },
+                 '60%': { opacity: '0', transform: 'scale(1)' },
+              },
+              particleFloat: {
+                '0%, 100%': { transform: 'translate(0, 0)', opacity: '0' },
+                '25%': { opacity: '0.8' },
+                '50%': { transform: 'translate(10px, -20px)', opacity: '0.5' },
+                '75%': { opacity: '0.8' }
+              },
+              particleRise: {
+                '0%': { transform: 'translateY(100%)', opacity: '0' },
+                '20%': { opacity: '1' },
+                '80%': { opacity: '0.5' },
+                '100%': { transform: 'translateY(-20%)', opacity: '0' }
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        background-color: #050505;
+        color: #e5e5e5;
+      }
+      /* Custom scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #1a1a1a;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #333;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #4a0404;
+      }
+      
+      .rain-streak {
+        position: absolute;
+        width: 1px;
+        height: 60px;
+        background: linear-gradient(to bottom, transparent, rgba(200, 200, 255, 0.3), transparent);
+        bottom: 100%;
+        animation: rainFall 1s linear infinite;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
+    "recharts": "https://aistudiocdn.com/recharts@^3.5.1",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
