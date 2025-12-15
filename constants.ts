@@ -195,7 +195,7 @@ You must generate a Hidden State Block in JSON format at the START of every resp
     "active_prices": ["Price Paid"],
     "sensory_focus": "Current dominant sensation",
     "visual_motif": "A 10-15 word art-prompt describing the scene's aesthetic.",
-    "illustration_request": "If the user specifically asks to SEE something.",
+    "illustration_request": "NULL unless the user EXPLICITLY commands 'Show me X' or 'Generate an image of X'. NEVER generate this automatically.",
     "active_events": [],
     "narrative_debt": ["Unpaid Consequence 1"],
     "unreliable_architect_level": 0,

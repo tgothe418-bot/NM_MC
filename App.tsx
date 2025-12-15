@@ -1,10 +1,12 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { StatusPanel } from './components/StatusPanel';
 import { StoryLog } from './components/StoryLog';
 import { InputArea } from './components/InputArea';
 import { ClusterAmbience } from './components/ClusterAmbience';
 import { SimulationModal } from './components/SimulationModal';
+import { VoiceControl } from './components/VoiceControl';
 import { sendMessageToGemini, initializeGemini, generateAutoPlayerAction, generateSimulationAnalysis, generateHorrorImage } from './services/geminiService';
 import { GameState, ChatMessage, NarrativeEvent, NpcState, SimulationConfig, VillainState, NpcRelation } from './types';
 import { parseResponse } from './utils';
@@ -582,6 +584,7 @@ const App: React.FC = () => {
   
   // Background Image State
   const [bgImage, setBgImage] = useState<string | null>(null);
+  const lastVisualParams = useRef({ motif: "", cluster: "" });
   
   // Simulation State
   const [isSimModalOpen, setIsSimModalOpen] = useState(false);
@@ -609,21 +612,27 @@ const App: React.FC = () => {
   useEffect(() => {
     const handleVisuals = async () => {
       // 1. Background Generation
-      if (gameState.narrative.visual_motif && gameState.narrative.visual_motif.length > 5) {
-        console.log("Generating background for:", gameState.narrative.visual_motif);
-        try {
-          // Use 16:9 for cinematic background
-          const bgUrl = await generateHorrorImage(
-             gameState.narrative.visual_motif, 
-             { activeCluster: gameState.meta.active_cluster, aspectRatio: "16:9" }
-          );
-          if (bgUrl) setBgImage(bgUrl);
-        } catch (e) {
-          console.error("BG Gen failed", e);
-        }
+      const currentMotif = gameState.narrative.visual_motif;
+      const currentCluster = gameState.meta.active_cluster;
+
+      if (currentMotif && currentMotif.length > 5) {
+         if (currentMotif !== lastVisualParams.current.motif || currentCluster !== lastVisualParams.current.cluster) {
+             console.log("Generating background for:", currentMotif);
+             lastVisualParams.current = { motif: currentMotif, cluster: currentCluster };
+             try {
+               // Use 16:9 for cinematic background
+               const bgUrl = await generateHorrorImage(
+                  currentMotif, 
+                  { activeCluster: currentCluster, aspectRatio: "16:9" }
+               );
+               if (bgUrl) setBgImage(bgUrl);
+             } catch (e) {
+               console.error("BG Gen failed", e);
+             }
+         }
       }
 
-      // 2. Illustration Requests
+      // 2. Illustration Requests (Manual user request only)
       if (gameState.narrative.illustration_request) {
         console.log("Generating illustration for:", gameState.narrative.illustration_request);
         try {
@@ -722,6 +731,10 @@ const App: React.FC = () => {
 
   const handleSendMessage = (text: string) => {
     processGameTurn(text);
+  };
+
+  const handleVoiceAction = async (action: string) => {
+    return processGameTurn(action);
   };
 
   // Handler for manual image generation (Snapshot)
@@ -880,6 +893,9 @@ const App: React.FC = () => {
                 <span className="hidden group-hover:block font-mono text-xs uppercase tracking-widest">Simulate</span>
             </button>
         </div>
+
+        {/* Voice Control Integration */}
+        <VoiceControl onProcessAction={handleVoiceAction} />
 
         <StoryLog 
           history={history} 
