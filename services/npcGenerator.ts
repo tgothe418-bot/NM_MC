@@ -7,7 +7,8 @@ import {
   VoiceProfile, 
   NpcTraits, 
   FractureVectors,
-  Injury 
+  Injury,
+  MemoryEvent
 } from '../types';
 
 /**
@@ -219,6 +220,14 @@ export const generateProceduralNpc = (
   const traits = generateTraits(flaw, background, hobby);
 
   // 6. Final Object Assembly
+  
+  // Create initial significant memory from background regret
+  const initialMemory: MemoryEvent = {
+    trigger: `Background: ${regret}`,
+    impact: 'Trauma',
+    turnCount: -1 // Represents pre-simulation history
+  };
+
   return {
       name: fullName,
       archetype: background, // "Butcher", "Hacker", etc.
@@ -259,7 +268,7 @@ export const generateProceduralNpc = (
       // Default social state
       relationship_state: { trust: 50, fear: 10, secretKnowledge: false },
       relationships_to_other_npcs: {},
-      memory_stream: [],
+      memory_stream: [initialMemory], // Populate with initial memory
       current_intent: { goal: 'Survive', target: 'Self', urgency: 1 },
       
       dialogue_state: {

@@ -1,5 +1,4 @@
 
-
 import { GoogleGenAI, LiveServerMessage, Modality, FunctionDeclaration, Type } from "@google/genai";
 import { float32To16BitPCM, arrayBufferToBase64, base64ToFloat32Array } from "./audioUtils";
 
@@ -24,6 +23,7 @@ const SUBMIT_ACTION_TOOL: FunctionDeclaration = {
 };
 
 type ActionProcessor = (action: string) => Promise<string>;
+type InputProgressCallback = (text: string, isFinal: boolean) => void;
 
 export class LiveClient {
   private ai: GoogleGenAI;
@@ -35,10 +35,12 @@ export class LiveClient {
   private nextStartTime: number = 0;
   
   private onAction: ActionProcessor;
+  private onInputProgress: InputProgressCallback | null = null;
 
-  constructor(onAction: ActionProcessor) {
+  constructor(onAction: ActionProcessor, onInputProgress?: InputProgressCallback) {
     this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     this.onAction = onAction;
+    if (onInputProgress) this.onInputProgress = onInputProgress;
   }
 
   async connect(config: VoiceConfig, systemInstruction: string) {
@@ -65,6 +67,7 @@ export class LiveClient {
         speechConfig: {
           voiceConfig: { prebuiltVoiceConfig: { voiceName: config.voiceName } }
         },
+        inputAudioTranscription: { model: "google_speech" }, // Enable Real-time Transcription
         systemInstruction: systemInstruction,
         tools: [{ functionDeclarations: [SUBMIT_ACTION_TOOL] }],
       }
@@ -118,7 +121,19 @@ export class LiveClient {
       this.nextStartTime = startTime + buffer.duration;
     }
 
-    // 2. Handle Tool Calls (Bridging Voice to Game Engine)
+    // 2. Handle Real-time Input Transcription (User Voice -> Text)
+    const transcription = msg.serverContent?.inputTranscription;
+    if (transcription && transcription.text && this.onInputProgress) {
+        // Stream text to UI
+        this.onInputProgress(transcription.text, false);
+    }
+    
+    // 3. Handle Turn Completion (Finalize Text)
+    if (msg.serverContent?.turnComplete && this.onInputProgress) {
+        this.onInputProgress("", true); // Signal completion/reset
+    }
+
+    // 4. Handle Tool Calls (Bridging Voice to Game Engine)
     if (msg.toolCall) {
       for (const fc of msg.toolCall.functionCalls) {
         if (fc.name === 'submit_action') {

@@ -12,6 +12,7 @@ export const initializeGemini = () => {
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         temperature: 0.9,
+        responseMimeType: 'application/json',
       },
     });
   } catch (error) {

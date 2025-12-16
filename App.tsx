@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { StatusPanel } from './components/StatusPanel';
 import { StoryLog } from './components/StoryLog';
@@ -15,6 +14,7 @@ import { LORE_LIBRARY } from './loreLibrary';
 import { constructVoiceManifesto } from './services/dialogueEngine';
 import { constructSensoryManifesto } from './services/sensoryEngine';
 import { generateProceduralNpc } from './services/npcGenerator';
+import { ttsService } from './services/ttsService'; // Import TTS Service
 import { Terminal, Cpu } from 'lucide-react';
 
 const INITIAL_STATE: GameState = {
@@ -592,6 +592,9 @@ const App: React.FC = () => {
   const [simulationReport, setSimulationReport] = useState<string | null>(null);
   const isSimulatingRef = useRef(false); // Ref for loop access
 
+  // Voice Input State
+  const [voiceInputText, setVoiceInputText] = useState("");
+
   // Initialize with greeting once ready
   useEffect(() => {
     initializeGemini();
@@ -671,6 +674,8 @@ const App: React.FC = () => {
     const userMsg: ChatMessage = { role: 'user', text, timestamp: Date.now() };
     setHistory(prev => [...prev, userMsg]);
     setIsLoading(true);
+    // Clear voice input display when processed
+    setVoiceInputText(""); 
 
     try {
       // 1. DIALOGUE ENGINE: Generate Voice Manifesto
@@ -706,6 +711,11 @@ const App: React.FC = () => {
       };
 
       setHistory(prev => [...prev, aiMsg]);
+
+      // --- TEXT TO SPEECH NARRATION ---
+      // Trigger TTS if enabled in VoiceControl
+      ttsService.speak(storyText);
+
       return storyText;
 
     } catch (error: any) {
@@ -734,7 +744,23 @@ const App: React.FC = () => {
   };
 
   const handleVoiceAction = async (action: string) => {
+    // We let the voice input flow naturally to the input box via handleVoiceProgress
+    // But when the final action is committed by the Live Client tool, we process it here.
     return processGameTurn(action);
+  };
+
+  // New handler for streaming voice text
+  const handleVoiceProgress = (text: string, isFinal: boolean) => {
+      // We buffer the text into the input box so the user sees it.
+      // If it's final (turn complete), we might clear it, but usually the tool call 
+      // happens before turn complete, which clears it in processGameTurn.
+      if (!isLoading) {
+          setVoiceInputText(prev => {
+              // Simple logic: if text is accumulated, replace. 
+              // The API usually sends the full current utterance.
+              return text;
+          });
+      }
   };
 
   // Handler for manual image generation (Snapshot)
@@ -882,20 +908,22 @@ const App: React.FC = () => {
           </h1>
         </header>
 
-        {/* Simulation Toggle */}
-        <div className="absolute top-4 left-4 z-40">
+        {/* Controls Container: Simulation & Voice */}
+        <div className="absolute top-4 left-4 z-40 flex flex-col gap-2 items-start">
             <button 
                 onClick={() => setIsSimModalOpen(true)}
-                className="bg-black/80 hover:bg-gray-900 border border-system-green/50 text-system-green p-2 rounded-sm backdrop-blur transition-all flex items-center gap-2 group"
+                className="bg-black/80 hover:bg-gray-900 border border-system-green/50 text-system-green p-2 rounded-sm backdrop-blur transition-all flex items-center gap-2 group shadow-[0_0_15px_rgba(0,0,0,0.5)]"
                 title="Open Simulation Protocol"
             >
                 <Cpu className="w-5 h-5 group-hover:animate-pulse" />
                 <span className="hidden group-hover:block font-mono text-xs uppercase tracking-widest">Simulate</span>
             </button>
+            
+            <VoiceControl 
+                onProcessAction={handleVoiceAction} 
+                onInputProgress={handleVoiceProgress} // Connect voice stream to app state
+            />
         </div>
-
-        {/* Voice Control Integration */}
-        <VoiceControl onProcessAction={handleVoiceAction} />
 
         <StoryLog 
           history={history} 
@@ -909,6 +937,7 @@ const App: React.FC = () => {
             onSnapshot={handleSnapshot}
             isLoading={isLoading || isSimulating} 
             inputType={gameState.narrativeFlags?.input_type || 'text'}
+            externalValue={voiceInputText} // Pass voice text to input box
           />
         </div>
       </div>
