@@ -1,4 +1,5 @@
 
+
 export interface ClusterWeights {
   [key: string]: string; // e.g., "Cluster 1 (Flesh)": "40%"
 }
@@ -122,11 +123,16 @@ export interface PhysicalFeatures {
   clothing_style: string;
 }
 
+export type ResilienceLevel = 'Unbreakable' | 'High' | 'Moderate' | 'Fragile' | 'Shattered';
+export type SurvivalInstinct = 'Fight' | 'Flight' | 'Freeze' | 'Fawn' | 'Submit';
+
 export interface PsychologicalState {
   current_thought: string; // Internal monologue snippet
   emotional_state: string; // e.g., "Panic", "Determination"
   sanity_percentage: number; // 0-100
-  resilience_level: string; // "High", "Shattered"
+  resilience_level: ResilienceLevel; 
+  stress_level: number; // 0-10, immediate psychological pressure
+  dominant_instinct: SurvivalInstinct;
 }
 
 export interface KnowledgeNode {

@@ -14,8 +14,8 @@ import { NpcState, DialogueEntry, VoiceProfile, NpcRelation } from '../types';
 export const constructVoiceManifesto = (npcs: NpcState[]): string => {
     if (!npcs || npcs.length === 0) return "";
 
-    let manifesto = "\n\n*** D. DIALOGUE ENGINE MANIFESTO (STRICT ENFORCEMENT) ***\n";
-    manifesto += "The following characters are present. You MUST adhere to their specific Voice Profiles, Hidden Agendas, and Social Stances. Do not make them sound generic.\n\n";
+    let manifesto = "\n\n*** D. DIALOGUE & PSYCHOLOGY MANIFESTO (STRICT ENFORCEMENT) ***\n";
+    manifesto += "The following characters are present. You MUST adhere to their specific Voice Profiles, Hidden Agendas, and Social Stances. You MUST update their Psychological Metrics based on the events of this turn.\n\n";
 
     npcs.forEach(npc => {
         // Skip ghosts/anomalies if they aren't active speakers, or handle them differently
@@ -40,6 +40,15 @@ export const constructVoiceManifesto = (npcs: NpcState[]): string => {
         else if (npc.relationship_state.trust < 20) moodMod = "HOSTILE / CLOSED OFF";
         
         manifesto += `   - CURRENT MOOD: ${moodMod}\n`;
+
+        // NEW: CRITICAL PSYCHOLOGICAL METRICS (Must be tracked)
+        if (npc.psychology) {
+            manifesto += `   - PSYCHOMETRICS (Update these in JSON):\n`;
+            manifesto += `     * Resilience Level: ${npc.psychology.resilience_level} (If Stress > 8, lower this)\n`;
+            manifesto += `     * Stress Load: ${npc.psychology.stress_level}/10 (Increase if threatened)\n`;
+            manifesto += `     * Dominant Instinct: ${npc.psychology.dominant_instinct} (Drives current behavior)\n`;
+            manifesto += `     * Current Thought: "${npc.psychology.current_thought}"\n`;
+        }
 
         // 3. OBJECTIVES & DRIVES (Volition)
         manifesto += `   - PUBLIC GOAL: "${npc.primary_goal || 'Survive'}" (What they say they want)\n`;

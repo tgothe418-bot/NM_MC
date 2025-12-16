@@ -1,4 +1,5 @@
 
+
 import { 
   NpcState, 
   PersonalityProfile, 
@@ -8,7 +9,9 @@ import {
   NpcTraits, 
   FractureVectors,
   Injury,
-  MemoryEvent
+  MemoryEvent,
+  SurvivalInstinct,
+  ResilienceLevel
 } from '../types';
 
 /**
@@ -165,7 +168,6 @@ export const generateProceduralNpc = (
   const totemItem = pickRandom(flavor.items);
 
   // 4. Construct Narrative Background (The "Deep Texture")
-  // Combines background + hobby + regret + fear into a rich origin string with varied templates
   const richOrigin = (() => {
       const b = background;
       const h = hobby.toLowerCase();
@@ -202,12 +204,18 @@ export const generateProceduralNpc = (
   // Determine starting fracture based on regret (Guilt) and random variance
   const startingGuilt = Math.floor(Math.random() * 20);
   const startingFear = Math.floor(Math.random() * 10) + 5;
+  
+  // New Psychological Fields
+  const startingInstinct: SurvivalInstinct = pickRandom(['Fight', 'Flight', 'Freeze', 'Fawn']);
+  const startingResilience: ResilienceLevel = pickRandom(['High', 'Moderate']);
 
   const psychology: PsychologicalState = {
       current_thought: "Keep moving. Don't look at the shadows.",
       emotional_state: "Anxious",
       sanity_percentage: 100,
-      resilience_level: "Moderate"
+      resilience_level: startingResilience,
+      stress_level: 0,
+      dominant_instinct: startingInstinct
   };
 
   const voice: VoiceProfile = {
@@ -220,8 +228,6 @@ export const generateProceduralNpc = (
   const traits = generateTraits(flaw, background, hobby);
 
   // 6. Final Object Assembly
-  
-  // Create initial significant memory from background regret
   const initialMemory: MemoryEvent = {
     trigger: `Background: ${regret}`,
     impact: 'Trauma',
@@ -230,22 +236,20 @@ export const generateProceduralNpc = (
 
   return {
       name: fullName,
-      archetype: background, // "Butcher", "Hacker", etc.
-      background_origin: richOrigin, // THE NEW DEEP FIELD
+      archetype: background, 
+      background_origin: richOrigin,
       
       personality,
       physical,
       psychology,
       
-      // -- Legacy / Compatibility Fields --
       current_state: "Wandering",
       visual_anchor: appearance,
       
-      // Inject starting variance so they don't all start at 0
       fracture_vectors: { 
         fear: startingFear, 
         isolation: 0, 
-        guilt: startingGuilt, // Regret fuels this
+        guilt: startingGuilt, 
         paranoia: 0, 
         faith: 0, 
         exhaustion: 0 
@@ -254,7 +258,7 @@ export const generateProceduralNpc = (
       fracture_state: 0,
       disassociation_index: 0.0,
       primary_goal: "Survive",
-      secondary_goal: "Redemption", // Linked to regret
+      secondary_goal: "Redemption",
       
       demographics: {
           gender: genderHint || pickRandom(["Male", "Female", "Non-Binary"]),
@@ -265,10 +269,9 @@ export const generateProceduralNpc = (
       
       generated_traits: traits,
       
-      // Default social state
       relationship_state: { trust: 50, fear: 10, secretKnowledge: false },
       relationships_to_other_npcs: {},
-      memory_stream: [initialMemory], // Populate with initial memory
+      memory_stream: [initialMemory],
       current_intent: { goal: 'Survive', target: 'Self', urgency: 1 },
       
       dialogue_state: {
@@ -278,16 +281,14 @@ export const generateProceduralNpc = (
           mood_state: "Neutral"
       },
       
-      // Redundant fields kept for type compatibility
       fatal_flaw: flaw,
       specific_fear: fear,
       knowledge_state: [],
       physical_state: "Healthy",
       active_injuries: [],
-      willpower: Math.floor(Math.random() * 40) + 30, // 30-70 range
+      willpower: Math.floor(Math.random() * 40) + 30, 
       devotion: Math.floor(Math.random() * 40) + 10,
       
-      // The "Totem" is their starting resource
       resources_held: [totemItem],
       
       trust_level: 2,

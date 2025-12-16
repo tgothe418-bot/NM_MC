@@ -1,7 +1,8 @@
 
+
 import React from 'react';
 import { GameState } from '../types';
-import { Skull, Radio, Users, Eye, Brain, MapPin, AlertTriangle, Scale, Clock, Ghost, ShieldAlert, Activity, BookOpen, Lock, Unlock, FileText, Zap, Heart, ZapOff, Stethoscope, Gauge, Hand, Footprints, AlertOctagon, Anchor, Wrench, Target, Search, Hexagon, Bone, Flame, Droplet, Scissors, Hammer, User, Star, Frown, Smile, Link, Mic, CloudLightning, MessageSquare } from 'lucide-react';
+import { Skull, Radio, Users, Eye, Brain, MapPin, AlertTriangle, Scale, Clock, Ghost, ShieldAlert, Activity, BookOpen, Lock, Unlock, FileText, Zap, Heart, ZapOff, Stethoscope, Gauge, Hand, Footprints, AlertOctagon, Anchor, Wrench, Target, Search, Hexagon, Bone, Flame, Droplet, Scissors, Hammer, User, Star, Frown, Smile, Link, Mic, CloudLightning, MessageSquare, Shield, MousePointer2, Download, FileJson } from 'lucide-react';
 import { ClusterRadar } from './ClusterRadar';
 import { LORE_LIBRARY } from '../loreLibrary';
 import { CHARACTER_ARCHIVE } from '../characterArchive';
@@ -28,6 +29,18 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({ gameState }) => {
       
       activeLore = LORE_LIBRARY[activeClusterKey];
   }
+
+  const handleExportNpcData = () => {
+    const dataStr = JSON.stringify(npc_states, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    
+    const exportFileDefaultName = `nightmare_subjects_turn_${meta.turn}.json`;
+    
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+  };
 
   const getThreatColor = (level: number) => {
     if (level <= 1) return 'bg-gray-700';
@@ -63,6 +76,28 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({ gameState }) => {
       case 'psychological': return <Brain className="w-3 h-3 text-pink-400" />;
       default: return <Stethoscope className="w-3 h-3 text-gray-400" />;
     }
+  };
+
+  const getInstinctColor = (instinct: string) => {
+      switch(instinct) {
+          case 'Fight': return 'text-red-400';
+          case 'Flight': return 'text-yellow-400';
+          case 'Freeze': return 'text-blue-300';
+          case 'Fawn': return 'text-pink-300';
+          case 'Submit': return 'text-gray-500';
+          default: return 'text-gray-400';
+      }
+  };
+
+  const getResilienceColor = (level: string) => {
+      switch(level) {
+          case 'Unbreakable': return 'text-system-green font-bold';
+          case 'High': return 'text-green-400';
+          case 'Moderate': return 'text-yellow-400';
+          case 'Fragile': return 'text-orange-400';
+          case 'Shattered': return 'text-red-500 font-bold animate-pulse';
+          default: return 'text-gray-400';
+      }
   };
 
   const getConsciousnessColor = (status: string) => {
@@ -161,9 +196,18 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({ gameState }) => {
 
       {/* NPC States (Expanded Engine) */}
       <div className="p-4 border-b border-gray-800 flex-1">
-        <h3 className="text-gray-400 font-bold tracking-widest uppercase mb-4 flex items-center gap-2">
-          <Users className="w-4 h-4" /> Subjects
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+             <h3 className="text-gray-400 font-bold tracking-widest uppercase flex items-center gap-2">
+               <Users className="w-4 h-4" /> Subjects
+             </h3>
+             <button 
+                onClick={handleExportNpcData}
+                className="text-gray-600 hover:text-system-green transition-colors"
+                title="Export Subject Data (JSON)"
+             >
+                <FileJson className="w-4 h-4" />
+             </button>
+        </div>
         
         <div className="space-y-6">
           {(npc_states || []).map((npc, idx) => {
@@ -201,15 +245,47 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({ gameState }) => {
                 )}
               </div>
 
-              {/* NEW: Psychological State Display */}
+              {/* NEW: Psychological State Display (Enriched) */}
               {!isAnomaly && npc.psychology && (
                   <div className="mb-3 bg-gray-900/40 p-2 rounded border-l-2 border-indigo-500/50">
-                      <div className="flex justify-between items-baseline mb-1">
+                      <div className="flex justify-between items-baseline mb-2">
                           <span className="text-[9px] text-indigo-400 uppercase tracking-wide flex items-center gap-1">
-                              <Brain className="w-3 h-3" /> Thought
+                              <Brain className="w-3 h-3" /> Psyche
                           </span>
-                          <span className="text-[9px] text-gray-500 uppercase">{npc.psychology.emotional_state}</span>
+                          <span className={`text-[9px] uppercase ${getResilienceColor(npc.psychology.resilience_level)}`}>
+                              {npc.psychology.resilience_level}
+                          </span>
                       </div>
+                      
+                      {/* Stress Bar */}
+                      <div className="mb-2">
+                          <div className="flex justify-between text-[8px] uppercase text-gray-500 mb-0.5">
+                              <span>Stress Load</span>
+                              <span>{npc.psychology.stress_level || 0}/10</span>
+                          </div>
+                          <div className="h-1 bg-gray-800 rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full transition-all duration-500 ${
+                                    (npc.psychology.stress_level || 0) > 7 ? 'bg-red-500' : 
+                                    (npc.psychology.stress_level || 0) > 4 ? 'bg-orange-500' : 'bg-indigo-500'
+                                }`} 
+                                style={{ width: `${((npc.psychology.stress_level || 0) / 10) * 100}%` }}
+                              ></div>
+                          </div>
+                      </div>
+
+                      {/* Instinct Tag */}
+                      <div className="flex items-center gap-2 mb-2 text-[9px] uppercase">
+                          <span className="text-gray-600 flex items-center gap-1">
+                             <MousePointer2 className="w-3 h-3" /> Instinct:
+                          </span>
+                          <span className={`font-bold ${getInstinctColor(npc.psychology.dominant_instinct)}`}>
+                             {npc.psychology.dominant_instinct}
+                          </span>
+                      </div>
+
+                      <div className="w-full h-px bg-gray-800/50 mb-2"></div>
+
                       <p className="text-[10px] text-gray-300 italic font-serif leading-tight">
                           "{npc.psychology.current_thought}"
                       </p>
