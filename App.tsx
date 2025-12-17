@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { StatusPanel } from './components/StatusPanel';
 import { StoryLog } from './components/StoryLog';
@@ -32,10 +34,13 @@ const INITIAL_STATE: GameState = {
       "Cluster 4 (Self)": "0%",
       "Cluster 5 (Blasphemy)": "0%",
       "Cluster 6 (Survival)": "0%"
-    }
+    },
+    // Pacing Defaults
+    target_duration: "Medium (30-50)",
+    target_turn_count: 40
   },
   co_author_state: {
-    name: "The Architect",
+    name: "Unnamed", // Starts as Unnamed to trigger the Naming Phase
     archetype: "Auto-Generated",
     tone: "Neutral",
     dominance_level: 50,
@@ -391,13 +396,13 @@ const App: React.FC = () => {
       {/* Main Container */}
       <div className="relative z-10 flex w-full h-full max-w-7xl mx-auto border-x border-gray-900 shadow-2xl bg-black/40 backdrop-blur-sm">
         
-        {/* Left: Status Panel */}
-        <div className="hidden lg:block h-full border-r border-gray-800 bg-black/60">
+        {/* Left: Status Panel (Scalable) */}
+        <div className="hidden lg:block h-full bg-black/60 relative z-20">
            <StatusPanel gameState={gameState} />
         </div>
 
         {/* Center: Story Log & Input */}
-        <div className="flex-1 flex flex-col h-full relative">
+        <div className="flex-1 flex flex-col h-full relative z-10">
             
             {/* Top Bar */}
             <div className="h-14 border-b border-gray-800 flex items-center justify-between px-6 bg-black/80 backdrop-blur">
@@ -411,16 +416,10 @@ const App: React.FC = () => {
                         onProcessAction={async (action) => {
                              // This bridging function allows the VoiceControl component to trigger the main game loop
                              await handleSendMessage(action);
-                             // Return the latest model response text for TTS narration
-                             // Note: history update is async, so we might need to grab it from a ref or wait.
-                             // For simplicity, we assume the latest message in history AFTER handleSendMessage resolves is the response.
-                             // However, handleSendMessage updates state.
-                             // A cleaner way is to let handleSendMessage handle TTS triggers directly (which it does now).
                              return "Action processed."; 
                         }}
                         onInputProgress={(text, isFinal) => {
                              // Optional: Show real-time transcription in the InputArea
-                             // We can pass this down to InputArea via props
                         }}
                     />
 

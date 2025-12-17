@@ -1,9 +1,8 @@
 
 
-import React from 'react';
-import { GameState } from '../types';
-import { Skull, Radio, Users, Eye, Brain, MapPin, AlertTriangle, Scale, Clock, Ghost, ShieldAlert, Activity, BookOpen, Lock, Unlock, FileText, Zap, Heart, ZapOff, Stethoscope, Gauge, Hand, Footprints, AlertOctagon, Anchor, Wrench, Target, Search, Hexagon, Bone, Flame, Droplet, Scissors, Hammer, User, Star, Frown, Smile, Link, Mic, CloudLightning, MessageSquare, Shield, MousePointer2, Download, FileJson } from 'lucide-react';
-import { ClusterRadar } from './ClusterRadar';
+import React, { useState, useEffect, useRef } from 'react';
+import { GameState, NpcState } from '../types';
+import { Skull, Radio, Users, Eye, Brain, CloudLightning, FileJson, ChevronDown, ChevronRight, GripVertical, Activity, Heart, ZapOff, Stethoscope, Link, ShieldAlert, Star, Frown, User, MousePointer2 } from 'lucide-react';
 import { LORE_LIBRARY } from '../loreLibrary';
 import { CHARACTER_ARCHIVE } from '../characterArchive';
 
@@ -12,35 +11,80 @@ interface StatusPanelProps {
 }
 
 export const StatusPanel: React.FC<StatusPanelProps> = ({ gameState }) => {
-  const { meta, villain_state, npc_states, location_state, narrative, star_game, co_author_state } = gameState;
+  const { meta, villain_state, npc_states, co_author_state } = gameState;
   const threatLevel = villain_state?.threat_scale || 0;
-  const sensoryFocus = narrative?.sensory_focus || "Silence"; 
   
-  let activeClusterKey = "None";
-  let activeLore = null;
+  // Resizable State
+  const [width, setWidth] = useState(384); // Default 96 (24rem * 16px)
+  const [isResizing, setIsResizing] = useState(false);
   
-  if (meta.active_cluster) {
-      if (meta.active_cluster.includes("Flesh")) activeClusterKey = "Flesh";
-      else if (meta.active_cluster.includes("System")) activeClusterKey = "System";
-      else if (meta.active_cluster.includes("Haunting")) activeClusterKey = "Haunting";
-      else if (meta.active_cluster.includes("Self")) activeClusterKey = "Self";
-      else if (meta.active_cluster.includes("Blasphemy")) activeClusterKey = "Blasphemy";
-      else if (meta.active_cluster.includes("Survival")) activeClusterKey = "Survival";
-      
-      activeLore = LORE_LIBRARY[activeClusterKey];
-  }
+  // Accordion State
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    meta: true,
+    villain: true,
+    subjects: true
+  });
+  const [expandedNpcs, setExpandedNpcs] = useState<Record<string, boolean>>({});
 
-  const handleExportNpcData = () => {
+  // --- Handlers ---
+
+  const startResizing = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isResizing) {
+        // Calculate new width based on mouse position
+        // Assuming panel is on the left, width is just clientX (minus offset if centered)
+        // Since it's in a flex container centered, this is tricky. 
+        // Simplification: We look at movement delta or strictly clamp to reasonable sizes.
+        // Let's rely on previous width + movementX for smoother UX if possible, 
+        // but clientX is safer for absolute positioning.
+        // Since layout is: [Panel][Main], simple delta works best.
+        setWidth(prev => {
+            const newWidth = prev + e.movementX;
+            return Math.max(300, Math.min(newWidth, 800)); // Clamp between 300px and 800px
+        });
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
+
+  const toggleSection = (key: string) => {
+    setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const toggleNpc = (name: string) => {
+    setExpandedNpcs(prev => ({ ...prev, [name]: !prev[name] }));
+  };
+
+  const handleExportNpcData = (e: React.MouseEvent) => {
+    e.stopPropagation();
     const dataStr = JSON.stringify(npc_states, null, 2);
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-    
     const exportFileDefaultName = `nightmare_subjects_turn_${meta.turn}.json`;
-    
     const linkElement = document.createElement('a');
     linkElement.setAttribute('href', dataUri);
     linkElement.setAttribute('download', exportFileDefaultName);
     linkElement.click();
   };
+
+  // --- Helpers ---
 
   const getThreatColor = (level: number) => {
     if (level <= 1) return 'bg-gray-700';
@@ -49,357 +93,341 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({ gameState }) => {
     return 'bg-red-600 animate-pulse';
   };
 
-  const getLocationColor = (level: number) => {
-    if (level === 0) return 'text-green-500';
-    if (level === 1) return 'text-yellow-500';
-    if (level === 2) return 'text-orange-500';
-    return 'text-red-600 animate-pulse';
-  };
-
-  const getInjuryDepthColor = (depth: string) => {
-    if (depth === 'STRUCTURAL') return 'text-red-500 border-red-500 font-bold bg-red-950/50';
-    if (depth === 'DEEP_TISSUE') return 'text-orange-400 border-orange-500 bg-orange-950/30';
-    return 'text-yellow-200 border-yellow-600 bg-yellow-950/30';
-  };
-
-  const getInjuryIcon = (type: string) => {
-    switch(type) {
-      case 'fracture': return <Bone className="w-3 h-3 text-gray-100" />;
-      case 'burn': return <Flame className="w-3 h-3 text-orange-500 animate-pulse" />;
-      case 'incision': return <Scissors className="w-3 h-3 text-teal-400" />; 
-      case 'laceration': return <Activity className="w-3 h-3 text-red-500" />; 
-      case 'avulsion':
-      case 'degloving': return <Droplet className="w-3 h-3 text-blood-red" />; 
-      case 'puncture': return <Target className="w-3 h-3 text-red-400" />; 
-      case 'contusion':
-      case 'abrasion': return <Hammer className="w-3 h-3 text-purple-400" />; 
-      case 'psychological': return <Brain className="w-3 h-3 text-pink-400" />;
-      default: return <Stethoscope className="w-3 h-3 text-gray-400" />;
-    }
-  };
-
-  const getInstinctColor = (instinct: string) => {
-      switch(instinct) {
-          case 'Fight': return 'text-red-400';
-          case 'Flight': return 'text-yellow-400';
-          case 'Freeze': return 'text-blue-300';
-          case 'Fawn': return 'text-pink-300';
-          case 'Submit': return 'text-gray-500';
-          default: return 'text-gray-400';
-      }
-  };
-
-  const getResilienceColor = (level: string) => {
-      switch(level) {
-          case 'Unbreakable': return 'text-system-green font-bold';
-          case 'High': return 'text-green-400';
-          case 'Moderate': return 'text-yellow-400';
-          case 'Fragile': return 'text-orange-400';
-          case 'Shattered': return 'text-red-500 font-bold animate-pulse';
-          default: return 'text-gray-400';
-      }
-  };
-
-  const getConsciousnessColor = (status: string) => {
-    if (status === 'Unconscious') return 'text-red-600 animate-pulse';
-    if (status === 'Fading') return 'text-orange-500';
-    if (status === 'Dazed') return 'text-yellow-500';
-    return 'text-green-500';
-  };
+  let activeClusterKey = "None";
+  if (meta.active_cluster) {
+      if (meta.active_cluster.includes("Flesh")) activeClusterKey = "Flesh";
+      else if (meta.active_cluster.includes("System")) activeClusterKey = "System";
+      else if (meta.active_cluster.includes("Haunting")) activeClusterKey = "Haunting";
+      else if (meta.active_cluster.includes("Self")) activeClusterKey = "Self";
+      else if (meta.active_cluster.includes("Blasphemy")) activeClusterKey = "Blasphemy";
+      else if (meta.active_cluster.includes("Survival")) activeClusterKey = "Survival";
+  }
 
   return (
-    <div className="w-full lg:w-96 bg-terminal border-l border-gray-800 h-full flex flex-col overflow-y-auto custom-scrollbar font-mono text-sm">
-      
-      {/* Header */}
-      <div className="p-4 border-b border-gray-800 bg-black sticky top-0 z-10">
-        <div className="flex justify-between items-center text-xs text-gray-500 mb-2">
-          <span>TURN: {meta.turn}</span>
-          <span>{meta.perspective && meta.perspective !== "Pending" ? meta.perspective.toUpperCase() : "PERSPECTIVE: UNKNOWN"}</span>
+    <div 
+        className="h-full border-r border-gray-800 flex flex-col bg-terminal relative group select-none"
+        style={{ width: `${width}px` }}
+    >
+      {/* Resizer Handle */}
+      <div 
+        className={`absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-system-green/50 z-50 transition-colors flex items-center justify-center ${isResizing ? 'bg-system-green' : 'bg-transparent'}`}
+        onMouseDown={startResizing}
+      >
+        <GripVertical className="w-3 h-3 text-gray-600 opacity-0 group-hover:opacity-100" />
+      </div>
+
+      {/* --- CONTENT AREA --- */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+
+        {/* 1. HEADER (Compact) */}
+        <div className="p-3 border-b border-gray-800 bg-black sticky top-0 z-10">
+            <div className="flex justify-between items-center mb-2">
+                <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">Turn: {meta.turn}</span>
+                <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider ${meta.mode === 'Villain' ? 'border-red-900/50 text-red-500 bg-red-900/10' : 'border-system-green/30 text-system-green bg-green-900/10'}`}>
+                    <Radio className="w-3 h-3" />
+                    {meta.mode} Protocol
+                </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2 text-xs">
+                 <div className="bg-gray-900/50 p-1.5 rounded border border-gray-800">
+                    <span className="block text-[9px] text-gray-500 uppercase">Cluster</span>
+                    <span className="text-haunt-gold font-mono">{activeClusterKey}</span>
+                 </div>
+                 <div className="bg-gray-900/50 p-1.5 rounded border border-gray-800">
+                    <span className="block text-[9px] text-gray-500 uppercase">Intensity</span>
+                    <span className="text-gray-300 font-mono">{meta.intensity_level}</span>
+                 </div>
+            </div>
         </div>
-        <div className="flex justify-between items-center mb-1">
-             <span className="text-xs text-gray-500">INTENSITY: {meta.intensity_level}</span>
-        </div>
-        
-        {meta.custodian_name && meta.custodian_name !== "Unknown" && (
-           <div className="flex items-center gap-1 mb-2 text-gray-400">
-               <span className="text-[10px] uppercase tracking-wider text-gray-600">ARCHITECT:</span>
-               <span className="text-xs font-bold text-gray-300 font-serif">{meta.custodian_name}</span>
-           </div>
+
+        {/* 2. CO-AUTHOR (Collapsible) */}
+        {co_author_state && co_author_state.archetype !== "Auto-Generated" && (
+             <div className="border-b border-gray-800">
+                 <button 
+                   onClick={() => toggleSection('coauthor')}
+                   className="w-full flex items-center justify-between p-3 bg-gray-900/30 hover:bg-gray-900/50 transition-colors"
+                 >
+                     <div className="flex items-center gap-2 text-system-green font-bold text-xs uppercase tracking-wider">
+                         <CloudLightning className="w-3 h-3" /> Architect Link
+                     </div>
+                     {expandedSections['coauthor'] ? <ChevronDown className="w-3 h-3 text-gray-500" /> : <ChevronRight className="w-3 h-3 text-gray-500" />}
+                 </button>
+                 
+                 {expandedSections['coauthor'] && (
+                     <div className="p-3 bg-black/20 text-xs space-y-2 border-t border-gray-800/50">
+                         <div className="flex justify-between">
+                             <span className="text-gray-500">Persona</span>
+                             <span className="text-system-cyan">{co_author_state.archetype}</span>
+                         </div>
+                         <div className="text-gray-400 italic text-[11px] border-l-2 border-system-green/30 pl-2">
+                             "{co_author_state.tone}"
+                         </div>
+                     </div>
+                 )}
+             </div>
         )}
 
-        <div className="flex justify-between items-center">
-            <div className={`flex items-center gap-2 ${meta.mode === 'Villain' ? 'text-red-500' : 'text-system-green'}`}>
-            <Radio className="w-4 h-4 animate-pulse" />
-            <span className="tracking-widest uppercase text-xs">{meta.mode} MODE</span>
-            </div>
-            <div className="text-xs text-haunt-gold tracking-wider">
-              {activeClusterKey !== "None" ? activeClusterKey.toUpperCase() : "NO SIGNAL"}
-            </div>
-        </div>
-      </div>
-
-      {/* CO-AUTHOR / ARCHITECT AGENTIC STATE */}
-      {co_author_state && co_author_state.archetype !== "Auto-Generated" && (
-          <div className="p-4 border-b border-gray-800 bg-gray-900/40 relative overflow-hidden">
-              <div className="absolute inset-0 bg-system-green/5 animate-pulse pointer-events-none"></div>
-              
-              <h3 className="text-system-green font-bold tracking-widest uppercase mb-3 flex items-center gap-2 text-xs relative z-10">
-                 <CloudLightning className="w-3 h-3" /> Architect Neural Link
-              </h3>
-
-              <div className="relative z-10 space-y-2">
-                  <div className="flex justify-between items-center text-xs">
-                      <span className="text-gray-500">PERSONA</span>
-                      <span className="text-system-cyan font-bold">{co_author_state.archetype}</span>
-                  </div>
-                  
-                  <div className="text-[10px] text-gray-400 italic border-l-2 border-system-green/30 pl-2">
-                      Tone: "{co_author_state.tone}"
-                  </div>
-              </div>
-          </div>
-      )}
-
-      {/* Villain State */}
-      <div className="p-4 border-b border-gray-800 relative">
-         <div className="absolute top-0 right-0 p-1 opacity-20">
-           <Skull className="w-24 h-24 text-red-900" />
-         </div>
-         <h3 className="text-red-500 font-bold tracking-widest uppercase mb-4 flex items-center gap-2">
-           <Eye className="w-4 h-4" /> Antagonist
-         </h3>
-         
-         <div className="space-y-3 relative z-10">
-           <div>
-             <span className="text-gray-500 block text-xs">DESIGNATION</span>
-             <span className="text-gray-200 text-lg font-serif">{villain_state?.name || "Unknown"}</span>
-           </div>
-
-           <div>
-             <span className="text-gray-500 block text-xs">ARCHETYPE</span>
-             <span className="text-red-400 text-sm font-bold font-serif tracking-wide">{villain_state?.archetype || "Unknown"}</span>
-           </div>
-
-           <div>
-             <span className="text-gray-500 block text-xs mb-1">THREAT SCALE ({threatLevel}/5)</span>
-             <div className="flex gap-1 h-2">
-               {[1, 2, 3, 4, 5].map((lvl) => (
-                 <div 
-                   key={lvl} 
-                   className={`flex-1 rounded-sm transition-all duration-500 ${lvl <= threatLevel ? getThreatColor(threatLevel) : 'bg-gray-900'}`}
-                 />
-               ))}
-             </div>
-           </div>
-         </div>
-      </div>
-
-      {/* NPC States (Expanded Engine) */}
-      <div className="p-4 border-b border-gray-800 flex-1">
-        <div className="flex items-center justify-between mb-4">
-             <h3 className="text-gray-400 font-bold tracking-widest uppercase flex items-center gap-2">
-               <Users className="w-4 h-4" /> Subjects
-             </h3>
+        {/* 3. VILLAIN STATE (Collapsible) */}
+        <div className="border-b border-gray-800">
              <button 
-                onClick={handleExportNpcData}
-                className="text-gray-600 hover:text-system-green transition-colors"
-                title="Export Subject Data (JSON)"
+                onClick={() => toggleSection('villain')}
+                className="w-full flex items-center justify-between p-3 bg-gray-900/30 hover:bg-gray-900/50 transition-colors"
              >
-                <FileJson className="w-4 h-4" />
-             </button>
-        </div>
-        
-        <div className="space-y-6">
-          {(npc_states || []).map((npc, idx) => {
-             const isAnomaly = npc.fracture_state === 4;
-             const archiveData = isAnomaly 
-                ? CHARACTER_ARCHIVE.find(c => c.name === npc.name || c.character_id === npc.archive_id)
-                : null;
-             
-             const willpower = npc.willpower ?? 50;
-             const devotion = npc.devotion ?? 50;
-             const pain = npc.pain_level ?? 0;
-             const shock = npc.shock_level ?? 0;
-             const consciousness = npc.consciousness || "Alert";
-             const disassociation = npc.disassociation_index ?? 0;
-
-             return (
-            <div 
-              key={idx} 
-              className={`p-3 rounded border transition-colors relative ${
-                  isAnomaly 
-                  ? 'bg-black/80 border-system-green/50 shadow-[0_0_15px_rgba(16,185,129,0.1)]' 
-                  : 'bg-black/40 border-gray-800 hover:border-gray-600'
-              }`}
-            >
-              {/* Header */}
-              <div className="mb-2 mt-1">
-                <span className={`font-bold block ${isAnomaly ? 'text-system-green font-mono' : 'text-gray-200'}`}>
-                    {npc.name}
-                </span>
-                <span className="text-[10px] text-gray-500 uppercase tracking-wider">{npc.archetype}</span>
-                {!isAnomaly && npc.current_state && (
-                  <span className="text-[10px] text-gray-400 ml-2 border-l border-gray-700 pl-2">
-                    {npc.current_state}
-                  </span>
-                )}
-              </div>
-
-              {/* NEW: Psychological State Display (Enriched) */}
-              {!isAnomaly && npc.psychology && (
-                  <div className="mb-3 bg-gray-900/40 p-2 rounded border-l-2 border-indigo-500/50">
-                      <div className="flex justify-between items-baseline mb-2">
-                          <span className="text-[9px] text-indigo-400 uppercase tracking-wide flex items-center gap-1">
-                              <Brain className="w-3 h-3" /> Psyche
-                          </span>
-                          <span className={`text-[9px] uppercase ${getResilienceColor(npc.psychology.resilience_level)}`}>
-                              {npc.psychology.resilience_level}
-                          </span>
-                      </div>
-                      
-                      {/* Stress Bar */}
-                      <div className="mb-2">
-                          <div className="flex justify-between text-[8px] uppercase text-gray-500 mb-0.5">
-                              <span>Stress Load</span>
-                              <span>{npc.psychology.stress_level || 0}/10</span>
-                          </div>
-                          <div className="h-1 bg-gray-800 rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full transition-all duration-500 ${
-                                    (npc.psychology.stress_level || 0) > 7 ? 'bg-red-500' : 
-                                    (npc.psychology.stress_level || 0) > 4 ? 'bg-orange-500' : 'bg-indigo-500'
-                                }`} 
-                                style={{ width: `${((npc.psychology.stress_level || 0) / 10) * 100}%` }}
-                              ></div>
-                          </div>
-                      </div>
-
-                      {/* Instinct Tag */}
-                      <div className="flex items-center gap-2 mb-2 text-[9px] uppercase">
-                          <span className="text-gray-600 flex items-center gap-1">
-                             <MousePointer2 className="w-3 h-3" /> Instinct:
-                          </span>
-                          <span className={`font-bold ${getInstinctColor(npc.psychology.dominant_instinct)}`}>
-                             {npc.psychology.dominant_instinct}
-                          </span>
-                      </div>
-
-                      <div className="w-full h-px bg-gray-800/50 mb-2"></div>
-
-                      <p className="text-[10px] text-gray-300 italic font-serif leading-tight">
-                          "{npc.psychology.current_thought}"
-                      </p>
-                  </div>
-              )}
-
-              {/* NEW: Physical / Appearance Display */}
-              {!isAnomaly && npc.physical && (
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-[10px] text-gray-400 bg-gray-900/20 p-2 rounded border border-gray-800/50">
-                     <span className="flex items-center gap-1"><User className="w-3 h-3 opacity-60" /> {npc.physical.build} / {npc.physical.height}</span>
-                     <div className="w-full h-px bg-gray-800 my-1"></div>
-                     <span className="italic opacity-80 leading-tight">"{npc.physical.distinguishing_feature}"</span>
-                  </div>
-              )}
-              
-              {/* NEW: Personality Profile */}
-              {!isAnomaly && npc.personality && (
-                  <div className="grid grid-cols-2 gap-2 mb-3 bg-black/30 p-2 rounded border border-gray-800/30">
-                      <div className="col-span-2 flex items-center gap-2 border-b border-gray-800 pb-1 mb-1">
-                          <Star className="w-3 h-3 text-haunt-gold" />
-                          <span className="text-[10px] text-haunt-gold italic">{npc.personality.dominant_trait}</span>
-                      </div>
-                      
-                      <div>
-                         <div className="text-[9px] text-gray-500 uppercase flex items-center gap-1 mb-1"><Frown className="w-3 h-3" /> Flaw</div>
-                         <div className="text-[10px] text-gray-300">{npc.personality.fatal_flaw}</div>
-                      </div>
-
-                      <div>
-                         <div className="text-[9px] text-gray-500 uppercase flex items-center gap-1 mb-1"><ShieldAlert className="w-3 h-3" /> Cope</div>
-                         <div className="text-[10px] text-gray-400">{npc.personality.coping_mechanism}</div>
-                      </div>
-                  </div>
-              )}
-
-              {/* Dynamic Resistance Stats */}
-              {!isAnomaly && (
-                 <div className="flex gap-4 mb-3 mt-2 border-b border-gray-800 pb-2">
-                    <div className="flex-1">
-                        <div className="flex justify-between text-[9px] uppercase text-gray-500 mb-1">
-                            <span className="flex items-center gap-1"><ZapOff className="w-3 h-3 text-purple-400" /> Will</span>
-                            <span className="text-gray-300">{willpower}</span>
-                        </div>
-                        <div className="h-1 bg-gray-900 rounded-full overflow-hidden">
-                            <div className="h-full bg-purple-600" style={{ width: `${willpower}%` }}></div>
-                        </div>
-                    </div>
-                    <div className="flex-1">
-                        <div className="flex justify-between text-[9px] uppercase text-gray-500 mb-1">
-                            <span className="flex items-center gap-1"><Heart className="w-3 h-3 text-red-400" /> Devotion</span>
-                            <span className="text-gray-300">{devotion}</span>
-                        </div>
-                        <div className="h-1 bg-gray-900 rounded-full overflow-hidden">
-                            <div className="h-full bg-red-800" style={{ width: `${devotion}%` }}></div>
-                        </div>
-                    </div>
+                 <div className="flex items-center gap-2 text-red-500 font-bold text-xs uppercase tracking-wider">
+                     <Eye className="w-3 h-3" /> Antagonist
                  </div>
-              )}
-
-              {/* Relationships */}
-              {!isAnomaly && npc.relationships_to_other_npcs && Object.keys(npc.relationships_to_other_npcs).length > 0 && (
-                  <div className="mb-2 bg-black/20 p-1.5 rounded border border-gray-800/30">
-                      <div className="flex items-center gap-1 text-[9px] text-gray-500 uppercase tracking-widest mb-1">
-                          <Link className="w-3 h-3" /> Bonds
-                      </div>
-                      <div className="space-y-1">
-                        {Object.keys(npc.relationships_to_other_npcs).map((targetName) => {
-                            const rel = npc.relationships_to_other_npcs[targetName];
-                            if (typeof rel === 'object' && rel !== null) {
-                               return (
-                                  <div key={targetName} className="flex justify-between items-center text-[10px] text-gray-400">
-                                      <span className="opacity-70">{targetName}:</span>
-                                      <span className="italic text-gray-300" title={`Trust: ${rel.trust}, Fear: ${rel.fear}`}>{rel.descriptor}</span>
-                                  </div>
-                               );
-                            }
-                            return null;
-                        })}
-                      </div>
-                  </div>
-              )}
-
-              {/* Forensic Ledger (Active Injuries) */}
-              {npc.active_injuries && npc.active_injuries.length > 0 && (
-                <div className="mb-3 bg-gradient-to-r from-red-950/30 to-transparent p-2 rounded border-l border-red-900/50">
-                    <div className="flex items-center gap-2 text-[10px] text-red-400 uppercase tracking-widest mb-2 border-b border-red-900/40 pb-1">
-                        <Stethoscope className="w-3 h-3" /> Forensic Ledger
-                    </div>
-                    <ul className="space-y-3">
-                        {npc.active_injuries.map((inj, i) => (
-                            <li key={i} className={`text-[10px] relative p-1 rounded-r ${inj.depth === 'STRUCTURAL' ? 'bg-red-900/10' : ''}`}>
-                                <div className="flex justify-between items-start mb-0.5">
-                                    <div className="flex items-center gap-1.5 font-bold text-gray-200">
-                                        {getInjuryIcon(inj.type)}
-                                        <span>{inj.location}</span>
-                                    </div>
-                                    <span className={`text-[9px] uppercase px-1.5 py-0.5 rounded border text-[8px] tracking-wider ${getInjuryDepthColor(inj.depth)}`}>
-                                        {inj.depth.replace('_', ' ')}
-                                    </span>
-                                </div>
-                                <div className="text-gray-400 italic mb-1 pl-5 text-[9px] leading-tight opacity-80">
-                                    "{inj.description}"
-                                </div>
-                            </li>
+                 <div className="flex items-center gap-2">
+                    <div className="flex gap-0.5 h-1.5 w-12">
+                        {[1, 2, 3, 4, 5].map((lvl) => (
+                            <div key={lvl} className={`flex-1 rounded-sm ${lvl <= threatLevel ? getThreatColor(threatLevel) : 'bg-gray-800'}`} />
                         ))}
-                    </ul>
-                </div>
-              )}
+                    </div>
+                    {expandedSections['villain'] ? <ChevronDown className="w-3 h-3 text-gray-500" /> : <ChevronRight className="w-3 h-3 text-gray-500" />}
+                 </div>
+             </button>
+
+             {expandedSections['villain'] && (
+                 <div className="p-3 bg-red-950/10 space-y-3 relative overflow-hidden">
+                     <div className="absolute -right-4 -top-4 opacity-5 pointer-events-none">
+                         <Skull className="w-32 h-32" />
+                     </div>
+                     
+                     <div className="relative z-10">
+                         <div className="text-gray-500 text-[10px] uppercase">Entity Name</div>
+                         <div className="text-lg font-serif text-gray-200">{villain_state?.name || "Unknown"}</div>
+                     </div>
+                     
+                     <div className="grid grid-cols-2 gap-2 relative z-10">
+                         <div className="bg-black/40 p-2 rounded border border-red-900/20">
+                             <div className="text-red-400 text-[9px] uppercase font-bold mb-1">Archetype</div>
+                             <div className="text-xs text-gray-300">{villain_state?.archetype}</div>
+                         </div>
+                         <div className="bg-black/40 p-2 rounded border border-red-900/20">
+                             <div className="text-red-400 text-[9px] uppercase font-bold mb-1">Goal</div>
+                             <div className="text-xs text-gray-300 truncate" title={villain_state?.primary_goal}>{villain_state?.primary_goal}</div>
+                         </div>
+                     </div>
+                 </div>
+             )}
+        </div>
+
+        {/* 4. SUBJECTS LIST (The Heavy Lifter) */}
+        <div className="flex-1 pb-10">
+            <div className="flex items-center justify-between p-3 bg-gray-900/20 border-b border-gray-800 sticky top-0 z-10 backdrop-blur-sm">
+                 <div className="flex items-center gap-2 text-gray-400 font-bold text-xs uppercase tracking-wider">
+                     <Users className="w-3 h-3" /> Subjects ({npc_states?.length || 0})
+                 </div>
+                 <button 
+                    onClick={handleExportNpcData}
+                    className="text-gray-600 hover:text-system-green transition-colors p-1 rounded hover:bg-gray-800"
+                    title="Export Subject Data"
+                 >
+                    <FileJson className="w-4 h-4" />
+                 </button>
             </div>
-          )})}
-          
-          {(!npc_states || npc_states.length === 0) && (
-            <div className="text-gray-600 text-center py-4 italic text-xs">No subjects detected.</div>
-          )}
+
+            <div className="p-2 space-y-2">
+                {(!npc_states || npc_states.length === 0) && (
+                    <div className="text-gray-600 text-center py-8 italic text-xs">No active subjects.</div>
+                )}
+
+                {npc_states?.map((npc, idx) => {
+                    const isExpanded = expandedNpcs[npc.name];
+                    const isAnomaly = npc.fracture_state === 4;
+                    const stress = npc.psychology?.stress_level || 0;
+                    const healthStatus = npc.active_injuries?.length > 0 ? 'Injured' : 'Healthy';
+                    const isPsychoticBreak = stress > 100;
+                    
+                    return (
+                        <div 
+                           key={idx} 
+                           className={`rounded border transition-all duration-300 overflow-hidden ${
+                               isAnomaly ? 'bg-black/80 border-system-green/40 shadow-sm shadow-system-green/10' 
+                               : isPsychoticBreak ? 'bg-red-950/20 border-red-900/60 animate-pulse'
+                               : isExpanded ? 'bg-gray-900/30 border-gray-600' : 'bg-black/40 border-gray-800 hover:border-gray-700'
+                           }`}
+                        >
+                            {/* Card Header (Always Visible) */}
+                            <button 
+                               onClick={() => toggleNpc(npc.name)}
+                               className="w-full text-left p-2 flex items-center justify-between group"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-1 h-8 rounded-full ${isAnomaly ? 'bg-system-green' : isPsychoticBreak ? 'bg-red-500' : 'bg-gray-700 group-hover:bg-gray-500'}`} />
+                                    <div>
+                                        <div className={`font-bold text-sm ${isAnomaly ? 'text-system-green font-mono' : isPsychoticBreak ? 'text-red-400 font-serif tracking-widest' : 'text-gray-200'}`}>
+                                            {npc.name}
+                                        </div>
+                                        <div className="text-[10px] text-gray-500 uppercase tracking-wide">
+                                            {npc.archetype}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex items-center gap-3">
+                                    {/* Mini Status Indicators */}
+                                    <div className="flex gap-1">
+                                        {/* Stress Dot */}
+                                        <div 
+                                          className={`w-2 h-2 rounded-full ${stress > 70 ? 'bg-red-500 animate-pulse' : stress > 40 ? 'bg-orange-500' : 'bg-green-900'}`} 
+                                          title={`Stress: ${stress}/100`}
+                                        />
+                                        {/* Injury Dot */}
+                                        <div 
+                                          className={`w-2 h-2 rounded-full ${healthStatus === 'Injured' ? 'bg-red-900' : 'bg-green-900'}`}
+                                          title={healthStatus} 
+                                        />
+                                    </div>
+                                    {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
+                                </div>
+                            </button>
+
+                            {/* Expanded Details */}
+                            {isExpanded && !isAnomaly && (
+                                <div className="px-3 pb-3 text-xs animate-fadeIn">
+                                    
+                                    {/* Psychology Grid */}
+                                    {npc.psychology && (
+                                        <div className="mb-3 bg-gray-950/50 p-2 rounded border border-gray-800/50 grid grid-cols-2 gap-2">
+                                            <div className="col-span-2 flex items-center gap-1 text-[9px] text-indigo-400 uppercase tracking-widest border-b border-indigo-900/30 pb-1 mb-1">
+                                                <Brain className="w-3 h-3" /> Psyche
+                                            </div>
+                                            
+                                            <div>
+                                                <div className="text-[9px] text-gray-500 uppercase">Resilience</div>
+                                                <div className="text-gray-300">{npc.psychology.resilience_level}</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-[9px] text-gray-500 uppercase">Instinct</div>
+                                                <div className="text-gray-300">{npc.psychology.dominant_instinct}</div>
+                                            </div>
+                                            
+                                            <div className="col-span-2 mt-1">
+                                                <div className="flex justify-between text-[9px] text-gray-500 uppercase mb-0.5">
+                                                    <span>Stress Load</span>
+                                                    <span className={`${stress > 100 ? 'text-red-500 font-bold animate-pulse' : ''}`}>
+                                                        {stress}/100
+                                                    </span>
+                                                </div>
+                                                <div className="h-1 bg-gray-800 rounded-full overflow-hidden">
+                                                    <div 
+                                                        className={`h-full transition-all duration-500 ${stress > 100 ? 'bg-red-600 animate-glitch' : stress > 70 ? 'bg-red-500' : 'bg-indigo-500'}`} 
+                                                        style={{ width: `${Math.min(100, stress)}%` }} 
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="col-span-2 text-[10px] text-gray-400 italic mt-1 font-serif border-l-2 border-indigo-900/50 pl-2">
+                                                "{npc.psychology.current_thought}"
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Personality & Physical (Compact Row) */}
+                                    <div className="grid grid-cols-2 gap-2 mb-3">
+                                        <div className="bg-gray-900/30 p-2 rounded border border-gray-800/50">
+                                            <div className="flex items-center gap-1 text-[9px] text-gray-500 uppercase tracking-widest mb-1">
+                                                <Star className="w-3 h-3 text-haunt-gold" /> Traits
+                                            </div>
+                                            <div className="space-y-1 text-[10px]">
+                                                <div className="text-haunt-gold">{npc.personality?.dominant_trait}</div>
+                                                <div className="text-gray-400 flex items-center gap-1">
+                                                    <Frown className="w-2 h-2" /> {npc.personality?.fatal_flaw}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="bg-gray-900/30 p-2 rounded border border-gray-800/50">
+                                            <div className="flex items-center gap-1 text-[9px] text-gray-500 uppercase tracking-widest mb-1">
+                                                <User className="w-3 h-3 text-gray-400" /> Physical
+                                            </div>
+                                            <div className="text-[10px] text-gray-400">
+                                                {npc.physical?.build}, {npc.physical?.height}
+                                            </div>
+                                            <div className="text-[9px] text-gray-500 italic mt-1 leading-tight">
+                                                "{npc.physical?.distinguishing_feature}"
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Stats Bars */}
+                                    <div className="flex gap-3 mb-3">
+                                        <div className="flex-1">
+                                            <div className="flex justify-between text-[9px] text-purple-400 uppercase mb-0.5">
+                                                <span className="flex items-center gap-1"><ZapOff className="w-3 h-3" /> Will</span>
+                                                <span>{npc.willpower}</span>
+                                            </div>
+                                            <div className="h-1 bg-gray-800 rounded-full">
+                                                <div className="h-full bg-purple-600" style={{ width: `${npc.willpower}%` }} />
+                                            </div>
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="flex justify-between text-[9px] text-red-400 uppercase mb-0.5">
+                                                <span className="flex items-center gap-1"><Heart className="w-3 h-3" /> Devotion</span>
+                                                <span>{npc.devotion}</span>
+                                            </div>
+                                            <div className="h-1 bg-gray-800 rounded-full">
+                                                <div className="h-full bg-red-800" style={{ width: `${npc.devotion}%` }} />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Relationships */}
+                                    {npc.relationships_to_other_npcs && Object.keys(npc.relationships_to_other_npcs).length > 0 && (
+                                        <div className="mb-3 bg-black/20 p-2 rounded border border-gray-800/30">
+                                            <div className="flex items-center gap-1 text-[9px] text-gray-500 uppercase tracking-widest mb-1">
+                                                <Link className="w-3 h-3" /> Bonds
+                                            </div>
+                                            <div className="space-y-1">
+                                                {Object.entries(npc.relationships_to_other_npcs).map(([target, rel]) => (
+                                                    <div key={target} className="flex justify-between items-center text-[10px]">
+                                                        <span className="text-gray-400">{target}</span>
+                                                        <span className="text-gray-300 italic">{rel.descriptor}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Injuries (Forensic Ledger) */}
+                                    {npc.active_injuries?.length > 0 && (
+                                        <div className="bg-red-950/10 p-2 rounded border border-red-900/30">
+                                            <div className="flex items-center gap-1 text-[9px] text-red-400 uppercase tracking-widest mb-1">
+                                                <Stethoscope className="w-3 h-3" /> Trauma
+                                            </div>
+                                            <ul className="space-y-2">
+                                                {npc.active_injuries.map((inj, i) => (
+                                                    <li key={i} className="text-[10px]">
+                                                        <div className="flex justify-between text-gray-200 font-bold">
+                                                            <span>{inj.location}</span>
+                                                            <span className="text-[8px] uppercase border px-1 rounded text-red-300 border-red-900 bg-red-900/20">{inj.type}</span>
+                                                        </div>
+                                                        <div className="text-gray-500 italic leading-tight mt-0.5">
+                                                            {inj.description}
+                                                        </div>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                </div>
+                            )}
+
+                            {/* Anomaly Static View (Simplified) */}
+                            {isExpanded && isAnomaly && (
+                                <div className="px-3 pb-3 text-xs text-system-green font-mono">
+                                    <div className="mb-2 opacity-80">{npc.narrative_role}</div>
+                                    <div className="p-2 border border-system-green/30 bg-green-900/10 rounded">
+                                        "{(CHARACTER_ARCHIVE.find(c => c.name === npc.name)?.dialogue_sample.warning) || "ERROR"}"
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
         </div>
       </div>
     </div>

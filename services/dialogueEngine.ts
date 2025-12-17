@@ -44,8 +44,8 @@ export const constructVoiceManifesto = (npcs: NpcState[]): string => {
         // NEW: CRITICAL PSYCHOLOGICAL METRICS (Must be tracked)
         if (npc.psychology) {
             manifesto += `   - PSYCHOMETRICS (Update these in JSON):\n`;
-            manifesto += `     * Resilience Level: ${npc.psychology.resilience_level} (If Stress > 8, lower this)\n`;
-            manifesto += `     * Stress Load: ${npc.psychology.stress_level}/10 (Increase if threatened)\n`;
+            manifesto += `     * Resilience Level: ${npc.psychology.resilience_level} (If Stress > 80, lower this)\n`;
+            manifesto += `     * Stress Load: ${npc.psychology.stress_level}/100 (Increase if threatened. If > 100, permanent break.)\n`;
             manifesto += `     * Dominant Instinct: ${npc.psychology.dominant_instinct} (Drives current behavior)\n`;
             manifesto += `     * Current Thought: "${npc.psychology.current_thought}"\n`;
         }

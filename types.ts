@@ -131,7 +131,7 @@ export interface PsychologicalState {
   emotional_state: string; // e.g., "Panic", "Determination"
   sanity_percentage: number; // 0-100
   resilience_level: ResilienceLevel; 
-  stress_level: number; // 0-10, immediate psychological pressure
+  stress_level: number; // 0-100, immediate psychological pressure. >100 is psychotic break.
   dominant_instinct: SurvivalInstinct;
 }
 
@@ -418,6 +418,10 @@ export interface GameState {
     intensity_level: string;
     active_cluster: string;
     cluster_weights: ClusterWeights;
+    
+    // PACING ENGINE
+    target_duration: string; // "Short (10-20)" | "Medium (30-50)" | "Long (60+)" | "Infinite"
+    target_turn_count: number;
   };
   villain_state: VillainState;
   npc_states: NpcState[];
