@@ -1,3 +1,5 @@
+
+
 import React, { useMemo, useEffect, useState } from 'react';
 
 interface ClusterAmbienceProps {
@@ -110,6 +112,8 @@ const DynamicLighting: React.FC<{
       lightColor = "rgba(165, 242, 243, 0.1)"; // Cyan (Cold)
   } else if (cluster.includes("Self")) {
       lightColor = "rgba(75, 0, 130, 0.15)"; // Indigo (Psych)
+  } else if (cluster.includes("Desire")) {
+      lightColor = "rgba(244, 63, 94, 0.15)"; // Rose (Seduction)
   }
 
   // Intensity logic
@@ -139,6 +143,7 @@ export const ClusterAmbience: React.FC<ClusterAmbienceProps> = ({
   const isSelf = activeCluster.includes('Self');
   const isBlasphemy = activeCluster.includes('Blasphemy');
   const isSurvival = activeCluster.includes('Survival');
+  const isDesire = activeCluster.includes('Desire');
 
   // Weather parsing
   const isRaining = weatherState.includes('Rain') || weatherState.includes('Storm') || weatherState.includes('Pouring') || weatherState.includes('Drizzle');
@@ -174,6 +179,8 @@ export const ClusterAmbience: React.FC<ClusterAmbienceProps> = ({
       fogColorMid = "rgba(200, 220, 230, 0.1)"; // Cold white mist (lighter but still atmospheric)
   } else if (isBlasphemy) {
       fogColorMid = "rgba(30, 0, 30, 0.3)"; // Incense smoke
+  } else if (isDesire) {
+      fogColorMid = "rgba(50, 0, 20, 0.3)"; // Perfumed musk
   }
 
   return (
@@ -283,6 +290,19 @@ export const ClusterAmbience: React.FC<ClusterAmbienceProps> = ({
           )}
           {/* Particles: Snow Falling */}
           <AmbientParticles type="fall" count={60} colorClass="bg-white/60" minSize={2} maxSize={4} />
+        </div>
+      )}
+
+      {/* Desire Cluster: Rose, Heat, Intimacy */}
+      {isDesire && (
+        <div style={{ opacity: intensity }}>
+          <div className="absolute inset-0 bg-rose-900/20 mix-blend-screen animate-pulse-slow" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle,transparent_30%,rgba(225,29,72,0.2)_120%)] mix-blend-soft-light" />
+          {isNightmareLocation && (
+              <div className="absolute inset-0 bg-red-900/10 animate-pulse" />
+          )}
+          {/* Particles: Dust/Pollen (Gold/Pink) */}
+          <AmbientParticles type="float" count={30} colorClass="bg-rose-400/30" minSize={1} maxSize={3} />
         </div>
       )}
 

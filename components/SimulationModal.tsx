@@ -166,6 +166,7 @@ export const SimulationModal: React.FC<SimulationModalProps> = ({
                                <option value="Self">Self (Psychological)</option>
                                <option value="Blasphemy">Blasphemy (Religious)</option>
                                <option value="Survival">Survival (Nature)</option>
+                               <option value="Desire">Desire (Erotic Horror)</option>
                            </select>
                        </div>
 

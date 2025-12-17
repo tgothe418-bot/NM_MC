@@ -1,6 +1,8 @@
 
+
+
 import React from 'react';
-import { Eye, Radio, Zap, Activity, Ghost, Fingerprint, Database } from 'lucide-react';
+import { Eye, Radio, Zap, Activity, Ghost, Fingerprint, Database, Heart } from 'lucide-react';
 
 interface SigilLoaderProps {
   cluster?: string;
@@ -16,6 +18,7 @@ export const SigilLoader: React.FC<SigilLoaderProps> = ({ cluster, text = "Simul
   if (cluster?.includes("Self")) type = 'self';
   if (cluster?.includes("Blasphemy")) type = 'blasphemy';
   if (cluster?.includes("Survival")) type = 'survival';
+  if (cluster?.includes("Desire")) type = 'desire';
 
   // Renderers
   const renderSystem = () => (
@@ -98,6 +101,17 @@ export const SigilLoader: React.FC<SigilLoaderProps> = ({ cluster, text = "Simul
       </div>
   );
 
+  const renderDesire = () => (
+      <div className="relative w-32 h-32 flex items-center justify-center text-rose-500 drop-shadow-[0_0_15px_rgba(225,29,72,0.6)]">
+          <div className="absolute inset-0 bg-rose-900/20 rounded-full animate-pulse blur-xl"></div>
+          <svg className="absolute inset-0 w-full h-full animate-[spin_10s_linear_infinite]" viewBox="0 0 100 100">
+              {/* Thorns */}
+              <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="2 8" />
+          </svg>
+          <Heart className="w-10 h-10 animate-heartbeat text-rose-600 relative z-10" />
+      </div>
+  );
+
   const renderGeneric = () => (
     <div className="relative w-32 h-32 flex items-center justify-center text-gray-500 drop-shadow-[0_0_10px_rgba(107,114,128,0.5)]">
          {/* Layer 1: The Outer Ward (Counter-Clockwise Slow) */}
@@ -158,6 +172,10 @@ export const SigilLoader: React.FC<SigilLoaderProps> = ({ cluster, text = "Simul
       case 'self': 
           content = renderSelf(); 
           colorClass = "text-psych-indigo";
+          break;
+      case 'desire':
+          content = renderDesire();
+          colorClass = "text-rose-500";
           break;
       default: 
           content = renderGeneric();

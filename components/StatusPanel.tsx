@@ -1,7 +1,5 @@
-
-
 import React, { useState, useEffect, useRef } from 'react';
-import { GameState, NpcState } from '../types';
+import { GameState, NpcState, NpcRelation } from '../types';
 import { Skull, Radio, Users, Eye, Brain, CloudLightning, FileJson, ChevronDown, ChevronRight, GripVertical, Activity, Heart, ZapOff, Stethoscope, Link, ShieldAlert, Star, Frown, User, MousePointer2 } from 'lucide-react';
 import { LORE_LIBRARY } from '../loreLibrary';
 import { CHARACTER_ARCHIVE } from '../characterArchive';
@@ -383,7 +381,7 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({ gameState }) => {
                                                 {Object.entries(npc.relationships_to_other_npcs).map(([target, rel]) => (
                                                     <div key={target} className="flex justify-between items-center text-[10px]">
                                                         <span className="text-gray-400">{target}</span>
-                                                        <span className="text-gray-300 italic">{rel.descriptor}</span>
+                                                        <span className="text-gray-300 italic">{(rel as NpcRelation).descriptor}</span>
                                                     </div>
                                                 ))}
                                             </div>

@@ -6,25 +6,25 @@ export const LORE_LIBRARY: Record<string, ClusterLore> = {
   "Flesh": {
     id: "Flesh",
     displayName: "The New Flesh (Extremity)",
-    philosophy: "Inspired by the 'New French Extremity', the body is a site of truth through trauma. We explore the 'Atavistic Resurgence'—the reawakening of pre-human instincts through physiological ordeal.",
+    philosophy: "Inspired by the 'New French Extremity' and the 'Exquisite Corpse' aesthetic. The body is a site of truth through trauma. We explore the 'Atavistic Resurgence'—the reawakening of pre-human instincts through physiological ordeal.",
     coreAxiom: "The body is a book of blood; wherever we're opened, we're red.",
-    mood: "Visceral. Clinical. Unflinching. The aesthetic of 'Martyrs' or 'Raw'—beautiful, high-definition gore.",
+    mood: "Visceral. Clinical. Unflinching. The aesthetic of dissecting rooms, humidity, and high-definition gore.",
     villains: [
+      {
+        name: "The Corpse Artist (Andrew)",
+        description: "A killer who perceives murder as high art. He seeks to liberate the 'inner beauty' of the anatomy.",
+        goeticRank: "Duke",
+        primaryGoal: "Create the perfect still-life from human remains",
+        obsessionFlaw: "Aesthetic Perfectionism",
+        vulnerability: "The banality of decay (Rot vs. Art)"
+      },
       {
         name: "The Slasher (Duke of Wounds)",
         description: "A manifestation of the 'Death Posture'. He seeks to carve sigils into living flesh to bind the energy of pain.",
         goeticRank: "Duke",
         primaryGoal: "Inscribe the 'Sacred Alphabet' upon the victims",
         obsessionFlaw: "Must complete the sigil perfectly",
-        vulnerability: "Disrupting the pattern of the cuts or offering 'willing' flesh (which negates the trauma energy)"
-      },
-      {
-        name: "The Atavism",
-        description: "A pre-human entity birthed from the user's subconscious. A hybrid of human and reptile/amphibian.",
-        goeticRank: "President",
-        primaryGoal: "Consume the 'New Brain' to restore the 'Old Brain'",
-        obsessionFlaw: "Driven by pure instinct (The Id)",
-        vulnerability: "Symbols of high intellect or complex geometry (The Star Game)"
+        vulnerability: "Disrupting the pattern of the cuts or offering 'willing' flesh"
       }
     ],
     environments: [
@@ -34,9 +34,14 @@ export const LORE_LIBRARY: Record<string, ClusterLore> = {
         activeHazards: ["Digestive acids", "Grappling cilia", "Psychic screaming"]
       },
       {
-        name: "The Surgery of Spare",
-        description: "An artist's studio filled with sketches of deformities that are coming to life.",
-        activeHazards: ["Animated sketches", "Flying scalpels", "Hypnotic gaze"]
+        name: "The Cold Room",
+        description: "A tiled, sterile abattoir that smells of bleach and copper. Drains in the floor gurgle with unseen fluids.",
+        activeHazards: ["Hypothermia", "Surgical traps", "Slip hazards (Blood)"]
+      },
+      {
+        name: "The Basement Shelter",
+        description: "A damp, concrete bunker beneath a suburban home. It smells of sour milk, laundry detergent, and burning hair.",
+        activeHazards: ["Restraints", "Heat exhaustion", "Complicit neighbors"]
       }
     ],
     sensoryInjectors: {
@@ -44,13 +49,14 @@ export const LORE_LIBRARY: Record<string, ClusterLore> = {
         "Coagulated milk", "Iodine and antiseptic", "Wet dog", "Humidity", "Spoiled sweetbreads", "Yeast", 
         "Periodontal decay", "Old bandages", "Sour stomach acid", "Formaldehyde",
         "Singed hair", "Rancid butter", "Copper and bleach", "Open bowel", "Old sweat",
-        "Musk of terrified animals", "Stagnant pond water", "Acetone", "Burnt sugar", "Raw meat left in the sun"
+        "Musk of terrified animals", "Stagnant pond water", "Acetone", "Burnt sugar", "Raw meat left in the sun",
+        "A heavy sickish sweetness", "Cut flowers in stagnant water", "Camphor", "Mothballs"
       ],
       sound: [
         "Wet tearing", "Heavy breathing", "Guttural grunts", "The snap of cartilage", "Suction", 
         "A low, purring vibration", "Fluids dripping on linoleum", "The squelch of walking in mud", "Teeth grinding",
         "Joints popping wetly", "Skin peeling like tape", "Gurgling drain", "Fist hitting raw meat", "Choking gasp",
-        "A wet cough from the dark", "Friction of skin on glass", "Flies buzzing in a closed jar"
+        "A wet cough from the dark", "Friction of skin on glass", "Flies buzzing in a closed jar", "A muffled scream behind a door"
       ],
       touch: [
         "Slick membranes", "Warmth", "Pulsing veins", "Sticky residue", "Velvet", 
@@ -61,7 +67,7 @@ export const LORE_LIBRARY: Record<string, ClusterLore> = {
       taste: [
         "Salt", "Iron", "Bile", "Sweetness of rot", "Metallic tang", "Fat", "Sour milk",
         "Metallic saliva", "Sour gastric fluid", "Clotted cream", "Raw steak", "Copper penny",
-        "Raw marrow", "Old fillings", "Stale adrenaline", "Moldy bread", "Hot saliva"
+        "Raw marrow", "Old fillings", "Stale adrenaline", "Moldy bread", "Hot saliva", "Unbuttered toast"
       ]
     },
     npcArchetypes: [
@@ -486,9 +492,9 @@ export const LORE_LIBRARY: Record<string, ClusterLore> = {
   "Blasphemy": {
     id: "Blasphemy",
     displayName: "The Transgression (Blasphemy)",
-    philosophy: "Inspired by the 'Cinema of Transgression'. Shock is a moral imperative. We explore the Qliphoth through the lens of punk zines, grit, and the violation of social taboos.",
+    philosophy: "Inspired by the 'Cinema of Transgression' and 'Exquisite Corpse'. Shock is a moral imperative. We explore the intersection of the sacred and the profane, using vitriol as a cleansing agent.",
     coreAxiom: "There is no god where we are going.",
-    mood: "Profane. Corrupt. Inverted. The aesthetic of a xeroxed punk zine or a cursed VHS tape.",
+    mood: "Profane. Corrupt. Inverted. The aesthetic of a pirate radio station broadcasting the end of the world.",
     villains: [
       {
         name: "The Black Brother",
@@ -499,12 +505,12 @@ export const LORE_LIBRARY: Record<string, ClusterLore> = {
         vulnerability: "The dissolving power of the Abyss (Choronzon)"
       },
       {
-        name: "Choronzon (The Dweller)",
-        description: "The demon of dispersion. He scatters the mind and will.",
-        goeticRank: "King",
-        primaryGoal: "Madness and Entropy",
-        obsessionFlaw: "Has no true self, only many voices",
-        vulnerability: "Silence and focus (The Point)"
+        name: "The Nihilist Broadcaster",
+        description: "A voice on the radio that infects the listener with rage. He seeks to take the world down with him.",
+        goeticRank: "Herald",
+        primaryGoal: "Maximum Entropy",
+        obsessionFlaw: "Despair masked as anger",
+        vulnerability: "Silence/Being Ignored"
       }
     ],
     environments: [
@@ -514,9 +520,9 @@ export const LORE_LIBRARY: Record<string, ClusterLore> = {
         activeHazards: ["Desecration", "Unholy visions", "Moral corruption"]
       },
       {
-        name: "The Tunnels of Set",
-        description: "A labyrinth of fleshy, dark tunnels beneath the Tree of Life.",
-        activeHazards: ["Qliphotic demons", "Insanity", "Loss of soul"]
+        name: "The Pirate Radio Station",
+        description: "A damp boat or basement filled with electronic equipment, broadcasting hate into the void.",
+        activeHazards: ["Viral frequencies", "Radicalization", "Suicidal ideation"]
       }
     ],
     sensoryInjectors: {
@@ -524,13 +530,15 @@ export const LORE_LIBRARY: Record<string, ClusterLore> = {
         "Heavy frankincense", "Tallow candles", "Offal", "Sulfur", "Ancient parchment", 
         "Wine turned to vinegar", "Rotting flowers", "Musk", "Burnt hair",
         "Myrrh", "Rotting lily", "Burnt fat", "Sour wine", "Damp crypt",
-        "Myrrh and rotting meat", "Goat musk", "Burnt sage", "Brimstone"
+        "Myrrh and rotting meat", "Goat musk", "Burnt sage", "Brimstone",
+        "Marijuana smoke", "Stale cigarette ash", "Vile protein shake"
       ],
       sound: [
         "Low frequency chanting", "Bells", "The bleating of a goat", "Discordant piping", 
         "Screams of the damned", "Buzzing flies", "Speaking in tongues",
         "Latin whispers", "Goat bleat", "Bell tolling", "Whip crack", "Choir off-key",
-        "Gregorian chant distorted", "Fly buzzing", "Dripping wax", "Bone scraping stone", "Inhuman growl"
+        "Gregorian chant distorted", "Fly buzzing", "Dripping wax", "Bone scraping stone", "Inhuman growl",
+        "Radio static", "Feedback loops", "Industrial music"
       ],
       touch: [
         "Greasy residue", "Hot wax", "Rough stone", "Oily smoke", "Scales", 
@@ -541,36 +549,36 @@ export const LORE_LIBRARY: Record<string, ClusterLore> = {
       taste: [
         "Ash", "Bitter herbs", "Rotten meat", "Poison", "Sour wine", "Moldy bread",
         "Ash", "Vinegar", "Raw meat", "Bitter root", "Dirt",
-        "Cinder", "Spoiled grape", "Raw liver", "Salt water"
+        "Cinder", "Spoiled grape", "Raw liver", "Salt water", "Chalky medicine"
       ]
     },
     npcArchetypes: [
       {
-        defaultName: "Fr. Judas",
-        background: "Heretic Priest",
-        archetype: "The Apostate",
+        defaultName: "Luke",
+        background: "Pirate DJ",
+        archetype: "The Voice",
         hiddenHistory: {
-          description: "Read the 'Black Book' and can't forget it.",
-          secondaryGoal: "Perform the final blasphemy."
+          description: "Diagnosed with a terminal illness, he turned his fear into rage.",
+          secondaryGoal: "Broadcast the truth before the silence comes."
         },
         triggerObject: {
-          name: "Inverted Crucifix",
-          description: "Warm to the touch.",
-          fractureImpact: 3
+          name: "Microphone",
+          description: "Sticky with spit and hate.",
+          fractureImpact: 4
         },
-        defaultRelationship: { trust: 60, fear: 10, secretKnowledge: true },
-        defaultVolition: { goal: 'Survive', target: 'Self', urgency: 5 },
-        defaultRelationships: { "The Relic Hunter": "Suspicion" },
+        defaultRelationship: { trust: 20, fear: 20, secretKnowledge: true },
+        defaultVolition: { goal: 'Warn', target: 'World', urgency: 8 },
+        defaultRelationships: { "The Relic Hunter": "Contempt" },
         defaultWillpower: 90,
-        defaultDevotion: 20,
-        fatal_flaw: "Hubris",
-        specific_fear: "Judgment",
-        defaultAgendas: ["Desecrate the altar", "Recite the Black Verse", "Avoid the light"],
+        defaultDevotion: 10,
+        fatal_flaw: "Nihilism",
+        specific_fear: "Silence",
+        defaultAgendas: ["Rant", "Play loud music", "Avoid the inevitable"],
         voice_profile: {
-            tone: "Solemn, mocking, commanding. Uses scripture to justify evil.",
-            vocabulary: ["Sin", "Flesh", "God", "Lie", "Sacrament", "Below"],
-            quirks: ["Quotes Latin", "Calls the user 'Child'", "Laughs at holy symbols"],
-            forbidden_topics: ["Redemption", "Prayer"]
+            tone: "Raspy, cynical, aggressive. Uses shock value as a weapon.",
+            vocabulary: ["Entropy", "Virus", "Void", "Silence", "Breeders", "Rot"],
+            quirks: ["Quotes poetry incorrectly", "Coughs violently", "Laughs at inappropriate times"],
+            forbidden_topics: ["Hope", "The Future"]
         }
       },
       {
@@ -588,7 +596,7 @@ export const LORE_LIBRARY: Record<string, ClusterLore> = {
         },
         defaultRelationship: { trust: 10, fear: 50, secretKnowledge: true },
         defaultVolition: { goal: 'Sabotage', target: 'User', urgency: 6 },
-        defaultRelationships: { "The Apostate": "Opportunity" },
+        defaultRelationships: { "The Voice": "Opportunity" },
         defaultWillpower: 50,
         defaultDevotion: 0,
         fatal_flaw: "Greed",
@@ -625,6 +633,14 @@ export const LORE_LIBRARY: Record<string, ClusterLore> = {
         primaryGoal: "Freeze all motion",
         obsessionFlaw: "Cyclical nature",
         vulnerability: "Shelter and warmth"
+      },
+      {
+        name: "The Woman",
+        description: "A feral matriarch who leads a clan of cannibals. She has reverted to a pre-human state of pure survival.",
+        goeticRank: "Queen",
+        primaryGoal: "Feed the family",
+        obsessionFlaw: "Protective fury",
+        vulnerability: "Her children"
       }
     ],
     environments: [
@@ -637,6 +653,11 @@ export const LORE_LIBRARY: Record<string, ClusterLore> = {
         name: "The Dark Forest",
         description: "Ancient trees that block out the stars. Something is watching.",
         activeHazards: ["Predators", "Getting lost", "Madness"]
+      },
+      {
+        name: "The Sea Cave",
+        description: "A hidden fissure in the cliffside, filled with bones and the smell of the sea. The tide is rising.",
+        activeHazards: ["Drowning", "Cannibals", "No exit"]
       }
     ],
     sensoryInjectors: {
@@ -644,23 +665,25 @@ export const LORE_LIBRARY: Record<string, ClusterLore> = {
         "Pine resin", "Wet fur", "Woodsmoke", "Mineral dirt", "Petrichor", 
         "Decomposition under snow", "Ice", "Blood on snow", "Ozone",
         "Woodsmoke", "Wet dog", "Pine needle", "Frozen earth", "Gun oil",
-        "Frostbite (sweet rot)", "Gutted fish", "Gunpowder", "Wet wool socks", "Frozen mud"
+        "Frostbite (sweet rot)", "Gutted fish", "Gunpowder", "Wet wool socks", "Frozen mud",
+        "Salt spray", "Rotting kelp", "Fox scat", "Excrement"
       ],
       sound: [
         "Wind whistling through gaps", "Twigs snapping", "The crunch of snow", "The roar of a river", 
         "Heavy panting", "Silence", "A tree falling far away",
         "Ice cracking", "Wolf howl", "Branch snapping", "Heavy boots", "Wind howl",
-        "Owl screech", "Crunching bone", "Silence of snow"
+        "Owl screech", "Crunching bone", "Silence of snow", "Waves crashing", "Gulls crying"
       ],
       touch: [
         "Numbing cold", "Rough bark", "Wind burn", "Wet socks", "Sharp rocks", "Sticky sap", "Shaking hands",
         "Frostbite burn", "Wet fur", "Rough stone", "Sharp ice", "Numb fingers",
-        "Frozen metal burns", "Wet moss", "Sharp pine needle", "Gritty snow", "Calloused hands"
+        "Frozen metal burns", "Wet moss", "Sharp pine needle", "Gritty snow", "Calloused hands",
+        "Slippery algae", "Sharp barnacles"
       ],
       taste: [
         "Metal", "Pine", "Dirt", "Raw meat", "Snow", "Adrenaline",
         "Snow", "Pine sap", "Gamey fat", "Adrenaline", "Iron",
-        "Bark", "Blood", "Ice water"
+        "Bark", "Blood", "Ice water", "Salt water"
       ]
     },
     npcArchetypes: [
@@ -718,6 +741,165 @@ export const LORE_LIBRARY: Record<string, ClusterLore> = {
             vocabulary: ["Sorry", "Wait", "Help", "Leg", "Please", "Home"],
             quirks: ["Winces while talking", "Apologizes for things that aren't their fault", "Clings to user"],
             forbidden_topics: ["Being left behind", "The inevitable"]
+        }
+      }
+    ]
+  },
+  "Desire": {
+    id: "Desire",
+    displayName: "The Hunger (Desire)",
+    philosophy: "Eros and Thanatos. The intertwining of sex and death. The ultimate intimacy is consumption. We explore the dangers of obsession, the objectification of the body, and the predator/prey dynamic in relationships.",
+    coreAxiom: "To love is to devour.",
+    mood: "Seductive. Predatory. Melancholic. The aesthetic of a dark romanticism gone wrong.",
+    villains: [
+      {
+        name: "The Gourmand (Jay)",
+        description: "A wealthy, cold killer who consumes his lovers to keep them forever.",
+        goeticRank: "Count",
+        primaryGoal: "Complete assimilation of the beloved",
+        obsessionFlaw: "Loneliness",
+        vulnerability: "Rejection or Disgust (spoils the meat)"
+      },
+      {
+        name: "The Muse",
+        description: "A beautiful entity that inspires obsession and madness in artists.",
+        goeticRank: "Duchess",
+        primaryGoal: "Be immortalized in art (usually made of flesh)",
+        obsessionFlaw: "Vanity",
+        vulnerability: "Ignoring their beauty"
+      },
+      {
+        name: "The Matriarch (Ruth)",
+        description: "A bitter, controlling mother figure who punishes youth and beauty to feed her own resentment.",
+        goeticRank: "Duchess",
+        primaryGoal: "Destroy innocence",
+        obsessionFlaw: "Jealousy of youth",
+        vulnerability: "Public exposure"
+      }
+    ],
+    environments: [
+      {
+        name: "The French Quarter Courtyard",
+        description: "Lush, overgrown, humid. The smell of jasmine masks the smell of rot.",
+        activeHazards: ["Seduction", "Poison", "Hidden traps"]
+      },
+      {
+        name: "The Bedroom",
+        description: "Silken sheets, candles, incense. A place of intimacy and slaughter.",
+        activeHazards: ["Hypnosis", "Restraints", "Betrayal"]
+      },
+      {
+        name: "The Suburban Basement",
+        description: "A damp, dark cellar. A place of punishment disguised as discipline. The air is thick with smoke and fear.",
+        activeHazards: ["Restraints", "Group violence", "Hopelessness"]
+      }
+    ],
+    sensoryInjectors: {
+      smell: [
+        "Jasmine", "Magnolia", "Old brick", "Expensive cologne", "Cognac", "Sex sweat", 
+        "Iron (Blood)", "Incense", "Wax", "Musk", "River mud", "Oysters", "Chutney",
+        "Rotting fruit", "Damp earth", "Sandalwood", "Bleach masking something else",
+        "Cigarette smoke", "Stale beer", "Cheap perfume", "Singeing hair", "Kerosene"
+      ],
+      sound: [
+        "Distant jazz saxophone", "Fountain gurgling", "Ice clinking in a glass", "Heavy breathing", 
+        "Silk rustling", "A soft laugh", "A zipper unzipping", "A sharp intake of breath",
+        "Heartbeat", "Muffled cry", "Sizzling meat", "A knife sharpening",
+        "A belt snapping", "Muffled sobbing", "The crunch of an apple", "Whispering behind a door"
+      ],
+      touch: [
+        "Cold marble", "Warm skin", "Velvet", "Sharp blade edge", "Sticky blood", 
+        "Damp sheets", "Rough brick", "Soft hair", "Tight restraints", "Cold metal handcuffs",
+        "Wet lips", "A bite", "Sweaty palm", "A slap", "The burn of a cigarette"
+      ],
+      taste: [
+        "Cognac", "Blood", "Salt", "Sweat", "Oysters", "Rich meat", "Bitter almonds",
+        "Champagne", "Lipstick", "Cold coffee", "Adrenaline", "Metal", "Sour milk"
+      ]
+    },
+    npcArchetypes: [
+      {
+        defaultName: "Tran",
+        background: "The Beautiful Victim",
+        archetype: "The Object of Desire",
+        hiddenHistory: {
+          description: "Kicked out of home, looking for love in all the wrong places.",
+          secondaryGoal: "Find a protector (even a dangerous one)."
+        },
+        triggerObject: {
+          name: "Silver Earring",
+          description: "A small hoop, tarnished.",
+          fractureImpact: 3
+        },
+        defaultRelationship: { trust: 80, fear: 10, secretKnowledge: false },
+        defaultVolition: { goal: 'Hide', target: 'Self', urgency: 4 },
+        defaultRelationships: { "The Obsessive": "Fear" },
+        defaultWillpower: 30,
+        defaultDevotion: 90,
+        fatal_flaw: "Naivety",
+        specific_fear: "Rejection",
+        defaultAgendas: ["Be loved", "Avoid pain", "Please the predator"],
+        voice_profile: {
+            tone: "Soft, hesitant, hopeful. Wanting to please.",
+            vocabulary: ["Love", "Please", "Beautiful", "Safe", "Sorry", "Cold"],
+            quirks: ["Touches hair constantly", "Smiles when nervous", "Apologizes for existing"],
+            forbidden_topics: ["Family", "The Future"]
+        }
+      },
+      {
+        defaultName: "Soren",
+        background: "Techno-Goth",
+        archetype: "The Cynic",
+        hiddenHistory: {
+          description: "Knows too much about the dark side of the city.",
+          secondaryGoal: "Save the victim from their own stupidity."
+        },
+        triggerObject: {
+          name: "Laptop",
+          description: "Full of secrets and surveillance logs.",
+          fractureImpact: 2
+        },
+        defaultRelationship: { trust: 40, fear: 40, secretKnowledge: true },
+        defaultVolition: { goal: 'Warn', target: 'User', urgency: 6 },
+        defaultRelationships: { "The Object of Desire": "Pity" },
+        defaultWillpower: 70,
+        defaultDevotion: 20,
+        fatal_flaw: "Cynicism",
+        specific_fear: "Emotional Intimacy",
+        defaultAgendas: ["Hack the system", "Expose the killer", "Keep distance"],
+        voice_profile: {
+            tone: "Sarcastic, rapid, detached. Uses humor as a shield.",
+            vocabulary: ["Logic", "Data", "Fake", "Chemicals", "System", "Glitch"],
+            quirks: ["Rolls eyes", "Uses technical jargon", "Refuses to be touched"],
+            forbidden_topics: ["Love", "Hope"]
+        }
+      },
+      {
+        defaultName: "David",
+        background: "The Witness",
+        archetype: "The Complicit",
+        hiddenHistory: {
+          description: "Saw everything. Did nothing until it was too late.",
+          secondaryGoal: "Atonement."
+        },
+        triggerObject: {
+          name: "Fishing Weight",
+          description: "Used to weigh down a secret.",
+          fractureImpact: 4
+        },
+        defaultRelationship: { trust: 60, fear: 60, secretKnowledge: true },
+        defaultVolition: { goal: 'Hide', target: 'Self', urgency: 5 },
+        defaultRelationships: { "The Object of Desire": "Guilt" },
+        defaultWillpower: 40,
+        defaultDevotion: 50,
+        fatal_flaw: "Cowardice",
+        specific_fear: "Confrontation",
+        defaultAgendas: ["Watch from the shadows", "Avoid responsibility", "Remember"],
+        voice_profile: {
+            tone: "Quiet, guilty, hesitant. Speaks in the past tense.",
+            vocabulary: ["Sorry", "Didn't mean to", "Watched", "Couldn't", "Locked"],
+            quirks: ["Looks away when speaking", "Fidgets with hands", "Apologizes unnecessarily"],
+            forbidden_topics: ["The Basement", "The Police"]
         }
       }
     ]

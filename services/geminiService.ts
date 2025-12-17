@@ -1,3 +1,5 @@
+
+
 import { GoogleGenAI, Chat } from "@google/genai";
 import { SYSTEM_INSTRUCTION, PLAYER_SYSTEM_INSTRUCTION, ANALYST_SYSTEM_INSTRUCTION } from "../constants";
 import { NarrativeEvent, SimulationConfig } from "../types";
@@ -194,6 +196,8 @@ export const generateHorrorImage = async (
         aestheticStyle = "Gothic horror aesthetic, spectral lighting, dust particles, decaying victorian textures, eerie shadows, sepia undertones.";
     } else if (cluster.includes("Self") || prompt.includes("Self")) {
         aestheticStyle = "Surrealist horror, hall of mirrors, shattered glass, impossible geometry, psychological distortion, dream logic.";
+    } else if (cluster.includes("Desire") || prompt.includes("Desire")) {
+        aestheticStyle = "Dark Romanticism aesthetic, lush red velvet textures, soft focus, chiaroscuro lighting, decadent decay, ominous beauty.";
     }
 
     const effectiveStyle = options.styleOverride || aestheticStyle;
