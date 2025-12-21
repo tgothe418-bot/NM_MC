@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { StatusPanel } from './components/StatusPanel';
 import { StoryLog } from './components/StoryLog';
@@ -8,11 +9,11 @@ import { ClusterAmbience } from './components/ClusterAmbience';
 import { SimulationModal } from './components/SimulationModal';
 import { VoiceControl } from './components/VoiceControl';
 import { sendMessageToGemini, initializeGemini, generateAutoPlayerAction, generateSimulationAnalysis, generateHorrorImage } from './services/geminiService';
-import { GameState, ChatMessage, NarrativeEvent, NpcState, SimulationConfig, VillainState, NpcRelation } from './types';
+import { GameState, ChatMessage, NarrativeEvent, NpcState, SimulationConfig, VillainState, NpcRelation, DialogueState } from './types';
 import { parseResponse } from './utils';
 import { INITIAL_GREETING } from './constants';
 import { LORE_LIBRARY } from './loreLibrary';
-import { constructVoiceManifesto } from './services/dialogueEngine';
+import { constructVoiceManifesto, updateDialogueState } from './services/dialogueEngine';
 import { constructSensoryManifesto } from './services/sensoryEngine';
 import { generateProceduralNpc } from './services/npcGenerator';
 import { ttsService } from './services/ttsService';
@@ -118,13 +119,15 @@ const INITIAL_STATE: GameState = {
 
 /**
  * Ensures incomplete NPC states from the LLM have valid psychological fields.
- * This fixes the "missing properties" type mismatch error.
+ * Now also hydrates the new DialogueMemory structures.
  */
 const hydrateNpcStates = (incomingNpcs: any[]): NpcState[] => {
     if (!Array.isArray(incomingNpcs)) return [];
     
     return incomingNpcs.map((npc) => {
         const psych = npc.psychology || {};
+        const dialog = npc.dialogue_state || {};
+        
         return {
             ...npc,
             psychology: {
@@ -134,6 +137,19 @@ const hydrateNpcStates = (incomingNpcs: any[]): NpcState[] => {
                 resilience_level: psych.resilience_level || "Moderate",
                 stress_level: psych.stress_level ?? 0,
                 dominant_instinct: psych.dominant_instinct || "Freeze"
+            },
+            dialogue_state: {
+                voice_profile: dialog.voice_profile || { tone: "Neutral", vocabulary: [], quirks: [], forbidden_topics: [] },
+                mood_state: dialog.mood_state || "Neutral",
+                last_topic: dialog.last_topic || "",
+                // NEW: Stateful Memory Logic
+                memory: dialog.memory || { 
+                    short_term_buffer: [], 
+                    long_term_summary: npc.background_origin || "No prior history.", 
+                    last_social_maneuver: null 
+                },
+                current_social_intent: dialog.current_social_intent || 'OBSERVE',
+                conversation_history: dialog.conversation_history || [] // Legacy Support
             }
         } as NpcState;
     });
@@ -141,27 +157,22 @@ const hydrateNpcStates = (incomingNpcs: any[]): NpcState[] => {
 
 const calculateNpcFunctionalState = (npcStates: NpcState[]): NpcState[] => {
   return npcStates.map(npc => {
-    // If it's an anomaly/ghost, skip calculations
     if (npc.fracture_state === 4) return npc;
 
-    // Reset scores to a baseline before applying penalties
     let mobility = 100;
     let manipulation = 100;
     let perception = 100;
 
-    // 1. Global Pain/Shock Penalties (Distraction Factor)
     const currentPain = npc.pain_level || 0;
     const currentShock = npc.shock_level || 0;
 
-    // Pain > 50 starts reducing Perception and Manipulation (Distraction)
     if (currentPain > 50) {
-        const painPenalty = Math.floor((currentPain - 50) / 5); // Max ~10 penalty at 100 pain
+        const painPenalty = Math.floor((currentPain - 50) / 5); 
         perception -= painPenalty;
         manipulation -= painPenalty;
     }
-    // Shock > 30 reduces everything (Systemic shutdown)
     if (currentShock > 30) {
-        const shockPenalty = Math.floor((currentShock - 30) / 2); // Max ~35 penalty at 100 shock
+        const shockPenalty = Math.floor((currentShock - 30) / 2);
         mobility -= shockPenalty;
         manipulation -= shockPenalty;
         perception -= shockPenalty;
@@ -174,7 +185,6 @@ const calculateNpcFunctionalState = (npcStates: NpcState[]): NpcState[] => {
         const functionalImpact = (injury.functional_impact || "").toLowerCase();
         const location = (injury.location || "").toLowerCase();
         
-        // 1. Direct Regex Parsing from Functional Impact string
         const mobMatch = functionalImpact.match(/mobility reduced by (\d+)%/);
         if (mobMatch) {
             mobility -= parseInt(mobMatch[1]);
@@ -193,7 +203,6 @@ const calculateNpcFunctionalState = (npcStates: NpcState[]): NpcState[] => {
             applied = true;
         }
 
-        // 2. Fallback Heuristics: If no explicit % was found, calculate based on Location & Depth
         if (!applied) {
            let penalty = 0;
            switch (injury.depth) {
@@ -210,7 +219,6 @@ const calculateNpcFunctionalState = (npcStates: NpcState[]): NpcState[] => {
            } else if (location.includes('head') || location.includes('eye')) {
                perception -= penalty;
            } else {
-               // Torso/Body hits reduce mobility slightly
                mobility -= (penalty / 2);
            }
         }
@@ -240,14 +248,12 @@ const App: React.FC = () => {
   const [simulationReport, setSimulationReport] = useState<string | null>(null);
   const [showSimModal, setShowSimModal] = useState(false);
   
-  // Refs
   const stateRef = useRef(gameState);
   
   useEffect(() => {
     stateRef.current = gameState;
   }, [gameState]);
 
-  // Init Gemini
   useEffect(() => {
     if (process.env.API_KEY) {
       setApiKey(process.env.API_KEY);
@@ -261,15 +267,12 @@ const App: React.FC = () => {
     setHistory(prev => [...prev, userMsg]);
     
     try {
-      // 1. Check for Image Generation Command (Explicit User Request)
-      // Check if user explicitly asks for an image/picture/photo
       const imageTriggerRegex = /\b(show me|generate|create|draw|paint|picture of|image of|photo of|illustration of)\b/i;
       const wantsImage = imageTriggerRegex.test(text);
 
       let generatedImageUrl: string | undefined = undefined;
 
       if (wantsImage) {
-           // Use the current active cluster and location for style context
            const cluster = gameState.meta.active_cluster;
            const visualContext = gameState.narrative.visual_motif || "";
            const prompt = `${text}. ${visualContext}`;
@@ -283,8 +286,14 @@ const App: React.FC = () => {
            }
       }
 
-      // 2. Construct Dynamic Contexts
-      const voiceManifesto = constructVoiceManifesto(gameState.npc_states);
+      // 1. UPDATE DIALOGUE BUFFERS FOR ALL NPCs (Memory Injection)
+      // We essentially "tell" the NPCs what the user just said so they can remember it next turn
+      const updatedNpcsPreCall = gameState.npc_states.map(npc => {
+          return updateDialogueState(npc, "User", text);
+      });
+
+      // 2. Construct Dynamic Contexts using the updated states
+      const voiceManifesto = constructVoiceManifesto(updatedNpcsPreCall);
       const sensoryManifesto = constructSensoryManifesto(gameState);
       
       // 3. Send Message to Gemini
@@ -300,17 +309,14 @@ const App: React.FC = () => {
       
       // 5. Update State
       if (newGameState) {
-        // HYDRATE NPCs with default psychological fields if missing
+        // Hydrate and clean
         const hydratedNpcs = hydrateNpcStates(newGameState.npc_states || []);
-        
-        // Calculate Functional Impact (Injuries)
         const functionalNpcs = calculateNpcFunctionalState(hydratedNpcs);
 
         setGameState(prev => ({
           ...prev,
           ...newGameState,
           npc_states: functionalNpcs,
-          // Ensure meta preserves deep merge if needed, but for now strict replace is safer
           meta: { ...prev.meta, ...newGameState.meta },
           villain_state: { ...prev.villain_state, ...newGameState.villain_state }
         }));
@@ -327,7 +333,7 @@ const App: React.FC = () => {
       
       setHistory(prev => [...prev, modelMsg]);
 
-      // 7. Trigger Text-to-Speech if enabled
+      // 7. Trigger Text-to-Speech
       if (ttsService.getEnabled()) {
           ttsService.speak(storyText);
       }
@@ -345,11 +351,9 @@ const App: React.FC = () => {
     }
   };
 
-  // --- SIMULATION LOOP ---
   useEffect(() => {
     if (isSimulating && !isLoading && simulationConfig) {
        const runSimulationTurn = async () => {
-           // Stop condition
            if (gameState.meta.turn >= simulationConfig.cycles) {
                setIsSimulating(false);
                const analysis = await generateSimulationAnalysis(
@@ -359,16 +363,13 @@ const App: React.FC = () => {
                return;
            }
 
-           // Generate Action
-           // Build history text for context
            const recentHistory = history.slice(-5).map(m => `[${m.role.toUpperCase()}]: ${m.text}`).join('\n');
            const action = await generateAutoPlayerAction(recentHistory, gameState, simulationConfig);
            
-           // Execute Action
            await handleSendMessage(action);
        };
 
-       const timer = setTimeout(runSimulationTurn, 2000); // 2s delay between turns
+       const timer = setTimeout(runSimulationTurn, 2000); 
        return () => clearTimeout(timer);
     }
   }, [isSimulating, isLoading, gameState.meta.turn, simulationConfig]);
@@ -378,14 +379,11 @@ const App: React.FC = () => {
       setSimulationConfig(config);
       setSimulationReport(null);
       setIsSimulating(true);
-      // Reset State if needed or continue
-      // For now, we assume continuing from current or initial
   };
 
   return (
     <div className="flex h-screen w-full bg-void text-gray-200 overflow-hidden font-sans relative">
       
-      {/* Background Ambience */}
       <ClusterAmbience 
           activeCluster={gameState.meta.active_cluster} 
           weatherState={gameState.location_state.weather_state}
@@ -393,33 +391,27 @@ const App: React.FC = () => {
           locationState={gameState.location_state.current_state}
       />
 
-      {/* Main Container */}
       <div className="relative z-10 flex w-full h-full max-w-7xl mx-auto border-x border-gray-900 shadow-2xl bg-black/40 backdrop-blur-sm">
         
-        {/* Left: Status Panel (Scalable) */}
         <div className="hidden lg:block h-full bg-black/60 relative z-20">
            <StatusPanel gameState={gameState} />
         </div>
 
-        {/* Center: Story Log & Input */}
         <div className="flex-1 flex flex-col h-full relative z-10">
             
-            {/* Top Bar */}
             <div className="h-14 border-b border-gray-800 flex items-center justify-between px-6 bg-black/80 backdrop-blur">
                 <div className="flex items-center gap-3">
                    <Terminal className="w-5 h-5 text-gray-500" />
-                   <h1 className="font-serif text-xl tracking-wider text-gray-300">THE NIGHTMARE MACHINE <span className="text-xs font-mono text-gray-600 align-top ml-1">v3.0</span></h1>
+                   <h1 className="font-serif text-xl tracking-wider text-gray-300">THE NIGHTMARE MACHINE <span className="text-xs font-mono text-gray-600 align-top ml-1">v3.1</span></h1>
                 </div>
                 
                 <div className="flex items-center gap-4">
                     <VoiceControl 
                         onProcessAction={async (action) => {
-                             // This bridging function allows the VoiceControl component to trigger the main game loop
                              await handleSendMessage(action);
                              return "Action processed."; 
                         }}
                         onInputProgress={(text, isFinal) => {
-                             // Optional: Show real-time transcription in the InputArea
                         }}
                     />
 
@@ -433,14 +425,12 @@ const App: React.FC = () => {
                 </div>
             </div>
 
-            {/* Scrollable Log */}
             <StoryLog 
                history={history} 
                isLoading={isLoading} 
                activeCluster={gameState.meta.active_cluster}
             />
 
-            {/* Input Area */}
             <div className="p-6 pb-8 bg-gradient-to-t from-black via-black/90 to-transparent">
                 <InputArea 
                   onSend={handleSendMessage} 
@@ -452,7 +442,6 @@ const App: React.FC = () => {
 
       </div>
 
-      {/* Modals */}
       <SimulationModal 
          isOpen={showSimModal} 
          onClose={() => setShowSimModal(false)}

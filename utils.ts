@@ -1,99 +1,73 @@
 
-
 import { GameState } from "./types";
 
 export const parseResponse = (responseText: string): { gameState: GameState | null, storyText: string } => {
   let gameState: GameState | null = null;
-  let storyText = responseText;
+  let storyText = "The Architect's voice dissolves into static... (Parsing Error)";
 
-  try {
-    // 1. Attempt Direct JSON parse (Standard for application/json)
-    const parsed = JSON.parse(responseText);
-    
-    // Check for the new envelope structure (Schema: { story_text, game_state })
-    if (parsed.story_text) {
-        storyText = parsed.story_text;
+  const tryParse = (str: string) => {
+    try {
+      return JSON.parse(str);
+    } catch (e) {
+      return null;
     }
-    
-    if (parsed.game_state) {
-        gameState = parsed.game_state;
-    } else if (parsed.meta) {
-        // Fallback: If root object is the state (legacy or malformed schema)
-        gameState = parsed;
-        // If the model output just state, storyText is undefined/empty here unless 
-        // we extracted it differently, but with strict JSON mode this is rare.
+  };
+
+  // 1. Full JSON Parse Attempt
+  let parsed = tryParse(responseText);
+
+  // 2. Markdown Code Block Fallback
+  if (!parsed) {
+    const codeBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/;
+    const match = responseText.match(codeBlockRegex);
+    if (match) parsed = tryParse(match[1]);
+  }
+
+  // 3. Brace Extraction Fallback
+  if (!parsed) {
+    const start = responseText.indexOf('{');
+    const end = responseText.lastIndexOf('}');
+    if (start !== -1 && end !== -1 && end > start) {
+      parsed = tryParse(responseText.substring(start, end + 1));
     }
-    
-    // If we successfully parsed a JSON object, return now.
+  }
+
+  // 4. THE SURGICAL DIRTY EXTRACTION (Prevents Code Leaks)
+  if (parsed) {
+    storyText = parsed.story_text || "";
+    gameState = parsed.game_state || null;
     return { gameState, storyText };
+  }
 
-  } catch (e) {
-      // 2. Fallback: Model might have wrapped JSON in markdown ```json ... ``` (Common in chat models)
-      const codeBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/;
-      const match = responseText.match(codeBlockRegex);
-      if (match) {
-          try {
-              const parsed = JSON.parse(match[1]);
-              
-              if (parsed.story_text) storyText = parsed.story_text;
-              
-              if (parsed.game_state) gameState = parsed.game_state;
-              else if (parsed.meta) gameState = parsed;
-              
-              return { gameState, storyText };
-          } catch (err) {
-              // Ignore regex parsing error, continue to manual fallback
-          }
-      }
-      
-      // 3. Last Resort: Brace Counting (For messy output)
-      let currentIndex = 0;
-      while (currentIndex < responseText.length) {
-        const openBraceIndex = responseText.indexOf('{', currentIndex);
-        if (openBraceIndex === -1) break;
+  // If all JSON parsing fails, we MUST NOT return the raw string (the leak).
+  // We regex for the "story_text" field specifically.
+  const storyRegex = /"story_text"\s*:\s*"((?:[^"\\]|\\.)*)"/s;
+  const match = responseText.match(storyRegex);
 
-        let braceCount = 0;
-        let endIndex = -1;
-        let inString = false;
-        let escaped = false;
-
-        for (let i = openBraceIndex; i < responseText.length; i++) {
-          const char = responseText[i];
-          if (escaped) { escaped = false; continue; }
-          if (char === '\\') { escaped = true; continue; }
-          if (char === '"') { inString = !inString; }
-
-          if (!inString) {
-            if (char === '{') braceCount++;
-            else if (char === '}') {
-              braceCount--;
-              if (braceCount === 0) {
-                endIndex = i;
-                break;
-              }
-            }
-          }
-        }
-
-        if (endIndex !== -1) {
-          const potentialJson = responseText.substring(openBraceIndex, endIndex + 1);
-          try {
-            const parsed = JSON.parse(potentialJson);
-            // Check if this object looks like our envelope or our state
-            if (parsed.story_text || parsed.game_state || parsed.meta) {
-                 if (parsed.story_text) storyText = parsed.story_text;
-                 if (parsed.game_state) gameState = parsed.game_state;
-                 else if (parsed.meta) gameState = parsed;
-                 
-                 // If we found a valid object, we stop looking to avoid grabbing nested objects later
-                 break; 
-            }
-          } catch (e) {
-            // Continue searching if this block wasn't valid JSON
-          }
-        }
-        currentIndex = openBraceIndex + 1;
-      }
+  if (match && match[1]) {
+    try {
+      // Use the native parser just for the string part to handle escapes (\n, etc)
+      storyText = JSON.parse(`"${match[1]}"`);
+    } catch (e) {
+      // Manual cleanup if even that fails
+      storyText = match[1]
+        .replace(/\\n/g, '\n')
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\');
+    }
+  } else {
+    // Final emergency: Strip JSON artifacts to present a "clean" error
+    let cleaned = responseText
+      .replace(/^\s*\{\s*"story_text"\s*:\s*"/, '')
+      .replace(/",\s*"game_state"[\s\S]*$/, '')
+      .replace(/"\s*\}\s*$/, '');
+    
+    // If it still looks like code, hide it.
+    if (cleaned.includes('"meta"') || cleaned.length > 2000) {
+      storyText = "The simulation encountered an ontological error. Re-stating action...";
+    } else {
+      storyText = cleaned;
+    }
   }
 
   return { gameState, storyText };

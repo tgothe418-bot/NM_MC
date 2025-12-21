@@ -1,5 +1,4 @@
 
-
 import { GoogleGenAI, Chat } from "@google/genai";
 import { SYSTEM_INSTRUCTION, PLAYER_SYSTEM_INSTRUCTION, ANALYST_SYSTEM_INSTRUCTION } from "../constants";
 import { NarrativeEvent, SimulationConfig } from "../types";
@@ -52,10 +51,8 @@ const withRetry = async <T>(
         let delay = baseDelay * Math.pow(2, attempt - 1);
         
         // Smart Delay: Parse specific retry duration from Gemini error message
-        // Example: "Please retry in 11.510260345s."
         const match = error.message?.match(/retry in ([0-9.]+)s/);
         if (match && match[1]) {
-           // Add a 1s buffer to the requested wait time
            delay = Math.ceil(parseFloat(match[1]) * 1000) + 1000;
         }
         
@@ -75,13 +72,14 @@ export const sendMessageToGemini = async (
   message: string, 
   injectedEvents?: NarrativeEvent[],
   dialogueManifesto?: string,
-  sensoryManifesto?: string // New Parameter
+  sensoryManifesto?: string
 ): Promise<string> => {
   if (!chatSession) {
     throw new Error("Gemini API not initialized. Please provide an API Key.");
   }
 
-  let finalMessage = message;
+  // Explicitly structure the prompt to separate User Action from System Injections
+  let finalMessage = `USER ACTION: ${message}`;
   
   // 1. Inject Narrative Events
   if (injectedEvents && injectedEvents.length > 0) {
@@ -89,18 +87,21 @@ export const sendMessageToGemini = async (
       `EVENT TRIGGERED: "${e.name}" - ${e.description}. Required Effects: ${JSON.stringify(e.effects)}`
     ).join('\n');
     
-    finalMessage += `\n\n[SYSTEM NOTICE: The following narrative events have been triggered externally. Integrate them into the story and update the Game State accordingly:]\n${eventDescriptions}`;
+    finalMessage += `\n\n*** SYSTEM ALERT: NARRATIVE EVENTS TRIGGERED ***\n[INSTRUCTION: Integrate these events into the immediate narrative and update Game State accordingly.]\n${eventDescriptions}`;
   }
 
-  // 2. Inject Dialogue Manifesto (Voice Profiles)
+  // 2. Inject Dialogue Manifesto (The New Dynamic Engine)
   if (dialogueManifesto) {
       finalMessage += dialogueManifesto;
   }
 
-  // 3. Inject Sensory Manifesto (Sensorium V3.0)
+  // 3. Inject Sensory Manifesto
   if (sensoryManifesto) {
       finalMessage += sensoryManifesto;
   }
+
+  // 4. State Update Instruction - Reinforced
+  finalMessage += `\n\n[SYSTEM INSTRUCTION]:\n1. You MUST update 'long_term_summary' in 'dialogue_state.memory' for any active NPCs to compress key events from this turn.\n2. Maintain the specified Social Intent for each NPC.`;
 
   return withRetry(async () => {
     const response = await chatSession!.sendMessage({ message: finalMessage });
@@ -114,9 +115,8 @@ export const generateAutoPlayerAction = async (historyText: string, gameState: a
     
     let instructions = PLAYER_SYSTEM_INSTRUCTION;
     
-    // Inject user preferences if provided
     if (config) {
-        instructions += `\n\nSIMULATION PARAMETERS (Dread Dials):
+        instructions += `\n\nSIMULATION PARAMETERS:
 - Perspective: ${config.perspective}
 - Role/Mode: ${config.mode}
 - Theme/Cluster: ${config.cluster}
@@ -124,14 +124,11 @@ export const generateAutoPlayerAction = async (historyText: string, gameState: a
 - Intensity: ${config.intensity}
 - Visual Motif: ${config.visual_motif || "Default specific to Cluster"}`;
         
-        // Add Victim Count instruction only if in Villain mode
         if (config.mode === 'Villain' && config.victim_count) {
              instructions += `\n- Victim Count: ${config.victim_count}`;
         }
 
 instructions += `\n\nCRITICAL INSTRUCTION:
-If the Architect asks any calibration questions (Perspective, Role, Identity, Theme, Entry Point, Intensity, Visual Motif), you MUST answer them using the parameters above.
-If asked about Victim Configuration in Villain mode, you MUST choose Option F (Custom Count) and specify: "${config.victim_count || 5} random victims".
 If asked about Visual Motif, describe: "${config.visual_motif || "A terrifying, cinematic scene matching the active cluster"}".
 If the simulation is already in progress, act according to the assigned Role (${config.mode}).`;
     }
@@ -168,10 +165,6 @@ export interface ImageGenerationOptions {
   aspectRatio?: "1:1" | "3:4" | "4:3" | "9:16" | "16:9";
 }
 
-/**
- * Generates a horror illustration based on a prompt.
- * Uses gemini-2.5-flash-image for visual generation.
- */
 export const generateHorrorImage = async (
   prompt: string, 
   options: ImageGenerationOptions = {}
@@ -183,7 +176,6 @@ export const generateHorrorImage = async (
     let aestheticStyle = "Dark atmospheric horror art, highly detailed, cinematic lighting, 8k resolution.";
     const cluster = options.activeCluster || "";
 
-    // Aesthetic Generators from 'Systems of the Extreme'
     if (cluster.includes("System") || prompt.includes("System")) {
         aestheticStyle = "Datamoshing aesthetic, compression artifacts, glitch art, high contrast cyan and black, industrial noise texture, CRT distortion.";
     } else if (cluster.includes("Flesh") || prompt.includes("Flesh")) {
@@ -217,7 +209,6 @@ export const generateHorrorImage = async (
       }
     });
 
-    // Extract image from parts
     if (response.candidates && response.candidates[0].content.parts) {
       for (const part of response.candidates[0].content.parts) {
         if (part.inlineData) {

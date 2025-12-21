@@ -1,5 +1,4 @@
 
-
 export interface ClusterWeights {
   [key: string]: string; // e.g., "Cluster 1 (Flesh)": "40%"
 }
@@ -86,11 +85,37 @@ export interface Volition {
   urgency: number; 
 }
 
+export type SocialManeuver = 
+  | 'CONFESS' 
+  | 'DEFLECT' 
+  | 'INTIMIDATE' 
+  | 'PLACATE' 
+  | 'OBSERVE' 
+  | 'ATTACK' 
+  | 'GASLIGHT' 
+  | 'BEG'
+  | 'BARGAIN';
+
 export interface DialogueEntry {
   speaker: string; 
   text: string;
   sentiment: 'Hostile' | 'Neutral' | 'Friendly' | 'Fearful';
   turn: number;
+  timestamp: number;
+}
+
+export interface DialogueMemory {
+  short_term_buffer: DialogueEntry[]; 
+  long_term_summary: string; 
+}
+
+export interface KnowledgeNode {
+  id: string;
+  topic: string; 
+  details: string; 
+  is_secret: boolean;
+  revealed: boolean;
+  source: string; 
 }
 
 export interface VoiceProfile {
@@ -102,24 +127,24 @@ export interface VoiceProfile {
 
 export interface DialogueState {
   voice_profile: VoiceProfile;
-  last_topic: string;
-  conversation_history: DialogueEntry[]; 
+  memory: DialogueMemory;
+  last_social_maneuver: SocialManeuver | null;
   mood_state: string; 
+  current_social_intent: SocialManeuver; 
+  conversation_history: DialogueEntry[]; 
 }
 
-// --- NEW NPC ENGINE TYPES ---
-
 export interface PersonalityProfile {
-  dominant_trait: string; // e.g., "Stoic", "Neurotic"
-  fatal_flaw: string; // e.g., "Hesitation"
-  coping_mechanism: string; // e.g., "Humor", "Dissociation"
-  moral_alignment: string; // e.g., "Selfish", "Altruistic"
+  dominant_trait: string; 
+  fatal_flaw: string; 
+  coping_mechanism: string; 
+  moral_alignment: string; 
 }
 
 export interface PhysicalFeatures {
   height: string;
   build: string;
-  distinguishing_feature: string; // e.g., "Scar above eye", "Trembling hands"
+  distinguishing_feature: string; 
   clothing_style: string;
 }
 
@@ -127,19 +152,12 @@ export type ResilienceLevel = 'Unbreakable' | 'High' | 'Moderate' | 'Fragile' | 
 export type SurvivalInstinct = 'Fight' | 'Flight' | 'Freeze' | 'Fawn' | 'Submit';
 
 export interface PsychologicalState {
-  current_thought: string; // Internal monologue snippet
-  emotional_state: string; // e.g., "Panic", "Determination"
-  sanity_percentage: number; // 0-100
+  current_thought: string; 
+  emotional_state: string; 
+  sanity_percentage: number; 
   resilience_level: ResilienceLevel; 
-  stress_level: number; // 0-100, immediate psychological pressure. >100 is psychotic break.
+  stress_level: number; 
   dominant_instinct: SurvivalInstinct;
-}
-
-export interface KnowledgeNode {
-  topic: string; 
-  details: string; 
-  confidence: number; 
-  source: string; 
 }
 
 export type InjuryDepth = 'SURFACE' | 'DEEP_TISSUE' | 'STRUCTURAL';
@@ -155,7 +173,7 @@ export interface Injury {
 export interface NpcDemographics {
   gender: string;
   age: string;
-  appearance: string; // Legacy string fallback
+  appearance: string; 
   aesthetic: string; 
 }
 
@@ -168,39 +186,29 @@ export interface NpcTraits {
 export interface NpcState {
   name: string;
   archetype: string; 
-  
-  // New Engine Fields
   personality?: PersonalityProfile;
   physical?: PhysicalFeatures;
   psychology?: PsychologicalState;
-  background_origin?: string; // Where they came from before the nightmare
-  
-  // Legacy/Compatibility Fields
+  background_origin?: string; 
   visual_anchor?: string; 
   current_state: string; 
   fracture_vectors: FractureVectors;
   fracture_state: number; 
   disassociation_index: number; 
-  
   primary_goal?: string; 
   secondary_goal: string; 
   atavistic_drive?: string; 
-  
   demographics?: NpcDemographics;
   generated_traits?: NpcTraits;
-
   relationship_state: RelationshipState; 
   relationships_to_other_npcs: Record<string, NpcRelation>; 
   memory_stream: MemoryEvent[]; 
   current_intent: Volition; 
-  
   dialogue_state: DialogueState;
-
   skill?: string; 
-  fatal_flaw?: string; // Keeping for compatibility, but moving to PersonalityProfile
+  fatal_flaw?: string; 
   specific_fear?: string; 
   agendas?: string[]; 
-
   breaking_point?: string;
   breaking_point_result?: string;
   knowledge_state: KnowledgeNode[]; 
@@ -209,32 +217,20 @@ export interface NpcState {
   trust_level: number; 
   agency_level: string; 
   narrative_role: string; 
-  history_ref?: HiddenHistory;
   archive_id?: string;
-
   willpower: number; 
   devotion: number; 
   active_injuries: Injury[];
-
   pain_level: number; 
   shock_level: number; 
   consciousness: 'Alert' | 'Dazed' | 'Fading' | 'Unconscious';
   mobility_score: number; 
   manipulation_score: number; 
   perception_score: number; 
-}
-
-export interface ActiveSensoryProfile {
-  primary_sense: string;
-  secondary_sense: string;
-  intensity: string;
-}
-
-export interface LocationSecret {
-  nature: string;
-  revelation_trigger: string;
-  consequence: string;
-  discovery_state: 'Hidden' | 'Suspected' | 'Evident' | 'Known' | 'Resolved';
+  // Added meta property to fix dialogueEngine.ts error
+  meta?: {
+    intensity_level: string;
+  };
 }
 
 export interface LocationState {
@@ -242,114 +238,23 @@ export interface LocationState {
   archetype: string; 
   cluster_alignment: string;
   current_state: number; 
-  dominant_sensory_palette: ActiveSensoryProfile;
+  dominant_sensory_palette: {
+    primary_sense: string;
+    secondary_sense: string;
+    intensity: string;
+  };
   time_of_day: string;
   weather_state: string;
   active_hazards: string[];
   hidden_resources: string[];
-  location_secret: LocationSecret;
+  location_secret: {
+    nature: string;
+    revelation_trigger: string;
+    consequence: string;
+    discovery_state: 'Hidden' | 'Suspected' | 'Evident' | 'Known' | 'Resolved';
+  };
   spatial_logic: string; 
   relationship_to_villain: string; 
-}
-
-export type ClusterType = 'Flesh' | 'System' | 'Haunting' | 'Self' | 'Blasphemy' | 'Survival' | 'Desire';
-
-export interface VillainArchetype {
-  name: string;
-  description: string;
-  goeticRank: string; 
-  primaryGoal: string;
-  obsessionFlaw: string;
-  vulnerability: string;
-}
-
-export interface EnvironmentArchetype {
-  name: string;
-  description: string;
-  activeHazards: string[];
-}
-
-export interface SensoryPalette {
-  smell: string[];
-  sound: string[];
-  touch: string[];
-  taste: string[];
-}
-
-export interface NPCArchetypeDef {
-  defaultName?: string;
-  background: string;
-  archetype: string; 
-  hiddenHistory: HiddenHistory;
-  triggerObject: TriggerObject;
-  defaultRelationship?: RelationshipState;
-  defaultVolition?: Volition;
-  defaultRelationships?: Record<string, string>; 
-  defaultCurrentState?: string; 
-  defaultWillpower?: number;
-  defaultDevotion?: number;
-  fatal_flaw?: string;
-  specific_fear?: string;
-  defaultAgendas?: string[]; 
-  voice_profile?: VoiceProfile; 
-}
-
-export interface ClusterLore {
-  id: ClusterType;
-  displayName: string;
-  philosophy: string;
-  coreAxiom: string;
-  mood: string;
-  villains: VillainArchetype[];
-  environments: EnvironmentArchetype[];
-  sensoryInjectors: SensoryPalette; 
-  npcArchetypes: NPCArchetypeDef[];
-}
-
-export interface DialogueSample {
-  greeting: string;
-  warning: string;
-  farewell: string;
-}
-
-export interface SpecialConditions {
-  trigger: string;
-  effect: string;
-}
-
-export interface ArchivedCharacter {
-  character_id: string;
-  name: string;
-  origin_story: string;
-  archetype: string;
-  fracture_state: number; 
-  permanent_traits: string[];
-  fracture_vectors: FractureVectors;
-  narrative_role: string;
-  behavioral_loop: string;
-  dialogue_sample: DialogueSample;
-  resources_held: string[];
-  special_conditions: SpecialConditions;
-}
-
-export interface SensoryRotation {
-  lastSmellIndex: number;
-  lastSoundIndex: number;
-  lastTouchIndex: number;
-  lastTasteIndex: number;
-}
-
-export interface NarrativeEvent {
-  name: string;
-  description: string;
-  effects: EventEffect[];
-}
-
-export interface EventEffect {
-  target: 'villain' | 'npc' | 'location' | 'global';
-  property: string;
-  value: any;
-  operation: 'set' | 'increment' | 'decrement' | 'append';
 }
 
 export interface NarrativeState {
@@ -360,7 +265,6 @@ export interface NarrativeState {
   active_events: NarrativeEvent[];
   narrative_debt: string[]; 
   unreliable_architect_level: number; 
-  style_mode?: 'Standard' | 'Ergodic' | 'Glitch' | 'CutUp' | 'Cinema' | 'Eerie'; 
 }
 
 export interface HistoryState {
@@ -374,38 +278,23 @@ export interface NarrativeFlags {
   input_type: 'text' | 'choice_yes_no';
 }
 
-export interface StarBoardState {
-  name: string; 
-  white: number; 
-  black: number; 
-}
-
 export interface StarGameState {
   is_active: boolean;
   turn: number;
-  boards: StarBoardState[];
+  boards: any[];
   mira_countdown: string[]; 
   last_resonance: string; 
 }
 
-export type ArchitectArchetype = 
-  | 'The Archivist'    
-  | 'The Director'     
-  | 'The Sadist'       
-  | 'The Oracle'       
-  | 'The Glitch'       
-  | 'The Caretaker'    
-  | 'Auto-Generated';  
-
 export interface CoAuthorState {
   name: string; 
-  archetype: ArchitectArchetype;
+  archetype: string;
   tone: string; 
   dominance_level: number; 
   creativity_temperature: number; 
   relationship_to_user: string; 
   current_obsession: string; 
-  meta_commentary_frequency: 'High' | 'Medium' | 'Low' | 'None'; 
+  meta_commentary_frequency: string; 
 }
 
 export interface GameState {
@@ -418,9 +307,7 @@ export interface GameState {
     intensity_level: string;
     active_cluster: string;
     cluster_weights: ClusterWeights;
-    
-    // PACING ENGINE
-    target_duration: string; // "Short (10-20)" | "Medium (30-50)" | "Long (60+)" | "Infinite"
+    target_duration: string;
     target_turn_count: number;
   };
   villain_state: VillainState;
@@ -429,7 +316,6 @@ export interface GameState {
   narrative: NarrativeState;
   history: HistoryState;
   narrativeFlags: NarrativeFlags;
-  sensory_rotation?: SensoryRotation; 
   star_game?: StarGameState; 
   co_author_state?: CoAuthorState;
 }
@@ -440,4 +326,84 @@ export interface ChatMessage {
   gameState?: GameState;
   imageUrl?: string; 
   timestamp: number;
+}
+
+export interface NarrativeEvent {
+  name: string;
+  description: string;
+  effects: any[];
+}
+
+// Added ClusterLore interface for loreLibrary.ts
+export interface ClusterLore {
+  id: string;
+  displayName: string;
+  philosophy: string;
+  coreAxiom: string;
+  mood: string;
+  villains: {
+    name: string;
+    description: string;
+    goeticRank: string;
+    primaryGoal: string;
+    obsessionFlaw: string;
+    vulnerability: string;
+  }[];
+  environments: {
+    name: string;
+    description: string;
+    activeHazards: string[];
+  }[];
+  sensoryInjectors: {
+    smell: string[];
+    sound: string[];
+    touch: string[];
+    taste: string[];
+  };
+  npcArchetypes: {
+    defaultName: string;
+    background: string;
+    archetype: string;
+    hiddenHistory: {
+      description: string;
+      secondaryGoal: string;
+    };
+    triggerObject: {
+      name: string;
+      description: string;
+      fractureImpact: number;
+    };
+    defaultRelationship: { trust: number; fear: number; secretKnowledge: boolean };
+    defaultVolition: Volition;
+    defaultRelationships: Record<string, string>;
+    defaultWillpower: number;
+    defaultDevotion: number;
+    fatal_flaw: string;
+    specific_fear: string;
+    defaultAgendas: string[];
+    voice_profile: VoiceProfile;
+  }[];
+}
+
+// Added ArchivedCharacter interface for characterArchive.ts
+export interface ArchivedCharacter {
+  character_id: string;
+  name: string;
+  origin_story: string;
+  archetype: string;
+  fracture_state: number;
+  permanent_traits: string[];
+  fracture_vectors: FractureVectors;
+  narrative_role: string;
+  behavioral_loop: string;
+  dialogue_sample: {
+    greeting: string;
+    warning: string;
+    farewell: string;
+  };
+  resources_held: string[];
+  special_conditions: {
+    trigger: string;
+    effect: string;
+  };
 }
