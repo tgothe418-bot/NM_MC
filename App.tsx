@@ -22,7 +22,7 @@ const INITIAL_STATE: GameState = {
     perspective: "Pending",
     mode: 'Pending',
     starting_point: "Pending",
-    intensity_level: "PENDING",
+    intensity_level: "Level 1",
     active_cluster: "None",
     cluster_weights: {
       "Cluster 1 (Flesh)": "0%",
@@ -139,6 +139,7 @@ const App: React.FC = () => {
   const [simulationConfig, setSimulationConfig] = useState<SimulationConfig | null>(null);
   const [simulationReport, setSimulationReport] = useState<string | null>(null);
   const [showSimModal, setShowSimModal] = useState(false);
+  const [simulationEndTurn, setSimulationEndTurn] = useState<number>(0);
   
   useEffect(() => {
     if (process.env.API_KEY) initializeGemini();
@@ -219,35 +220,43 @@ INSTRUCTION: You MUST respect the user's choices for their villain persona and t
 
     startPrompt += `\n\nTASK: Generate the opening 'Tales From the Crypt' style greeting. Then ask for the user's name (or title of terror if Villain) to tether them to the machine.`;
     
-    const initialStoryText = await handleSendMessage(startPrompt, true);
+    await handleSendMessage(startPrompt, true);
 
-    // If cycle count is defined (Simulation Synthesis mode), start autonomous turns immediately
+    // If cycle count is defined (Simulation Synthesis mode), start autonomous turns immediately IF requested
+    // "Simulation Mode is an option. It is never a default." 
+    // This logic ensures that even if SetupOverlay path leads here, 
+    // it's treated as an initialization choice.
     if (config.cycles > 0) {
         setSimulationConfig(config);
+        setSimulationEndTurn(gameState.meta.turn + config.cycles);
         setIsSimulating(true);
     }
+  };
+
+  const handleRunSimulation = (config: SimulationConfig) => {
+    setSimulationConfig(config);
+    setSimulationEndTurn(gameState.meta.turn + config.cycles);
+    setIsSimulating(true);
+    setShowSimModal(false);
   };
 
   useEffect(() => {
     if (isSimulating && !isLoading && simulationConfig) {
        const runSimulationTurn = async () => {
-           // Calculate effective cycles relative to current turn if mid-session
-           const currentTurn = gameState.meta.turn;
-           const targetTurn = (simulationConfig.cycles + currentTurn);
-           
-           if (currentTurn >= targetTurn) {
+           if (gameState.meta.turn >= simulationEndTurn) {
                setIsSimulating(false);
                const analysis = await generateSimulationAnalysis(history.map(m => `[${m.role.toUpperCase()}]: ${m.text}`).join('\n'));
                setSimulationReport(analysis);
+               setShowSimModal(true); // Show report when finished
                return;
            }
            const action = await generateAutoPlayerAction(history.slice(-5).map(m => `[${m.role.toUpperCase()}]: ${m.text}`).join('\n'), gameState, simulationConfig);
            await handleSendMessage(action);
        };
-       const timer = setTimeout(runSimulationTurn, 2500); 
+       const timer = setTimeout(runSimulationTurn, 3000); 
        return () => clearTimeout(timer);
     }
-  }, [isSimulating, isLoading, gameState.meta.turn]);
+  }, [isSimulating, isLoading, gameState.meta.turn, simulationEndTurn]);
 
   return (
     <div className="flex h-screen w-full bg-void text-gray-200 overflow-hidden font-sans relative items-center justify-center">
@@ -272,7 +281,7 @@ INSTRUCTION: You MUST respect the user's choices for their villain persona and t
            <StatusPanel 
             gameState={gameState} 
             onProcessAction={handleSendMessage}
-            onOpenSimulation={() => setShowSimModal(true)}
+            onOpenSimulation={() => { setSimulationReport(null); setShowSimModal(true); }}
             isSimulating={isSimulating}
            />
         </div>
@@ -292,13 +301,14 @@ INSTRUCTION: You MUST respect the user's choices for their villain persona and t
       <SimulationModal 
         isOpen={showSimModal} 
         onClose={() => setShowSimModal(false)} 
-        onRunSimulation={config => { setSimulationConfig(config); setIsSimulating(true); }} 
+        onRunSimulation={handleRunSimulation} 
         isSimulating={isSimulating} 
         simulationReport={simulationReport}
         initialPerspective={gameState.meta.perspective}
         initialMode={gameState.meta.mode}
         initialCluster={gameState.meta.active_cluster}
         initialIntensity={gameState.meta.intensity_level}
+        isSessionActive={gameState.meta.turn > 1}
       />
     </div>
   );

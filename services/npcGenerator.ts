@@ -6,7 +6,7 @@ import {
 import { getDefaultDialogueState } from './dialogueEngine';
 
 /**
- * NPC GENERATOR ENGINE (V3.1 - ANCESTRAL SINS & PSYCHOLOGICAL EXCAVATION)
+ * NPC GENERATOR ENGINE (V3.2 - INTENSITY SCALED EXCAVATION)
  */
 
 const FIRST_NAMES = ["Elias", "Mara", "Jonas", "Silas", "Caleb", "Ivy", "Ezra", "Thalia", "Felix", "Rowan", "Iris", "Julian", "Beatrix", "Soren", "Lyra", "Gideon", "Hazel", "Atticus", "Freya", "Miles", "August", "Clara", "Jasper", "Ophelia", "Arthur", "Mabel", "Finn", "Elara", "Hugo", "Maeve", "Orion", "Nova", "Cyrus", "Salome", "Judah", "Vesper", "Kit", "Remi", "Dahlia", "Bram", "Victor", "Justine", "Henry", "Elizabeth", "Robert", "Walton", "Agatha", "Safie", "William", "Alphonse", "Ely", "Boy", "Man", "Papa", "Andrew", "Jay", "Luke", "Tran", "Lucas", "Lush", "Birdy", "Johnnie", "Meg", "Susan", "Ruth", "David", "Donny", "Willie", "Eddie", "Claire", "Steven", "Amy"];
@@ -48,9 +48,13 @@ const CLUSTER_FLAVORS: Record<string, ClusterFlavor> = {
 
 const pickRandom = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
-export const generateProceduralNpc = (clusterName: string = "Flesh", intensity: string = "R", startingPoint: string = "Prologue"): NpcState => {
+export const generateProceduralNpc = (clusterName: string = "Flesh", intensity: string = "Level 3", startingPoint: string = "Prologue"): NpcState => {
   let flavor = CLUSTER_FLAVORS[clusterName] || CLUSTER_FLAVORS["Flesh"];
-  const isExtreme = intensity === "Extreme";
+  
+  // Calculate numeric intensity for scaling
+  const intensityLevel = parseInt(intensity.replace(/\D/g, '')) || 3;
+  const isHighIntensity = intensityLevel >= 4;
+  const isTransgressive = intensityLevel === 5;
   const isPrologue = startingPoint === "Prologue";
 
   const firstName = pickRandom(FIRST_NAMES);
@@ -58,8 +62,8 @@ export const generateProceduralNpc = (clusterName: string = "Flesh", intensity: 
   const sin = pickRandom(ANCESTRAL_SINS);
   const background = pickRandom(flavor.backgrounds);
   
-  // Depth increases exponentially for Extreme/Prologue
-  const richOrigin = (isExtreme || isPrologue)
+  // Depth increases exponentially with intensity
+  const richOrigin = (isHighIntensity || isPrologue)
     ? `**GENESIS TRAUMA**: Before the Machine, this was ${firstName} ${lastName}, a ${background.toLowerCase()}. Their hobby of ${pickRandom(HOBBIES).toLowerCase()} was a mask for a darker truth. ${sin} They are a complicit specimen, and the simulation knows their scent.`
     : `${background}. Haunted by the past. They once ${pickRandom(["lied to a friend", "stole a watch", "broke a promise"]).toLowerCase()}.`;
 
@@ -71,7 +75,7 @@ export const generateProceduralNpc = (clusterName: string = "Flesh", intensity: 
           dominant_trait: pickRandom(["Nihilistic", "Aggressive", "Clinical", "Manic"]),
           fatal_flaw: pickRandom(flavor.flaws),
           coping_mechanism: pickRandom(["Prayer", "Dissociation", "Violence", "Self-Harm"]),
-          moral_alignment: isExtreme ? "Tainted" : "Neutral"
+          moral_alignment: isTransgressive ? "Tainted" : intensityLevel >= 3 ? "Neutral" : "Innocent"
       },
       physical: {
           height: pickRandom(["Lanky", "Emaciated", "Stocky"]),
@@ -80,32 +84,37 @@ export const generateProceduralNpc = (clusterName: string = "Flesh", intensity: 
           clothing_style: background
       },
       psychology: {
-          current_thought: isExtreme ? "The sins of the father are finally here." : "Just keep moving.",
-          emotional_state: isExtreme ? "Crushing Guilt" : "Anxious",
-          sanity_percentage: isExtreme ? 60 : 100,
-          resilience_level: isExtreme ? 'Fragile' : 'Moderate',
-          stress_level: isExtreme ? 45 : 0,
-          dominant_instinct: isExtreme ? 'Aggression' : pickRandom(['Fight', 'Flight', 'Freeze', 'Fawn'])
+          current_thought: isHighIntensity ? "The sins of the father are finally here." : "Just keep moving.",
+          emotional_state: isHighIntensity ? "Crushing Guilt" : "Anxious",
+          sanity_percentage: isHighIntensity ? 60 : 100,
+          resilience_level: isHighIntensity ? 'Fragile' : 'Moderate',
+          stress_level: intensityLevel * 10,
+          dominant_instinct: isHighIntensity ? 'Aggression' : pickRandom(['Fight', 'Flight', 'Freeze', 'Fawn'])
       },
       current_state: "Dormant",
-      fracture_vectors: { fear: isExtreme ? 40 : 10, isolation: 30, guilt: isExtreme ? 80 : 10, paranoia: 20 },
+      fracture_vectors: { 
+          fear: intensityLevel * 15, 
+          isolation: 30, 
+          guilt: isHighIntensity ? 80 : 10, 
+          paranoia: 20 
+      },
       fracture_state: 0,
       disassociation_index: 0.0,
       secondary_goal: "Atonement",
-      relationship_state: { trust: 25, fear: 25, secretKnowledge: isExtreme },
+      relationship_state: { trust: 25, fear: intensityLevel * 10, secretKnowledge: isHighIntensity },
       relationships_to_other_npcs: {},
       memory_stream: [],
       current_intent: { goal: 'Survive', target: 'Self', urgency: 5 },
       dialogue_state: {
           ...getDefaultDialogueState(richOrigin),
           voice_profile: { tone: pickRandom(flavor.voices), vocabulary: [], quirks: [], forbidden_topics: [] },
-          current_social_intent: isExtreme ? 'DEBASE' : 'OBSERVE'
+          current_social_intent: isTransgressive ? 'DEBASE' : 'OBSERVE'
       },
       knowledge_state: [],
       physical_state: "Tense",
       active_injuries: [],
-      willpower: isExtreme ? 25 : 60,
-      devotion: isExtreme ? 15 : 40,
+      willpower: isHighIntensity ? 25 : 60,
+      devotion: isHighIntensity ? 15 : 40,
       resources_held: [pickRandom(flavor.items)],
       trust_level: 1,
       agency_level: "Low",

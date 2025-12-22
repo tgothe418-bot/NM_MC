@@ -2,7 +2,7 @@
 import { NpcState, DialogueEntry, KnowledgeNode, SocialManeuver, DialogueMemory, DialogueState } from '../types';
 
 /**
- * THE DIALOGUE ENGINE V3 (TRANSGRESSIVE & STATEFUL)
+ * THE DIALOGUE ENGINE V3.1 (INTENSITY AWARE)
  */
 
 export const getDefaultDialogueState = (background: string = ""): DialogueState => ({
@@ -23,23 +23,24 @@ export const getDefaultDialogueState = (background: string = ""): DialogueState 
 });
 
 const calculateSocialIntent = (npc: NpcState): SocialManeuver => {
-    // Safety check for relationship_state
     const rel = npc.relationship_state || { trust: 50, fear: 20, secretKnowledge: false };
     const { trust, fear } = rel;
     
     const stress = npc.psychology?.stress_level || 0;
     const instinct = npc.psychology?.dominant_instinct || 'Freeze';
     const fracture = npc.fracture_state || 0;
-    const intensity = npc.meta?.intensity_level || "R";
-    const isExtreme = intensity === "Extreme";
+    const intensity = npc.meta?.intensity_level || "Level 3";
+    
+    // Parse intensity number
+    const intensityLevel = parseInt(intensity.replace(/\D/g, '')) || 3;
 
     if (fracture >= 4) {
-        if (isExtreme) return 'ENLIGHTEN'; // Prophetic, transcendental pain
+        if (intensityLevel >= 4) return 'ENLIGHTEN'; // Prophetic, transcendental pain
         return 'GASLIGHT'; 
     }
 
     // Complicity Vector & Architect maneuvers
-    if (isExtreme) {
+    if (intensityLevel >= 4) {
         if (stress > 90) return 'TRANSFIX'; // Addressing the user/architect directly
         if (stress > 60 && trust < 30) return 'DEBASE'; // Mocking or lowering others
     }
@@ -105,7 +106,7 @@ export const updateNpcMemory = (currentMemory: DialogueMemory, newEntry: Dialogu
 export const constructVoiceManifesto = (npcs: NpcState[]): string => {
     if (!npcs || npcs.length === 0) return "";
 
-    let manifesto = "\n\n*** D. DIALOGUE & PSYCHOLOGY MANIFESTO (TRANSGRESSIVE V3) ***\n";
+    let manifesto = "\n\n*** D. DIALOGUE & PSYCHOLOGY MANIFESTO (GRADIENT V3.1) ***\n";
     manifesto += "Follow the CALCULATED SOCIAL INTENT and MEMORY CONTEXT for each NPC.\n";
     
     npcs.forEach(npc => {

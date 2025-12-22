@@ -60,6 +60,14 @@ const CLUSTER_OPTIONS = [
   },
 ];
 
+const INTENSITY_OPTIONS = [
+  { id: 'Level 1', label: 'Level 1: The Uncanny', desc: 'Atmospheric disquiet; no on-screen violence.' },
+  { id: 'Level 2', label: 'Level 2: The Dread', desc: 'Elevated anxiety; brief restrained violence.' },
+  { id: 'Level 3', label: 'Level 3: The Visceral', desc: 'Hard R; survival horror stakes and gore.' },
+  { id: 'Level 4', label: 'Level 4: The Grotesque', desc: 'Disturbing medical/process horror.' },
+  { id: 'Level 5', label: 'Level 5: The Transgressive', desc: 'Apotheosis; philosophical and absolute excess.' },
+];
+
 const Tooltip: React.FC<{ text: string }> = ({ text }) => (
   <div className="absolute bottom-full mb-2 left-0 w-80 p-4 bg-black border border-gray-700 text-xs text-gray-300 font-mono leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-[0_0_30px_rgba(0,0,0,0.9)] backdrop-blur-md rounded-sm border-l-4 border-l-fresh-blood">
     <div className="flex items-center gap-2 mb-2 text-fresh-blood uppercase font-bold tracking-tighter text-sm">
@@ -74,7 +82,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
   const [perspective, setPerspective] = useState('First Person (Direct Immersion)');
   const [mode, setMode] = useState('The Survivor (Prey Protocol)');
   const [selectedClusters, setSelectedClusters] = useState<string[]>(['Flesh']);
-  const [intensity, setIntensity] = useState('Visceral (Explicit Physicality)');
+  const [intensity, setIntensity] = useState('Level 3: The Visceral');
   const [visualMotif, setVisualMotif] = useState('');
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [simulationCycles, setSimulationCycles] = useState(20);
@@ -119,8 +127,8 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
       key: "visual_motif"
     },
     {
-      q: "Finally... how much fidelity can your psyche withstand? Atmospheric dread, visceral physicality, or the extreme transgressive truth?",
-      options: ["PG-13", "R", "Extreme"],
+      q: "Finally... how much fidelity can your psyche withstand? Choose your intensity gradient.",
+      options: ["Level 1: Uncanny", "Level 2: Dread", "Level 3: Visceral", "Level 4: Grotesque", "Level 5: Transgressive"],
       key: "intensity"
     }
   ];
@@ -167,7 +175,10 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
     if (currentKey === 'perspective') setPerspective(val === 'First Person' ? 'First Person (Direct Immersion)' : 'Third Person (Observational Dread)');
     if (currentKey === 'cluster') setSelectedClusters([val]);
     if (currentKey === 'visual_motif') setVisualMotif(val);
-    if (currentKey === 'intensity') setIntensity(val === 'PG-13' ? 'Atmospheric (Psychological Focus)' : val === 'R' ? 'Visceral (Explicit Physicality)' : 'Extreme (Transgressive Apotheosis)');
+    if (currentKey === 'intensity') {
+        const levelNum = val.split(':')[0].trim();
+        setIntensity(levelNum); // Normalize to Level X
+    }
 
     setGuidedAnswers([...guidedAnswers, val]);
     setGuidedInput('');
@@ -195,7 +206,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
         mode: mode.includes('Survivor') ? 'Survivor' : 'Villain',
         starting_point: 'Prologue',
         cluster: selectedClusters.join(', '),
-        intensity: intensity.split(' (')[0],
+        intensity: intensity.split(':')[0].trim(), // Send "Level X"
         cycles: setupMode === 'simulation' ? simulationCycles : 40,
         visual_motif: visualMotif,
         villain_name: isVillain ? villainName : undefined,
@@ -407,9 +418,9 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
                     onChange={(e) => setIntensity(e.target.value)}
                     className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 text-lg focus:border-system-green outline-none appearance-none rounded-sm"
                   >
-                    <option value="Atmospheric (Psychological Focus)">Atmospheric (PG-13)</option>
-                    <option value="Visceral (Explicit Physicality)">Visceral (R)</option>
-                    <option value="Extreme (Transgressive Apotheosis)">Extreme (NC-17)</option>
+                    {INTENSITY_OPTIONS.map(opt => (
+                        <option key={opt.id} value={opt.id}>{opt.label}</option>
+                    ))}
                   </select>
                </div>
 
@@ -432,14 +443,14 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
                </div>
             </div>
 
-            {/* Antagonist Parameters (Now parity with Villain mode) */}
+            {/* Antagonist Parameters */}
             {isVillain && (
               <div className="col-span-1 md:col-span-2 space-y-12 border-y-2 border-system-green/20 py-16 animate-fadeIn bg-green-950/5 px-10 rounded-sm">
                 <div className="text-system-green font-mono text-2xl font-bold uppercase tracking-[0.5em] flex items-center gap-6">
                    <Target className="w-10 h-10 animate-pulse" /> Entity Specifications
                 </div>
                 
-                <div className="grid grid-cols-1 md:col-span-2 lg:grid-cols-3 gap-12">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
                   <div className="space-y-4 group relative">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
@@ -786,11 +797,11 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
               onChange={(e) => setIntensity(e.target.value)}
               className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-lg focus:border-fresh-blood outline-none transition-all hover:bg-gray-900 cursor-pointer appearance-none rounded-sm"
             >
-              <option value="Atmospheric (Psychological Focus)">Atmospheric (Psychological Focus)</option>
-              <option value="Visceral (Explicit Physicality)">Visceral (Explicit Physicality)</option>
-              <option value="Extreme (Transgressive Apotheosis)">Extreme (Transgressive Apotheosis)</option>
+                {INTENSITY_OPTIONS.map(opt => (
+                    <option key={opt.id} value={opt.id}>{opt.label}</option>
+                ))}
             </select>
-            <Tooltip text="Determines the forensic detail of violence and the complexity of psychological trauma." />
+            <Tooltip text="Determines the focus, violence constraint, and psychological goal of the simulation." />
           </div>
 
           <div className="space-y-4 group relative">
