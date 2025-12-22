@@ -5,6 +5,11 @@ export const parseResponse = (responseText: string): { gameState: GameState | nu
   let gameState: GameState | null = null;
   let storyText = "The Architect's voice dissolves into static... (Parsing Error)";
 
+  // Defensive check to avoid calling methods on undefined/null
+  if (typeof responseText !== 'string' || !responseText) {
+    return { gameState, storyText: "The simulation encountered an ontological void." };
+  }
+
   const tryParse = (str: string) => {
     try {
       return JSON.parse(str);

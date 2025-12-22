@@ -1,251 +1,226 @@
 
-import { GoogleGenAI, Chat } from "@google/genai";
-import { SYSTEM_INSTRUCTION, PLAYER_SYSTEM_INSTRUCTION, ANALYST_SYSTEM_INSTRUCTION } from "../constants";
-import { NarrativeEvent, SimulationConfig } from "../types";
+import { GoogleGenAI, Chat, Type } from "@google/genai";
+import { SIMULATOR_INSTRUCTION, NARRATOR_INSTRUCTION, PLAYER_SYSTEM_INSTRUCTION, ANALYST_SYSTEM_INSTRUCTION } from "../constants";
+import { NarrativeEvent, SimulationConfig, GameState, NpcState } from "../types";
 
 let chatSession: Chat | null = null;
 
-export const initializeGemini = () => {
-  try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    chatSession = ai.chats.create({
-      model: 'gemini-3-pro-preview',
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        temperature: 0.9,
-        responseMimeType: 'application/json',
-      },
-    });
-  } catch (error) {
-    console.error("Failed to initialize Gemini:", error);
-  }
-};
-
-const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-const withRetry = async <T>(
-  operation: () => Promise<T>, 
-  context: string = "API Call"
-): Promise<T> => {
-  let attempt = 0;
-  const maxAttempts = 5;
-  const baseDelay = 2000;
-
-  while (attempt < maxAttempts) {
-    try {
-      return await operation();
-    } catch (error: any) {
-      attempt++;
-      const isRetryable = error.status === 429 || 
-                         error.status === 503 || 
-                         (error.message && (
-                            error.message.includes('429') || 
-                            error.message.includes('quota') || 
-                            error.message.includes('RESOURCE_EXHAUSTED')
-                         ));
-
-      if (isRetryable && attempt < maxAttempts) {
-        let delay = baseDelay * Math.pow(2, attempt - 1);
-        const match = error.message?.match(/retry in ([0-9.]+)s/);
-        if (match && match[1]) {
-           delay = Math.ceil(parseFloat(match[1]) * 1000) + 1000;
+const GAME_STATE_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    meta: {
+      type: Type.OBJECT,
+      properties: {
+        turn: { type: Type.INTEGER },
+        intensity_level: { type: Type.STRING },
+        active_cluster: { type: Type.STRING },
+        perspective: { type: Type.STRING },
+        mode: { type: Type.STRING }
+      }
+    },
+    villain_state: {
+      type: Type.OBJECT,
+      properties: {
+        name: { type: Type.STRING },
+        threat_scale: { type: Type.INTEGER },
+        primary_goal: { type: Type.STRING }
+      }
+    },
+    npc_states: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          name: { type: Type.STRING },
+          archetype: { type: Type.STRING },
+          hidden_agenda: {
+            type: Type.OBJECT,
+            properties: {
+              goal: { type: Type.STRING },
+              progress_level: { type: Type.INTEGER }
+            }
+          },
+          psychology: {
+            type: Type.OBJECT,
+            properties: {
+              stress_level: { type: Type.INTEGER },
+              current_thought: { type: Type.STRING }
+            }
+          },
+          active_injuries: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                location: { type: Type.STRING },
+                description: { type: Type.STRING }
+              }
+            }
+          }
         }
-        console.warn(`Gemini API busy (${context}). Retrying in ${Math.round(delay/1000)}s...`);
-        await wait(delay);
-        continue;
       }
-      console.error(`Gemini API Error (${context}):`, error);
-      throw error;
+    },
+    location_state: {
+      type: Type.OBJECT,
+      properties: {
+        current_room_id: { type: Type.STRING },
+        room_map: {
+          type: Type.OBJECT,
+          additionalProperties: {
+            type: Type.OBJECT,
+            properties: {
+              id: { type: Type.STRING },
+              name: { type: Type.STRING },
+              description_cache: { type: Type.STRING },
+              exits: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    direction: { type: Type.STRING },
+                    target_node_id: { type: Type.STRING, nullable: true }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    narrative: {
+      type: Type.OBJECT,
+      properties: {
+        visual_motif: { type: Type.STRING }
+      }
     }
   }
-  throw new Error(`Failed ${context} after ${maxAttempts} attempts.`);
 };
 
-export const generateCalibrationField = async (
-  field: string, 
-  cluster: string, 
-  intensity: string, 
-  count?: number, 
-  existingValue?: string
-): Promise<string> => {
-  return withRetry(async () => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    let instructions = `Be creative, unsettling, and highly detailed. Stay true to the specific tropes and aesthetics of the selected cluster. 
-Output ONLY the generated text. No preamble, no quotes.`;
+const NARRATOR_RESPONSE_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    story_text: { type: Type.STRING },
+    game_state: GAME_STATE_SCHEMA
+  },
+  required: ["story_text", "game_state"]
+};
 
-    if (existingValue && existingValue.trim().length > 0) {
-      instructions = `The user has provided some initial notes: "${existingValue}". 
-Your task is to EXPAND and REFINE these notes. Maintain the core idea but add depth, atmospheric detail, and transgressive weight appropriate for the ${cluster} cluster and ${intensity} intensity. 
-Output ONLY the expanded text. No preamble, no quotes.`;
-    } else {
-      if (field === 'Specimen Targets' && count) {
-        instructions = `Generate exactly ${count} named characters with evocative backgrounds who will serve as the victims/survivors in this story. 
-For each character, include their name, archetype, and a 'Genesis Sin' or a deep psychological vulnerability that makes them a target for the Machine. 
-Format as a structured list or catalog of specimens. Use a tone appropriate for the ${cluster} cluster and ${intensity} intensity.`;
-      }
-      if (field === 'Primary Objective') {
-        instructions = `Generate a very brief, simple, and vague primary objective. It should be evocative and unsettling but lack specific mechanical detail. One short sentence maximum. 
-Stay true to the ${cluster} theme. Output ONLY the text.`;
-      }
-      if (field === 'Entity Name') {
-        instructions = `Generate a single, terrifying, and thematically appropriate name or title for a horror antagonist. 
-Appropriate for ${cluster} cluster and ${intensity} intensity. 
-Output ONLY the name. No quotes, no descriptions.`;
-      }
-      if (field === 'Initial Location') {
-        instructions = `Generate a detailed and atmospheric description of the starting location for this nightmare. 
-Focus on sensory details (smell, temperature, sound) and the "Wrongness" of the space. 
-Incorporate elements unique to the ${cluster} cluster and ${intensity} intensity. 
-Describe the location from the perspective of an architect of trauma. Output ONLY the description.`;
-      }
-    }
+export const initializeGemini = () => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  chatSession = ai.chats.create({
+    model: 'gemini-3-pro-preview',
+    config: {
+      systemInstruction: NARRATOR_INSTRUCTION,
+      responseMimeType: 'application/json',
+      responseSchema: NARRATOR_RESPONSE_SCHEMA
+    },
+  });
+};
 
-    const prompt = `As the Horror Story Architect, generate a relevant entry for the field "${field}" in an interactive horror simulation.
-Cluster: ${cluster}
-Intensity: ${intensity}
-Context: The user is playing as an Antagonist/Predator.
-${instructions}`;
+const withRetry = async <T>(op: () => Promise<T>): Promise<T> => {
+  let attempt = 0;
+  while (attempt < 3) {
+    try { return await op(); }
+    catch (e) { attempt++; if (attempt === 3) throw e; await new Promise(r => setTimeout(r, 2000)); }
+  }
+  throw new Error("Retry failed");
+};
 
-    const response = await ai.models.generateContent({
+export const generateNpcActions = async (gameState: GameState, userAction: string): Promise<string[]> => {
+  if (!gameState.npc_states?.length) return [];
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const actions: string[] = [];
+  for (const npc of gameState.npc_states) {
+    const prompt = `NPC: ${npc.name}, Goal: ${npc.hidden_agenda.goal}, User: ${userAction}. Decide ONE discrete action they take to advance their goal. One sentence.`;
+    const res = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
-      config: { temperature: 0.8 },
     });
-    return response.text?.trim() || "";
-  }, `Generate Calibration Field: ${field}`);
-};
-
-export const sendMessageToGemini = async (
-  message: string, 
-  injectedEvents?: NarrativeEvent[],
-  dialogueManifesto?: string,
-  sensoryManifesto?: string
-): Promise<string> => {
-  if (!chatSession) {
-    throw new Error("Gemini API not initialized. Please provide an API Key.");
+    actions.push(`${npc.name}: ${res.text}`);
   }
-  let finalMessage = `USER ACTION: ${message}`;
-  if (injectedEvents && injectedEvents.length > 0) {
-    const eventDescriptions = injectedEvents.map(e => 
-      `EVENT TRIGGERED: "${e.name}" - ${e.description}. Required Effects: ${JSON.stringify(e.effects)}`
-    ).join('\n');
-    finalMessage += `\n\n*** SYSTEM ALERT: NARRATIVE EVENTS TRIGGERED ***\n[INSTRUCTION: Integrate these events into the immediate narrative and update Game State accordingly.]\n${eventDescriptions}`;
+  return actions;
+};
+
+export const simulateTurn = async (gameState: GameState, userAction: string, npcActions: string[]): Promise<GameState> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const prompt = `STATE: ${JSON.stringify(gameState)}\nUSER: ${userAction}\nNPCs: ${npcActions.join('\n')}\nUpdate state logic.`;
+  const res = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: prompt,
+    config: {
+      systemInstruction: SIMULATOR_INSTRUCTION,
+      responseMimeType: 'application/json',
+      responseSchema: GAME_STATE_SCHEMA
+    }
+  });
+  return JSON.parse(res.text || "{}");
+};
+
+export const sendMessageToGemini = async (userAction: string, simulatedState: GameState, manifestos: string): Promise<string> => {
+  if (!chatSession) throw new Error("Not initialized");
+  const prompt = `SIMULATED STATE: ${JSON.stringify(simulatedState)}\nUSER ACTION: ${userAction}\n${manifestos}`;
+  const res = await chatSession.sendMessage({ message: prompt });
+  return res.text || "";
+};
+
+// Fix: Updated generateCalibrationField to accept additional context for calibration
+export const generateCalibrationField = async (field: string, cluster: string, intensity: string, count?: number, existingValue?: string): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const countContext = count ? ` Generate for ${count} subjects.` : "";
+  const baseContext = existingValue ? ` Refine this content: ${existingValue}.` : "";
+  const res = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: `Field: ${field}, Theme: ${cluster}, Fidelity: ${intensity}.${countContext}${baseContext} Generate evocative content.`,
+  });
+  return res.text?.trim() || "";
+};
+
+export const generateHorrorImage = async (prompt: string, options: any): Promise<string | null> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const res = await ai.models.generateContent({
+    model: 'gemini-2.5-flash-image',
+    contents: { parts: [{ text: prompt }] },
+    config: { imageConfig: { aspectRatio: options.aspectRatio || "1:1" } }
+  });
+  const part = res.candidates?.[0]?.content?.parts.find(p => p.inlineData);
+  return part ? `data:image/png;base64,${part.inlineData.data}` : null;
+};
+
+export const generateCinematicVideo = async (prompt: string, config: any): Promise<string | null> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  let op = await ai.models.generateVideos({
+    model: 'veo-3.1-fast-generate-preview',
+    prompt,
+    config: { numberOfVideos: 1, resolution: config.resolution, aspectRatio: config.aspectRatio }
+  });
+  while (!op.done) {
+    await new Promise(r => setTimeout(r, 10000));
+    op = await ai.operations.getVideosOperation({ operation: op });
   }
-  if (dialogueManifesto) finalMessage += dialogueManifesto;
-  if (sensoryManifesto) finalMessage += sensoryManifesto;
-  finalMessage += `\n\n[SYSTEM INSTRUCTION]:\n1. You MUST update 'long_term_summary' in 'dialogue_state.memory' for any active NPCs to compress key events from this turn.\n2. Maintain the specified Social Intent for each NPC.`;
-
-  return withRetry(async () => {
-    const response = await chatSession!.sendMessage({ message: finalMessage });
-    return response.text || "";
-  }, "Narrative Generation");
+  const uri = op.response?.generatedVideos?.[0]?.video?.uri;
+  if (uri) {
+    const res = await fetch(`${uri}&key=${process.env.API_KEY}`);
+    return URL.createObjectURL(await res.blob());
+  }
+  return null;
 };
 
-export const generateAutoPlayerAction = async (historyText: string, gameState: any, config?: SimulationConfig): Promise<string> => {
-  return withRetry(async () => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    let instructions = PLAYER_SYSTEM_INSTRUCTION;
-    if (config) {
-        instructions += `\n\nSIMULATION PARAMETERS:
-- Perspective: ${config.perspective}
-- Role/Mode: ${config.mode}
-- Theme/Cluster: ${config.cluster}
-- Entry Point: ${config.starting_point}
-- Intensity: ${config.intensity}
-- Visual Motif: ${config.visual_motif || "Default specific to Cluster"}`;
-        if (config.mode === 'Villain' && config.victim_count) instructions += `\n- Victim Count: ${config.victim_count}`;
-        instructions += `\n\nCRITICAL INSTRUCTION:
-If asked about Visual Motif, describe: "${config.visual_motif || "A terrifying, cinematic scene matching the active cluster"}".
-If the simulation is already in progress, act according to the assigned Role (${config.mode}).`;
-    }
-    const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `CURRENT NARRATIVE:\n${historyText}\n\nCURRENT STATE:\n${JSON.stringify(gameState)}`,
-        config: { systemInstruction: instructions, temperature: 1.0 }
-    });
-    return response.text?.trim() || "I hesitate, unsure what to do.";
-  }, "Auto-Player Action");
+export const generateSimulationAnalysis = async (log: string) => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const res = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: log,
+    config: { systemInstruction: ANALYST_SYSTEM_INSTRUCTION }
+  });
+  return res.text;
 };
 
-export const generateSimulationAnalysis = async (gameLog: string): Promise<string> => {
-  return withRetry(async () => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `GAMEPLAY LOG:\n${gameLog}`,
-        config: { systemInstruction: ANALYST_SYSTEM_INSTRUCTION }
-    });
-    return response.text || "Analysis incomplete.";
-  }, "Simulation Analysis");
-};
-
-export interface ImageGenerationOptions {
-  activeCluster?: string;
-  styleOverride?: string;
-  aspectRatio?: "1:1" | "3:4" | "4:3" | "9:16" | "16:9";
-  highQuality?: boolean;
-}
-
-export const generateHorrorImage = async (
-  prompt: string, 
-  options: ImageGenerationOptions = {}
-): Promise<string | null> => {
-  return withRetry(async () => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    let aestheticStyle = "Dark atmospheric horror art, highly detailed, cinematic lighting, 8k resolution.";
-    const cluster = options.activeCluster || "";
-
-    if (cluster.includes("System")) aestheticStyle = "Datamoshing aesthetic, compression artifacts, glitch art, industrial noise texture, CRT distortion.";
-    else if (cluster.includes("Flesh")) aestheticStyle = "New French Extremity style, visceral body horror, medical lighting, wet organic textures, dark crimson palette.";
-    else if (cluster.includes("Blasphemy")) aestheticStyle = "Cinema of Transgression style, grainy 16mm film texture, high contrast black and white photocopy style, occult symbols.";
-    else if (cluster.includes("Survival")) aestheticStyle = "The Void aesthetic, vast empty landscapes, liminal space, whiteout fog, cold blue and grey palette.";
-    else if (cluster.includes("Haunting")) aestheticStyle = "Gothic horror aesthetic, spectral lighting, dust particles, decaying victorian textures.";
-    else if (cluster.includes("Self")) aestheticStyle = "Surrealist horror, hall of mirrors, shattered glass, impossible geometry, psychological distortion.";
-    else if (cluster.includes("Desire")) aestheticStyle = "Dark Romanticism aesthetic, lush red velvet textures, soft focus, chiaroscuro lighting.";
-
-    const effectiveStyle = options.styleOverride || aestheticStyle;
-    const styledPrompt = `${effectiveStyle} Context: ${prompt}`;
-
-    const model = options.highQuality ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
-    const response = await ai.models.generateContent({
-      model: model,
-      contents: { parts: [{ text: styledPrompt }] },
-      config: { imageConfig: { aspectRatio: options.aspectRatio || "1:1", ...(options.highQuality ? { imageSize: "1K" } : {}) } }
-    });
-
-    if (response.candidates && response.candidates[0].content.parts) {
-      for (const part of response.candidates[0].content.parts) {
-        if (part.inlineData) return `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
-      }
-    }
-    return null;
-  }, "Image Generation");
-};
-
-export const generateCinematicVideo = async (prompt: string, config: { aspectRatio: "16:9" | "9:16", resolution: "720p" | "1080p" }): Promise<string | null> => {
-  return withRetry(async () => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    let operation = await ai.models.generateVideos({
-      model: 'veo-3.1-fast-generate-preview',
-      prompt: `Cinematic horror cutscene, dark atmospheric, 4k detail. Scene: ${prompt}`,
-      config: {
-        numberOfVideos: 1,
-        resolution: config.resolution,
-        aspectRatio: config.aspectRatio
-      }
-    });
-
-    while (!operation.done) {
-      await new Promise(resolve => setTimeout(resolve, 10000));
-      operation = await ai.operations.getVideosOperation({ operation: operation });
-    }
-
-    const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-    if (downloadLink) {
-      const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
-      const blob = await response.blob();
-      return URL.createObjectURL(blob);
-    }
-    return null;
-  }, "Video Generation");
+export const generateAutoPlayerAction = async (log: string, state: any, config: any) => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const res = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: `LOG: ${log}\nSTATE: ${JSON.stringify(state)}`,
+    config: { systemInstruction: PLAYER_SYSTEM_INSTRUCTION }
+  });
+  return res.text || "I hesitate.";
 };

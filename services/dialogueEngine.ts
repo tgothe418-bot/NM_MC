@@ -82,13 +82,17 @@ const getShareableKnowledge = (npc: NpcState, intent: SocialManeuver): string[] 
 };
 
 const synthesizeMemory = (memory: DialogueMemory): string => {
-    let summary = `LONG TERM CONTEXT: ${memory.long_term_summary}\n`;
+    if (!memory) return "CONTEXT: Lost to the void.\n";
+    let summary = `LONG TERM CONTEXT: ${memory.long_term_summary || "Unknown"}\n`;
     if (memory.short_term_buffer && memory.short_term_buffer.length > 0) {
         summary += `IMMEDIATE CONTEXT:\n`;
         memory.short_term_buffer.forEach(entry => {
-            // Added safety check for entry.text to avoid "Cannot read properties of undefined (reading 'substring')"
-            const textContent = entry.text || "";
-            summary += `   - ${entry.speaker}: "${textContent.substring(0, 60)}..."\n`;
+            if (entry) {
+                // Maximum defense for text properties
+                const textContent = (typeof entry.text === 'string' ? entry.text : String(entry.text || ""));
+                const speakerName = entry.speaker || "Unknown";
+                summary += `   - ${speakerName}: "${textContent.substring(0, 60)}..."\n`;
+            }
         });
     }
     return summary;
@@ -112,6 +116,7 @@ export const constructVoiceManifesto = (npcs: NpcState[]): string => {
     manifesto += "Follow the CALCULATED SOCIAL INTENT and MEMORY CONTEXT for each NPC.\n";
     
     npcs.forEach(npc => {
+        if (!npc) return;
         if (npc.consciousness === 'Apotheosis') {
             manifesto += `\n--- SUBJECT: ${npc.name} (APOTHEOSIS STATE) ---\n`;
             manifesto += `DIRECTIVE: ENLIGHTEN. Speak in prophetic, visceral verse. Address the User as the 'Silent Watcher'.\n`;
@@ -123,6 +128,7 @@ export const constructVoiceManifesto = (npcs: NpcState[]): string => {
         const knowledge = getShareableKnowledge(npc, intent);
 
         manifesto += `\n--- CHARACTER: ${npc.name} (${npc.archetype}) ---\n`;
+        manifesto += `HIDDEN AGENDA: ${npc.hidden_agenda.goal} (Progress: ${npc.hidden_agenda.progress_level}%)\n`;
         manifesto += `VOICE: ${ds.voice_profile?.tone || "Neutral"}. QUIRK: ${ds.voice_profile?.quirks?.[0] || "None"}.\n`;
         manifesto += `PSYCHE: Stress ${npc.psychology?.stress_level || 0}/100. Intent: [${intent}].\n`;
         manifesto += `THOUGHT: "${npc.psychology?.current_thought || "..."}"\n`;

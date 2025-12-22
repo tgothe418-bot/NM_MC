@@ -1,129 +1,73 @@
 
-export interface TTSVoice {
-  name: string;
-  lang: string;
-  isDefault: boolean;
-  localService: boolean;
-  voiceURI: string;
-}
+import { GoogleGenAI, Modality } from "@google/genai";
 
-export interface NarrationProfile {
+// Fix: Exported TTSVoice interface for external usage
+export interface TTSVoice {
   id: string;
   name: string;
-  description: string;
-  rate: number;
-  pitch: number;
 }
 
-export const NARRATION_PROFILES: NarrationProfile[] = [
-  { id: 'storyteller', name: 'The Storyteller', description: 'Warm, natural, and balanced.', rate: 1.0, pitch: 1.0 },
-  { id: 'architect', name: 'The Architect', description: 'Deep, authoritative, and precise.', rate: 0.95, pitch: 0.9 },
-  { id: 'whisper', name: 'The Whisper', description: 'Soft, eerie, and higher pitched.', rate: 0.9, pitch: 1.15 },
-  { id: 'beast', name: 'The Beast', description: 'Slow, guttural, and menacing.', rate: 0.8, pitch: 0.6 },
-  { id: 'glitch', name: 'The Glitch', description: 'Rapid, anxious, and uneven.', rate: 1.25, pitch: 1.1 },
-  { id: 'oracle', name: 'The Oracle', description: 'Very slow, deliberate, and dreamlike.', rate: 0.7, pitch: 1.0 },
+export const NARRATION_PROFILES = [
+  { id: 'architect', name: 'The Architect', voiceName: 'Zephyr' },
+  { id: 'narrator', name: 'The Narrator', voiceName: 'Kore' },
+  { id: 'trickster', name: 'The Trickster', voiceName: 'Puck' },
 ];
 
+function decode(base64: string) {
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+async function decodeAudioData(data: Uint8Array, ctx: AudioContext): Promise<AudioBuffer> {
+  const int16 = new Int16Array(data.buffer);
+  const buffer = ctx.createBuffer(1, int16.length, 24000);
+  const channel = buffer.getChannelData(0);
+  for (let i = 0; i < int16.length; i++) channel[i] = int16[i] / 32768.0;
+  return buffer;
+}
+
 class TTSService {
-  private synth: SpeechSynthesis;
-  private voices: SpeechSynthesisVoice[] = [];
-  private selectedVoice: SpeechSynthesisVoice | null = null;
-  private isEnabled: boolean = false;
-  private currentProfile: NarrationProfile = NARRATION_PROFILES[0]; // Default: Storyteller
+  private ctx: AudioContext | null = null;
+  private node: GainNode | null = null;
+  private enabled = false;
+  private profile = NARRATION_PROFILES[0];
 
-  constructor() {
-    this.synth = window.speechSynthesis;
-    this.loadVoices();
-    
-    if (this.synth.onvoiceschanged !== undefined) {
-      this.synth.onvoiceschanged = () => {
-        this.loadVoices();
-      };
-    }
+  setEnabled(v: boolean) { this.enabled = v; if (v && !this.ctx) this.init(); }
+  getEnabled() { return this.enabled; }
+  setProfile(id: string) { const p = NARRATION_PROFILES.find(x => x.id === id); if (p) this.profile = p; }
+  // Fix: Explicitly typed return value
+  getVoices(): TTSVoice[] { return NARRATION_PROFILES.map(p => ({ id: p.id, name: p.name })); }
+
+  private init() {
+    this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+    this.node = this.ctx.createGain();
+    this.node.connect(this.ctx.destination);
   }
 
-  private loadVoices() {
-    this.voices = this.synth.getVoices();
-    // Try to set a default "spooky" or serious voice if available
-    if (!this.selectedVoice && this.voices.length > 0) {
-      // Prefer Google US English or similar high-quality voices
-      const preferred = this.voices.find(v => 
-        (v.name.includes("Google US English") || v.name.includes("Samantha")) && v.lang.startsWith("en")
-      );
-      this.selectedVoice = preferred || this.voices[0];
-    }
-  }
-
-  getVoices(): TTSVoice[] {
-    return this.voices
-      .filter(v => v.lang.startsWith('en')) // Filter for English for now to reduce noise
-      .map(v => ({
-        name: v.name,
-        lang: v.lang,
-        isDefault: v.default,
-        localService: v.localService,
-        voiceURI: v.voiceURI
-      }));
-  }
-
-  setVoice(voiceName: string) {
-    const voice = this.voices.find(v => v.name === voiceName);
-    if (voice) {
-      this.selectedVoice = voice;
-    }
-  }
-
-  setProfile(profileId: string) {
-    const profile = NARRATION_PROFILES.find(p => p.id === profileId);
-    if (profile) {
-      this.currentProfile = profile;
-    }
-  }
-
-  setEnabled(enabled: boolean) {
-    this.isEnabled = enabled;
-    if (!enabled) {
-      this.stop();
-    }
-  }
-
-  getEnabled(): boolean {
-    return this.isEnabled;
-  }
-
-  stop() {
-    if (this.synth.speaking) {
-      this.synth.cancel();
-    }
-  }
-
-  speak(text: string) {
-    if (!this.isEnabled) return;
-    
-    // Cancel any existing speech to avoid overlap
-    this.stop();
-
-    // Clean text of markdown/artifacts for better reading
-    const cleanText = text
-      .replace(/\*\*/g, '')      // Remove bold
-      .replace(/\*/g, '')        // Remove italics
-      .replace(/\[\^.*?\]/g, '') // Remove footnotes like [^1]
-      .replace(/```.*?```/gs, 'System Output.') // Skip code blocks
-      .trim();
-
-    if (!cleanText) return;
-
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    
-    if (this.selectedVoice) {
-      utterance.voice = this.selectedVoice;
-    }
-
-    // Apply active profile settings
-    utterance.rate = this.currentProfile.rate;
-    utterance.pitch = this.currentProfile.pitch;
-    
-    this.synth.speak(utterance);
+  async speak(text: string) {
+    if (!this.enabled || !text) return;
+    if (!this.ctx) this.init();
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const res = await ai.models.generateContent({
+        model: "gemini-2.5-flash-preview-tts",
+        contents: [{ parts: [{ text }] }],
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: this.profile.voiceName } } }
+        }
+      });
+      const data = res.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (data && this.ctx && this.node) {
+        const audio = await decodeAudioData(decode(data), this.ctx);
+        const source = this.ctx.createBufferSource();
+        source.buffer = audio;
+        source.connect(this.node);
+        source.start();
+      }
+    } catch (e) { console.error(e); }
   }
 }
 

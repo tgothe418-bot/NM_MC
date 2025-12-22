@@ -37,13 +37,58 @@ interface ClusterFlavor {
   appearances: string[];
   items: string[];
   hooks: string[];
+  agendas: { goal: string; constraint: string }[];
 }
 
 const CLUSTER_FLAVORS: Record<string, ClusterFlavor> = {
-  "Flesh": { backgrounds: ["Disgraced Anatomist", "Abattoir Owner", "Galvanist", "Body-Mod Artist"], flaws: ["Sadistic", "God Complex"], voices: ["Hushed", "Clinical"], appearances: ["Surgical silk", "Skin like paper"], items: ["Silver probes", "Formaldehyde jar"], hooks: ["Dissection of the ego", "Replacing the lost body"] },
-  "System": { backgrounds: ["Ontological Coder", "Signal Analyst", "Transhumanist"], flaws: ["Solipsistic", "Paranoid"], voices: ["Monotone", "Static hiss"], appearances: ["Utility jacket", "Reflective lenses"], items: ["Encrypted drive", "Signal scanner"], hooks: ["Found a coordinate in static", "Upload consciousness"] },
-  "Haunting": { backgrounds: ["Defrocked Exorcist", "Grieving Medium", "Antique Forger"], flaws: ["Superstitious", "Guilt-ridden"], voices: ["Mournful", "Echoing"], appearances: ["Faded funeral wear", "Bruised eyes"], items: ["Locket of hair", "Silver coin"], hooks: ["Carrying a spirit", "Purgatory belief"] },
-  "Survival": { backgrounds: ["Feral Pilgrim", "Cannibal Matriarch", "Ex-Military Deserter"], flaws: ["Ruthless", "Hoarder"], voices: ["Hoarse", "Animalistic"], appearances: ["Rotted furs", "Sharpened teeth"], items: ["Bag of bones", "Human jerky"], hooks: ["Eaten loved ones", "Carrying the fire"] }
+  "Flesh": { 
+      backgrounds: ["Disgraced Anatomist", "Abattoir Owner", "Galvanist", "Body-Mod Artist"], 
+      flaws: ["Sadistic", "God Complex"], 
+      voices: ["Hushed", "Clinical"], 
+      appearances: ["Surgical silk", "Skin like paper"], 
+      items: ["Silver probes", "Formaldehyde jar"], 
+      hooks: ["Dissection of the ego", "Replacing the lost body"],
+      agendas: [
+          { goal: "Secure a fresh biological sample without being noticed.", constraint: "Must maintain a helpful facade." },
+          { goal: "Find a way to paralyze a companion for 'study'.", constraint: "Cannot use direct violence." }
+      ]
+  },
+  "System": { 
+      backgrounds: ["Ontological Coder", "Signal Analyst", "Transhumanist"], 
+      flaws: ["Solipsistic", "Paranoid"], 
+      voices: ["Monotone", "Static hiss"], 
+      appearances: ["Utility jacket", "Reflective lenses"], 
+      items: ["Encrypted drive", "Signal scanner"], 
+      hooks: ["Found a coordinate in static", "Upload consciousness"],
+      agendas: [
+          { goal: "Locate and disable the tracking beacon in the room.", constraint: "Must keep everyone else stationary." },
+          { goal: "Access the hidden terminal to initiate a data dump.", constraint: "Requires a distraction." }
+      ]
+  },
+  "Haunting": { 
+      backgrounds: ["Defrocked Exorcist", "Grieving Medium", "Antique Forger"], 
+      flaws: ["Superstitious", "Guilt-ridden"], 
+      voices: ["Mournful", "Echoing"], 
+      appearances: ["Faded funeral wear", "Bruised eyes"], 
+      items: ["Locket of hair", "Silver coin"], 
+      hooks: ["Carrying a spirit", "Purgatory belief"],
+      agendas: [
+          { goal: "Establish a circle of protection using salt.", constraint: "Cannot let the others know it's for them." },
+          { goal: "Complete the ritual to banish the whispering voice.", constraint: "Needs an anchor from someone else." }
+      ]
+  },
+  "Survival": { 
+      backgrounds: ["Feral Pilgrim", "Cannibal Matriarch", "Ex-Military Deserter"], 
+      flaws: ["Ruthless", "Hoarder"], 
+      voices: ["Hoarse", "Animalistic"], 
+      appearances: ["Rotted furs", "Sharpened teeth"], 
+      items: ["Bag of bones", "Human jerky"], 
+      hooks: ["Eaten loved ones", "Carrying the fire"],
+      agendas: [
+          { goal: "Scout for an escape route and booby-trap the current one.", constraint: "Must remain the 'scout'." },
+          { goal: "Cache a secret supply of food and water.", constraint: "Cannot share with anyone." }
+      ]
+  }
 };
 
 const pickRandom = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
@@ -61,6 +106,7 @@ export const generateProceduralNpc = (clusterName: string = "Flesh", intensity: 
   const lastName = pickRandom(LAST_NAMES);
   const sin = pickRandom(ANCESTRAL_SINS);
   const background = pickRandom(flavor.backgrounds);
+  const agenda = pickRandom(flavor.agendas);
   
   // Depth increases exponentially with intensity
   const richOrigin = (isHighIntensity || isPrologue)
@@ -101,6 +147,10 @@ export const generateProceduralNpc = (clusterName: string = "Flesh", intensity: 
       fracture_state: 0,
       disassociation_index: 0.0,
       secondary_goal: "Atonement",
+      hidden_agenda: {
+          ...agenda,
+          progress_level: 0
+      },
       relationship_state: { trust: 25, fear: intensityLevel * 10, secretKnowledge: isHighIntensity },
       relationships_to_other_npcs: {},
       memory_stream: [],
