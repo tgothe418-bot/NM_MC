@@ -15,6 +15,11 @@ export interface SimulationConfig {
   co_author_mode?: 'Manual' | 'Auto';
   co_author_archetype?: string;
   co_author_dominance?: number;
+  villain_name?: string;
+  villain_appearance?: string;
+  villain_methods?: string;
+  victim_description?: string;
+  primary_goal?: string;
 }
 
 export interface VillainState {
@@ -94,7 +99,10 @@ export type SocialManeuver =
   | 'ATTACK' 
   | 'GASLIGHT' 
   | 'BEG'
-  | 'BARGAIN';
+  | 'BARGAIN'
+  | 'ENLIGHTEN' 
+  | 'DEBASE' 
+  | 'TRANSFIX';
 
 export interface DialogueEntry {
   speaker: string; 
@@ -149,7 +157,7 @@ export interface PhysicalFeatures {
 }
 
 export type ResilienceLevel = 'Unbreakable' | 'High' | 'Moderate' | 'Fragile' | 'Shattered';
-export type SurvivalInstinct = 'Fight' | 'Flight' | 'Freeze' | 'Fawn' | 'Submit';
+export type SurvivalInstinct = 'Fight' | 'Flight' | 'Freeze' | 'Fawn' | 'Submit' | 'Aggression';
 
 export interface PsychologicalState {
   current_thought: string; 
@@ -160,11 +168,11 @@ export interface PsychologicalState {
   dominant_instinct: SurvivalInstinct;
 }
 
-export type InjuryDepth = 'SURFACE' | 'DEEP_TISSUE' | 'STRUCTURAL';
+export type InjuryDepth = 'SURFACE' | 'DEEP_TISSUE' | 'STRUCTURAL' | 'TRANSCENDENTAL';
 
 export interface Injury {
   location: string;
-  type: 'abrasion' | 'contusion' | 'laceration' | 'incision' | 'puncture' | 'fracture' | 'avulsion' | 'degloving' | 'burn' | 'psychological';
+  type: 'abrasion' | 'contusion' | 'laceration' | 'incision' | 'puncture' | 'fracture' | 'avulsion' | 'degloving' | 'burn' | 'psychological' | 'apotheosis';
   depth: InjuryDepth; 
   description: string; 
   functional_impact: string; 
@@ -223,7 +231,7 @@ export interface NpcState {
   active_injuries: Injury[];
   pain_level: number; 
   shock_level: number; 
-  consciousness: 'Alert' | 'Dazed' | 'Fading' | 'Unconscious';
+  consciousness: 'Alert' | 'Dazed' | 'Fading' | 'Unconscious' | 'Apotheosis';
   mobility_score: number; 
   manipulation_score: number; 
   perception_score: number; 

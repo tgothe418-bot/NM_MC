@@ -7,7 +7,7 @@ interface InputAreaProps {
   onSnapshot?: () => void;
   isLoading: boolean;
   inputType?: 'text' | 'choice_yes_no';
-  externalValue?: string; // Prop for voice input override
+  externalValue?: string; 
 }
 
 export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, isLoading, inputType = 'text', externalValue }) => {
@@ -15,7 +15,6 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, isLoad
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
 
-  // Sync with external value (Voice Input)
   useEffect(() => {
     if (externalValue !== undefined) {
       setText(externalValue);
@@ -47,30 +46,30 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, isLoad
   }, [text]);
 
   return (
-    <div className="relative w-full max-w-4xl mx-auto mt-6">
+    <div className="relative w-full max-w-5xl mx-auto">
       <form onSubmit={handleSubmit} className="relative group">
-        <div className={`absolute -inset-0.5 bg-gradient-to-r from-gray-800 to-gray-700 rounded-lg blur opacity-30 group-hover:opacity-60 transition duration-1000 ${isLoading ? 'animate-pulse' : ''} ${isVoiceActive ? 'opacity-80 from-red-900 to-red-500' : ''}`}></div>
-        <div className={`relative flex items-end bg-black border rounded-lg p-2 shadow-2xl transition-colors duration-500 ${isVoiceActive ? 'border-red-900/50 shadow-[0_0_20px_rgba(220,20,60,0.1)]' : 'border-gray-800'}`}>
+        <div className={`absolute -inset-1 bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 rounded-2xl blur-md opacity-30 group-hover:opacity-70 transition duration-1000 ${isLoading ? 'animate-pulse' : ''} ${isVoiceActive ? 'opacity-90 from-red-900 via-red-600 to-red-900' : ''}`}></div>
+        <div className={`relative flex items-center bg-black/90 border-2 rounded-2xl p-4 shadow-3xl transition-all duration-700 backdrop-blur-xl ${isVoiceActive ? 'border-red-900 shadow-[0_0_40px_rgba(220,20,60,0.2)]' : 'border-gray-800 group-hover:border-gray-700'}`}>
           
           {onSnapshot && (
             <button
               type="button"
               onClick={onSnapshot}
               disabled={isLoading}
-              className="mb-1 mr-2 p-3 rounded-full text-gray-400 hover:text-system-cyan hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed group/cam relative"
-              title="Generate Scene Snapshot"
+              className="p-4 rounded-xl text-gray-500 hover:text-system-cyan hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed group/cam relative"
+              title="Visualize Neural Landscape"
             >
-               <Camera className="w-5 h-5" />
-               <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 text-[10px] bg-black border border-gray-700 text-gray-300 px-2 py-1 rounded opacity-0 group-hover/cam:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-                 Capture Scene
+               <Camera className="w-8 h-8" />
+               <span className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 text-xs bg-black border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg opacity-0 group-hover/cam:opacity-100 transition-opacity pointer-events-none whitespace-nowrap uppercase tracking-widest font-mono shadow-2xl">
+                 Project Neural Image
                </span>
             </button>
           )}
 
-          <div className="relative w-full">
+          <div className="relative w-full px-4">
             {isVoiceActive && (
-                 <div className="absolute -top-6 left-0 flex items-center gap-2 text-[10px] text-red-500 font-mono uppercase tracking-widest animate-pulse">
-                     <Mic className="w-3 h-3" /> Voice Input Active
+                 <div className="absolute -top-10 left-4 flex items-center gap-3 text-xs text-red-500 font-mono uppercase tracking-[0.4em] animate-pulse font-bold">
+                     <Mic className="w-4 h-4" /> System Listening...
                  </div>
             )}
             <textarea
@@ -78,19 +77,19 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, isLoad
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={isLoading ? "The Architect is thinking..." : (isVoiceActive ? "Listening..." : "State your action...")}
+                placeholder={isLoading ? "Architect is reweaving the simulation..." : (isVoiceActive ? "Speak to the Void..." : "Define your volition...")}
                 disabled={isLoading}
                 rows={1}
-                className={`w-full bg-transparent text-gray-200 placeholder-gray-600 px-4 py-3 focus:outline-none resize-none font-serif text-lg max-h-32 disabled:opacity-50 transition-colors ${isVoiceActive ? 'text-red-100 placeholder-red-900/50' : ''}`}
+                className={`w-full bg-transparent text-gray-100 placeholder-gray-700 px-2 py-4 focus:outline-none resize-none font-serif text-2xl max-h-64 disabled:opacity-50 transition-all ${isVoiceActive ? 'text-red-100 placeholder-red-900/40' : ''}`}
             />
           </div>
           
           <button
             type="submit"
             disabled={!text.trim() || isLoading}
-            className={`mb-1 p-3 rounded-full text-gray-400 hover:text-white hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed ${isVoiceActive ? 'text-red-500 hover:bg-red-900/20' : ''}`}
+            className={`p-4 rounded-xl text-gray-600 hover:text-white hover:bg-gray-800 transition-all disabled:opacity-10 disabled:cursor-not-allowed ${isVoiceActive ? 'text-red-500 hover:bg-red-900/30 animate-pulse' : ''}`}
           >
-            {isLoading ? <Activity className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+            {isLoading ? <Activity className="w-8 h-8 animate-spin" /> : <Send className="w-8 h-8" />}
           </button>
         </div>
       </form>

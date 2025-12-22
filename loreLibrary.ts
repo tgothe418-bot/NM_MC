@@ -1,5 +1,4 @@
 
-
 import { ClusterLore } from './types';
 
 export const LORE_LIBRARY: Record<string, ClusterLore> = {
@@ -50,19 +49,22 @@ export const LORE_LIBRARY: Record<string, ClusterLore> = {
         "Periodontal decay", "Old bandages", "Sour stomach acid", "Formaldehyde",
         "Singed hair", "Rancid butter", "Copper and bleach", "Open bowel", "Old sweat",
         "Musk of terrified animals", "Stagnant pond water", "Acetone", "Burnt sugar", "Raw meat left in the sun",
-        "A heavy sickish sweetness", "Cut flowers in stagnant water", "Camphor", "Mothballs"
+        "A heavy sickish sweetness", "Cut flowers in stagnant water", "Camphor", "Mothballs",
+        "The alkaline sharp of fresh bone marrow", "Exposed intestinal bile", "The metallic steam of an open thoracic cavity"
       ],
       sound: [
         "Wet tearing", "Heavy breathing", "Guttural grunts", "The snap of cartilage", "Suction", 
         "A low, purring vibration", "Fluids dripping on linoleum", "The squelch of walking in mud", "Teeth grinding",
         "Joints popping wetly", "Skin peeling like tape", "Gurgling drain", "Fist hitting raw meat", "Choking gasp",
-        "A wet cough from the dark", "Friction of skin on glass", "Flies buzzing in a closed jar", "A muffled scream behind a door"
+        "A wet cough from the dark", "Friction of skin on glass", "Flies buzzing in a closed jar", "A muffled scream behind a door",
+        "The rhythmic wet-thud of an exposed heart", "The forensic grind of a saw meeting femur", "The hiss of air escaping a punctured lung"
       ],
       touch: [
         "Slick membranes", "Warmth", "Pulsing veins", "Sticky residue", "Velvet", 
         "Degloved texture", "Fever-hot skin", "Greasy hair", "Something wet that dries sticky",
         "Oily film", "Warm gelatin", "Rough tongue", "Loose tooth", "Sweaty palm",
-        "Pulsing warmth under the floor", "Wet wool", "Sticky condensation", "Soft spots in the wall"
+        "Pulsing warmth under the floor", "Wet wool", "Sticky condensation", "Soft spots in the wall",
+        "The heat of fresh arterial spray", "Tactile grit of bone fragments", "The slick recoil of exposed muscle tissue"
       ],
       taste: [
         "Salt", "Iron", "Bile", "Sweetness of rot", "Metallic tang", "Fat", "Sour milk",
@@ -531,14 +533,16 @@ export const LORE_LIBRARY: Record<string, ClusterLore> = {
         "Wine turned to vinegar", "Rotting flowers", "Musk", "Burnt hair",
         "Myrrh", "Rotting lily", "Burnt fat", "Sour wine", "Damp crypt",
         "Myrrh and rotting meat", "Goat musk", "Burnt sage", "Brimstone",
-        "Marijuana smoke", "Stale cigarette ash", "Vile protein shake"
+        "Marijuana smoke", "Stale cigarette ash", "Vile protein shake",
+        "The stench of systematic moral erosion", "Infected ritual oil", "Sacrificial iron residue"
       ],
       sound: [
         "Low frequency chanting", "Bells", "The bleating of a goat", "Discordant piping", 
         "Screams of the damned", "Buzzing flies", "Speaking in tongues",
         "Latin whispers", "Goat bleat", "Bell tolling", "Whip crack", "Choir off-key",
         "Gregorian chant distorted", "Fly buzzing", "Dripping wax", "Bone scraping stone", "Inhuman growl",
-        "Radio static", "Feedback loops", "Industrial music"
+        "Radio static", "Feedback loops", "Industrial music",
+        "The digital feedback of a desecrated broadcast", "The rhythmic wet-crack of ritual flagellation"
       ],
       touch: [
         "Greasy residue", "Hot wax", "Rough stone", "Oily smoke", "Scales", 

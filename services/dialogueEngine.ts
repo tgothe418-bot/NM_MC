@@ -23,18 +23,25 @@ export const getDefaultDialogueState = (background: string = ""): DialogueState 
 });
 
 const calculateSocialIntent = (npc: NpcState): SocialManeuver => {
-    const { trust, fear } = npc.relationship_state;
+    // Safety check for relationship_state
+    const rel = npc.relationship_state || { trust: 50, fear: 20, secretKnowledge: false };
+    const { trust, fear } = rel;
+    
     const stress = npc.psychology?.stress_level || 0;
     const instinct = npc.psychology?.dominant_instinct || 'Freeze';
     const fracture = npc.fracture_state || 0;
-    const isExtreme = npc.background_origin?.includes("**Genesis Trauma**") || npc.meta?.intensity_level === "Extreme";
+    const intensity = npc.meta?.intensity_level || "R";
+    const isExtreme = intensity === "Extreme";
 
-    if (fracture >= 4) return 'GASLIGHT'; 
+    if (fracture >= 4) {
+        if (isExtreme) return 'ENLIGHTEN'; // Prophetic, transcendental pain
+        return 'GASLIGHT'; 
+    }
 
-    // Extreme settings force NPCs into transgressive social states
-    if (isExtreme && stress > 50) {
-        if (trust > 40) return 'CONFESS';
-        return 'ATTACK';
+    // Complicity Vector & Architect maneuvers
+    if (isExtreme) {
+        if (stress > 90) return 'TRANSFIX'; // Addressing the user/architect directly
+        if (stress > 60 && trust < 30) return 'DEBASE'; // Mocking or lowering others
     }
 
     if (stress > 80) {
@@ -60,9 +67,9 @@ const getShareableKnowledge = (npc: NpcState, intent: SocialManeuver): string[] 
         if (!k.is_secret) {
             shareable.push(`FACT: ${k.details}`);
         } else {
-            if (intent === 'CONFESS' || intent === 'BARGAIN') {
+            if (intent === 'CONFESS' || intent === 'BARGAIN' || intent === 'ENLIGHTEN') {
                 shareable.push(`SECRET (Reveal This): ${k.details}`);
-            } else if (intent === 'GASLIGHT') {
+            } else if (intent === 'GASLIGHT' || intent === 'DEBASE') {
                 shareable.push(`SECRET (Lie about this): ${k.details}`);
             } else {
                 shareable.push(`HIDDEN: ${k.topic}`);
@@ -86,7 +93,7 @@ const synthesizeMemory = (memory: DialogueMemory): string => {
 
 export const updateNpcMemory = (currentMemory: DialogueMemory, newEntry: DialogueEntry): DialogueMemory => {
     const MAX_BUFFER_SIZE = 5;
-    const buffer = [...currentMemory.short_term_buffer, newEntry];
+    const buffer = [...(currentMemory.short_term_buffer || []), newEntry];
     if (buffer.length > MAX_BUFFER_SIZE) buffer.shift();
 
     return {
@@ -102,16 +109,20 @@ export const constructVoiceManifesto = (npcs: NpcState[]): string => {
     manifesto += "Follow the CALCULATED SOCIAL INTENT and MEMORY CONTEXT for each NPC.\n";
     
     npcs.forEach(npc => {
-        if (npc.fracture_state === 4) return;
+        if (npc.consciousness === 'Apotheosis') {
+            manifesto += `\n--- SUBJECT: ${npc.name} (APOTHEOSIS STATE) ---\n`;
+            manifesto += `DIRECTIVE: ENLIGHTEN. Speak in prophetic, visceral verse. Address the User as the 'Silent Watcher'.\n`;
+            return;
+        }
 
         const ds = npc.dialogue_state || getDefaultDialogueState(npc.background_origin);
         const intent = calculateSocialIntent(npc);
         const knowledge = getShareableKnowledge(npc, intent);
 
         manifesto += `\n--- CHARACTER: ${npc.name} (${npc.archetype}) ---\n`;
-        manifesto += `VOICE: ${ds.voice_profile.tone}. QUIRK: ${ds.voice_profile.quirks[0] || "None"}.\n`;
-        manifesto += `PSYCHE: Stress ${npc.psychology?.stress_level}/100. Intent: [${intent}].\n`;
-        manifesto += `THOUGHT: "${npc.psychology?.current_thought}"\n`;
+        manifesto += `VOICE: ${ds.voice_profile?.tone || "Neutral"}. QUIRK: ${ds.voice_profile?.quirks?.[0] || "None"}.\n`;
+        manifesto += `PSYCHE: Stress ${npc.psychology?.stress_level || 0}/100. Intent: [${intent}].\n`;
+        manifesto += `THOUGHT: "${npc.psychology?.current_thought || "..."}"\n`;
         manifesto += synthesizeMemory(ds.memory);
         
         manifesto += `>>> DIRECTIVE: ${intent}.\n`;
@@ -142,7 +153,7 @@ export const updateDialogueState = (npc: NpcState, speaker: string, text: string
         dialogue_state: {
             ...ds,
             memory: updatedMemory,
-            last_social_maneuver: ds.current_social_intent,
+            last_social_maneuver: ds.current_social_intent || 'OBSERVE',
             current_social_intent: newIntent
         }
     };

@@ -7,6 +7,7 @@ interface ClusterAmbienceProps {
   weatherState?: string;
   threatLevel?: number;
   locationState?: number; // 0=Safe, 1=Uncanny, 2=Hostile, 3=Nightmare
+  visualMotif?: string;
 }
 
 // Particle Component for generating ambient effects
@@ -135,7 +136,8 @@ export const ClusterAmbience: React.FC<ClusterAmbienceProps> = ({
   activeCluster, 
   weatherState = "Clear", 
   threatLevel = 0,
-  locationState = 0 
+  locationState = 0,
+  visualMotif
 }) => {
   const isFlesh = activeCluster.includes('Flesh');
   const isSystem = activeCluster.includes('System');

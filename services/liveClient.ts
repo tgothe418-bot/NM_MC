@@ -12,6 +12,7 @@ const SUBMIT_ACTION_TOOL: FunctionDeclaration = {
   description: "Submit the user's spoken action or statement to the Nightmare Machine game engine.",
   parameters: {
     type: Type.OBJECT,
+    description: 'The exact words spoken by the user that constitute their action.',
     properties: {
       action: {
         type: Type.STRING,
@@ -67,7 +68,8 @@ export class LiveClient {
         speechConfig: {
           voiceConfig: { prebuiltVoiceConfig: { voiceName: config.voiceName } }
         },
-        inputAudioTranscription: { model: "google_speech" }, // Enable Real-time Transcription
+        // Using empty object as per guidelines for input audio transcription
+        inputAudioTranscription: {}, 
         systemInstruction: systemInstruction,
         tools: [{ functionDeclarations: [SUBMIT_ACTION_TOOL] }],
       }
@@ -82,12 +84,13 @@ export class LiveClient {
     this.inputSource = this.inputContext.createMediaStreamSource(stream);
     this.inputProcessor = this.inputContext.createScriptProcessor(4096, 1, 1);
 
-    this.inputProcessor.onaudioprocess = (e) => {
-      const inputData = e.inputBuffer.getChannelData(0);
+    this.inputProcessor.onaudioprocess = (audioProcessingEvent) => {
+      const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
       const pcmBuffer = float32To16BitPCM(inputData);
       const base64Data = arrayBufferToBase64(pcmBuffer);
 
       if (this.sessionPromise) {
+        // CRITICAL: Solely rely on sessionPromise resolves and then call `session.sendRealtimeInput`
         this.sessionPromise.then(session => {
           session.sendRealtimeInput({
             media: {
@@ -105,8 +108,10 @@ export class LiveClient {
 
   private async handleMessage(msg: LiveServerMessage) {
     // 1. Handle Audio Output (Narrator Voice)
+    // Scheduling each new audio chunk to start at this time ensures smooth, gapless playback.
     const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
     if (audioData && this.outputContext) {
+      this.nextStartTime = Math.max(this.nextStartTime, this.outputContext.currentTime);
       const float32 = base64ToFloat32Array(audioData);
       const buffer = this.outputContext.createBuffer(1, float32.length, 24000);
       buffer.getChannelData(0).set(float32);
@@ -115,10 +120,8 @@ export class LiveClient {
       source.buffer = buffer;
       source.connect(this.outputContext.destination);
 
-      const now = this.outputContext.currentTime;
-      const startTime = Math.max(now, this.nextStartTime);
-      source.start(startTime);
-      this.nextStartTime = startTime + buffer.duration;
+      source.start(this.nextStartTime);
+      this.nextStartTime = this.nextStartTime + buffer.duration;
     }
 
     // 2. Handle Real-time Input Transcription (User Voice -> Text)
@@ -144,15 +147,14 @@ export class LiveClient {
              const resultText = await this.onAction(actionText);
 
              // Send the result back to the Live Model so it can narrate it
+             // Using object format for functionResponses as per guidelines
              this.sessionPromise?.then(session => {
                 session.sendToolResponse({
-                   functionResponses: [
-                     {
+                   functionResponses: {
                        id: fc.id,
                        name: fc.name,
                        response: { result: resultText }
-                     }
-                   ]
+                   }
                 });
              });
 
@@ -160,13 +162,11 @@ export class LiveClient {
              console.error("Game Engine Tool Error", e);
              this.sessionPromise?.then(session => {
                 session.sendToolResponse({
-                   functionResponses: [
-                     {
+                   functionResponses: {
                        id: fc.id,
                        name: fc.name,
                        response: { error: "The Nightmare Machine is unresponsive." }
-                     }
-                   ]
+                   }
                 });
              });
           }

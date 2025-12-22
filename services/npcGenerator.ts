@@ -24,10 +24,12 @@ const ANCESTRAL_SINS = [
   "They were once part of a 'cleaning crew' for a high-profile murderer, disposing of evidence that included a child's shoe.",
   "They sold their child's location to a debt collector to settle their own gambling debts.",
   "They poisoned a rival's crops with industrial runoff, leading to a localized famine in their home village.",
-  "They falsified evidence that sent an innocent man to death row, all for a minor promotion in the DA's office."
+  "They falsified evidence that sent an innocent man to death row, all for a minor promotion in the DA's office.",
+  "They participated in 'Specimen Technics', assisting a rogue researcher in measuring the neural response to prolonged psychological degradation.",
+  "They recorded a sexual assault and used it as collateral to secure a corporate merger.",
+  "They deliberately caused a high-speed pileup on a highway to film the 'visceral reality' for a snuff-adjacent art project."
 ];
 
-// Defined ClusterFlavor interface to fix unknown type errors
 interface ClusterFlavor {
   backgrounds: string[];
   flaws: string[];
@@ -83,7 +85,7 @@ export const generateProceduralNpc = (clusterName: string = "Flesh", intensity: 
           sanity_percentage: isExtreme ? 60 : 100,
           resilience_level: isExtreme ? 'Fragile' : 'Moderate',
           stress_level: isExtreme ? 45 : 0,
-          dominant_instinct: pickRandom(['Fight', 'Flight', 'Freeze', 'Fawn'])
+          dominant_instinct: isExtreme ? 'Aggression' : pickRandom(['Fight', 'Flight', 'Freeze', 'Fawn'])
       },
       current_state: "Dormant",
       fracture_vectors: { fear: isExtreme ? 40 : 10, isolation: 30, guilt: isExtreme ? 80 : 10, paranoia: 20 },
@@ -97,7 +99,7 @@ export const generateProceduralNpc = (clusterName: string = "Flesh", intensity: 
       dialogue_state: {
           ...getDefaultDialogueState(richOrigin),
           voice_profile: { tone: pickRandom(flavor.voices), vocabulary: [], quirks: [], forbidden_topics: [] },
-          current_social_intent: isExtreme ? 'DEFLECT' : 'OBSERVE'
+          current_social_intent: isExtreme ? 'DEBASE' : 'OBSERVE'
       },
       knowledge_state: [],
       physical_state: "Tense",

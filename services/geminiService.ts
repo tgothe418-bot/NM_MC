@@ -9,7 +9,7 @@ export const initializeGemini = () => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     chatSession = ai.chats.create({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-pro-preview',
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         temperature: 0.9,
@@ -66,6 +66,47 @@ const withRetry = async <T>(
     }
   }
   throw new Error(`Failed ${context} after ${maxAttempts} attempts.`);
+};
+
+export const generateCalibrationField = async (field: string, cluster: string, intensity: string, count?: number): Promise<string> => {
+  return withRetry(async () => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
+    let instructions = `Be creative, unsettling, and highly detailed. Stay true to the specific tropes and aesthetics of the selected cluster. 
+Output ONLY the generated text. No preamble, no quotes.`;
+
+    if (field === 'Specimen Targets' && count) {
+      instructions = `Generate exactly ${count} named characters with evocative backgrounds who will serve as the victims/survivors in this story. 
+For each character, include their name, archetype, and a 'Genesis Sin' or a deep psychological vulnerability that makes them a target for the Machine. 
+Format as a structured list or catalog of specimens. Use a tone appropriate for the ${cluster} cluster and ${intensity} intensity.`;
+    }
+
+    if (field === 'Primary Objective') {
+      instructions = `Generate a very brief, simple, and vague primary objective. It should be evocative and unsettling but lack specific mechanical detail. One short sentence maximum. 
+Stay true to the ${cluster} theme. Output ONLY the text.`;
+    }
+
+    if (field === 'Entity Name') {
+      instructions = `Generate a single, terrifying, and thematically appropriate name or title for a horror antagonist. 
+Appropriate for ${cluster} cluster and ${intensity} intensity. 
+Output ONLY the name. No quotes, no descriptions.`;
+    }
+
+    const prompt = `As the Horror Story Architect, generate a relevant entry for the field "${field}" in an interactive horror simulation.
+Cluster: ${cluster}
+Intensity: ${intensity}
+Context: The user is playing as an Antagonist/Predator.
+${instructions}`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        temperature: 0.8,
+      },
+    });
+    return response.text?.trim() || "";
+  }, `Generate Calibration Field: ${field}`);
 };
 
 export const sendMessageToGemini = async (
@@ -134,7 +175,7 @@ If the simulation is already in progress, act according to the assigned Role (${
     }
 
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: `CURRENT NARRATIVE:\n${historyText}\n\nCURRENT STATE:\n${JSON.stringify(gameState)}`,
         config: {
         systemInstruction: instructions,
@@ -149,7 +190,7 @@ export const generateSimulationAnalysis = async (gameLog: string): Promise<strin
   return withRetry(async () => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: `GAMEPLAY LOG:\n${gameLog}`,
         config: {
         systemInstruction: ANALYST_SYSTEM_INSTRUCTION

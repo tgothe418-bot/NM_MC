@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import { ChatMessage } from '../types';
 import { Image, FileText } from 'lucide-react';
@@ -9,10 +10,8 @@ interface StoryLogProps {
   activeCluster?: string;
 }
 
-// Zalgo / Glitch Text Generator
 const generateZalgo = (text: string, intensity: number = 1): string => {
   const chars = text.split('');
-  // Simplified glitch chars
   const combining = [
     '\u0300', '\u0301', '\u0302', '\u0303', '\u0304', '\u0305', '\u0306', '\u0307',
     '\u0320', '\u0321', '\u0322', '\u0323', '\u0324', '\u0325', '\u0326', '\u0327'
@@ -31,83 +30,68 @@ const generateZalgo = (text: string, intensity: number = 1): string => {
   }).join('');
 };
 
-// Map clusters to Tailwind colors defined in index.html
 const getHighlightColor = (cluster?: string) => {
-  if (!cluster || cluster === "None") return "text-green-200 drop-shadow-[0_0_8px_rgba(134,239,172,0.3)]";
+  if (!cluster || cluster === "None") return "text-green-200 drop-shadow-[0_0_10px_rgba(134,239,172,0.4)]";
   
-  if (cluster.includes("Flesh")) return "text-fresh-blood drop-shadow-[0_0_8px_rgba(220,20,60,0.4)]";
-  if (cluster.includes("System")) return "text-system-cyan drop-shadow-[0_0_8px_rgba(0,255,255,0.3)]";
-  if (cluster.includes("Haunting")) return "text-haunt-gold drop-shadow-[0_0_8px_rgba(180,83,9,0.3)]";
-  if (cluster.includes("Self")) return "text-psych-lavender drop-shadow-[0_0_8px_rgba(75,0,130,0.4)]";
-  if (cluster.includes("Blasphemy")) return "text-blasphemy-sulfur drop-shadow-[0_0_8px_rgba(255,215,0,0.3)]";
-  if (cluster.includes("Survival")) return "text-survival-ice drop-shadow-[0_0_8px_rgba(165,242,243,0.4)]";
+  if (cluster.includes("Flesh")) return "text-fresh-blood drop-shadow-[0_0_10px_rgba(136,8,8,0.5)]";
+  if (cluster.includes("System")) return "text-system-cyan drop-shadow-[0_0_10px_rgba(0,255,255,0.4)]";
+  if (cluster.includes("Haunting")) return "text-haunt-gold drop-shadow-[0_0_10px_rgba(180,83,9,0.4)]";
+  if (cluster.includes("Self")) return "text-psych-lavender drop-shadow-[0_0_10px_rgba(230,230,250,0.5)]";
+  if (cluster.includes("Blasphemy")) return "text-blasphemy-sulfur drop-shadow-[0_0_10px_rgba(255,215,0,0.4)]";
+  if (cluster.includes("Survival")) return "text-survival-ice drop-shadow-[0_0_10px_rgba(165,242,243,0.5)]";
   
   return "text-green-200";
 };
 
-// Map clusters to italic/accent colors
 const getAccentColor = (cluster?: string) => {
   if (!cluster || cluster === "None") return "text-gray-400";
 
-  if (cluster.includes("Flesh")) return "text-red-300";
+  if (cluster.includes("Flesh")) return "text-red-400";
   if (cluster.includes("System")) return "text-green-400";
   if (cluster.includes("Haunting")) return "text-haunt-dust";
-  if (cluster.includes("Self")) return "text-indigo-300";
-  if (cluster.includes("Blasphemy")) return "text-purple-300";
-  if (cluster.includes("Survival")) return "text-cyan-200";
+  if (cluster.includes("Self")) return "text-indigo-400";
+  if (cluster.includes("Blasphemy")) return "text-purple-400";
+  if (cluster.includes("Survival")) return "text-cyan-300";
 
   return "text-gray-400";
 };
 
-// House of Leaves Stylizer + Specific Color Cues
 const applyTypographicAnomalies = (text: string): React.ReactNode[] => {
-  // Regex to match specific color words and HoL keywords
-  // Keywords: house (blue), minotaur (red/strike)
-  // Colors: Russet, Crimson Lake, Cerulean Sky, etc.
   const regex = /(\b(?:house|home|dwelling|hallway|hallways|corridor|room|rooms|walls|structure|place)\b|\b(?:minotaur|beast|monster|threat|horror)\b|\b(?:russet|crimson lake|crimson|cerulean sky|cerulean|cobalt|vermilion|ochre|umber|sienna|viridian)\b)/gi;
-  
   const parts = text.split(regex);
   
   return parts.map((part, index) => {
     const lower = part.toLowerCase();
     
-    // 1. The House (Blue)
     if (['house', 'home', 'dwelling', 'hallway', 'hallways', 'corridor', 'room', 'rooms', 'walls', 'structure', 'place'].includes(lower)) {
-       return <span key={index} className="text-[#3b82f6] font-bold">{part}</span>;
+       return <span key={index} className="text-[#4dabff] font-bold drop-shadow-[0_0_5px_rgba(77,171,255,0.3)]">{part}</span>;
     }
     
-    // 2. The Minotaur (Red / Struck)
     if (['minotaur', 'beast', 'monster', 'threat', 'horror'].includes(lower)) {
        return (
-         <span key={index} className="text-[#dc2626] font-bold relative inline-block">
+         <span key={index} className="text-[#ff3b3b] font-bold relative inline-block">
             <span className="relative z-10">{part}</span>
-            {/* Optional Strikethrough effect for 'Minotaur' specific style */}
-            {lower === 'minotaur' && <span className="absolute left-0 top-1/2 w-full h-[1px] bg-red-500 transform -translate-y-1/2"></span>}
+            {lower === 'minotaur' && <span className="absolute left-0 top-1/2 w-full h-[2px] bg-red-600/50 transform -translate-y-1/2"></span>}
          </span>
        );
     }
 
-    // 3. Specific Color Cues (As described in screenshot)
-    if (lower.includes('russet')) return <span key={index} style={{ color: '#80461B' }} className="font-bold">{part}</span>;
-    if (lower.includes('crimson')) return <span key={index} style={{ color: '#DC143C' }} className="font-bold">{part}</span>;
-    if (lower.includes('cerulean')) return <span key={index} style={{ color: '#007BA7' }} className="font-bold">{part}</span>;
-    if (lower.includes('cobalt')) return <span key={index} style={{ color: '#0047AB' }} className="font-bold">{part}</span>;
-    if (lower.includes('vermilion')) return <span key={index} style={{ color: '#E34234' }} className="font-bold">{part}</span>;
-    if (lower.includes('ochre')) return <span key={index} style={{ color: '#CC7722' }} className="font-bold">{part}</span>;
-    if (lower.includes('umber')) return <span key={index} style={{ color: '#635147' }} className="font-bold">{part}</span>;
-    if (lower.includes('sienna')) return <span key={index} style={{ color: '#882D17' }} className="font-bold">{part}</span>;
-    if (lower.includes('viridian')) return <span key={index} style={{ color: '#40826D' }} className="font-bold">{part}</span>;
+    if (lower.includes('russet')) return <span key={index} style={{ color: '#9e5a26' }} className="font-bold">{part}</span>;
+    if (lower.includes('crimson')) return <span key={index} style={{ color: '#ff1f4c' }} className="font-bold">{part}</span>;
+    if (lower.includes('cerulean')) return <span key={index} style={{ color: '#0099d1' }} className="font-bold">{part}</span>;
+    if (lower.includes('cobalt')) return <span key={index} style={{ color: '#1a66ff' }} className="font-bold">{part}</span>;
+    if (lower.includes('vermilion')) return <span key={index} style={{ color: '#ff4d40' }} className="font-bold">{part}</span>;
+    if (lower.includes('ochre')) return <span key={index} style={{ color: '#e68a00' }} className="font-bold">{part}</span>;
+    if (lower.includes('umber')) return <span key={index} style={{ color: '#8c7060' }} className="font-bold">{part}</span>;
+    if (lower.includes('sienna')) return <span key={index} style={{ color: '#b33b1d' }} className="font-bold">{part}</span>;
+    if (lower.includes('viridian')) return <span key={index} style={{ color: '#4da68a' }} className="font-bold">{part}</span>;
 
     return part;
   });
 };
 
-// Helper component to parse and render bold/italic/footnote markdown
 const FormattedText: React.FC<{ text: string, cluster?: string }> = ({ text, cluster }) => {
-  // 1. Check for Glitch Markers (e.g. from System cluster)
   const isSystem = cluster?.includes("System");
-  
-  // Split by footnotes: [^1]
   const parts = text.split(/(\[\^\d+\])/g);
   const highlightClass = getHighlightColor(cluster);
   const accentClass = getAccentColor(cluster);
@@ -115,49 +99,43 @@ const FormattedText: React.FC<{ text: string, cluster?: string }> = ({ text, clu
   return (
     <span>
       {parts.map((part, k) => {
-        // Handle Footnote Reference
         if (part.match(/^\[\^\d+\]$/)) {
             return (
-                <sup key={k} className="text-xs text-haunt-gold cursor-help ml-0.5 select-none hover:text-white transition-colors">
+                <sup key={k} className="text-sm text-haunt-gold cursor-help ml-1 font-bold select-none hover:text-white transition-colors">
                     {part}
                 </sup>
             );
         }
 
-        // Apply Glitch to System Text randomly
         let displayPart = part;
         if (isSystem && Math.random() > 0.95) {
-             displayPart = generateZalgo(part, 3);
+             displayPart = generateZalgo(part, 4);
         }
 
-        // Split by bold: **text**
         const boldParts = displayPart.split(/(\*\*[^*]+\*\*)/g);
         
         return (
           <span key={k}>
             {boldParts.map((subPart, i) => {
-              // Handle Bold
               if (subPart.startsWith('**') && subPart.endsWith('**')) {
                 return (
-                  <strong key={i} className={`font-bold tracking-wide transition-colors duration-500 ${highlightClass}`}>
+                  <strong key={i} className={`font-bold tracking-wider transition-all duration-700 ${highlightClass}`}>
                     {subPart.slice(2, -2)}
                   </strong>
                 );
               }
               
-              // Handle Italics within non-bold parts
               const italicParts = subPart.split(/(\*[^*]+\*)/g);
               return (
                 <span key={i}>
                   {italicParts.map((innerPart, j) => {
                     if (innerPart.startsWith('*') && innerPart.endsWith('*')) {
                       return (
-                        <em key={j} className={`italic font-serif tracking-wide ${accentClass}`}>
+                        <em key={j} className={`italic font-serif tracking-widest ${accentClass}`}>
                           {innerPart.slice(1, -1)}
                         </em>
                       );
                     }
-                    // Apply Typographic Anomalies (House of Leaves style) to normal text
                     return applyTypographicAnomalies(innerPart);
                   })}
                 </span>
@@ -177,11 +155,9 @@ export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, activeCl
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [history, isLoading]);
 
-  // Extract footnotes from the latest model message
   const latestModelMsg = [...history].reverse().find(m => m.role === 'model');
   const footnotes: string[] = [];
   if (latestModelMsg) {
-      // Regex to find footnote definitions at end of text e.g. [^1]: Text
       const regex = /\[\^(\d+)\]:\s*(.*)/g;
       let match;
       while ((match = regex.exec(latestModelMsg.text)) !== null) {
@@ -190,11 +166,10 @@ export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, activeCl
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 lg:p-12 custom-scrollbar bg-transparent relative z-10">
-      <div className="max-w-3xl mx-auto space-y-8 pb-32">
+    <div className="flex-1 overflow-y-auto p-10 lg:p-20 custom-scrollbar bg-transparent relative z-10">
+      <div className="max-w-4xl mx-auto space-y-16 pb-64">
         
-        {/* Intro Spacer */}
-        <div className="h-4"></div>
+        <div className="h-10"></div>
 
         {history.map((msg, idx) => (
           <div 
@@ -202,30 +177,27 @@ export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, activeCl
             className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-fadeIn`}
           >
             {msg.role === 'user' ? (
-              <div className="bg-gray-900 text-gray-300 px-6 py-3 rounded-2xl rounded-tr-none max-w-[80%] border border-gray-700 font-serif text-lg shadow-lg">
+              <div className="bg-gray-900/80 text-gray-100 px-10 py-6 rounded-3xl rounded-tr-none max-w-[85%] border border-gray-700 font-serif text-2xl shadow-2xl backdrop-blur-md">
                 {msg.text}
               </div>
             ) : (
-              <div className="max-w-full w-full">
-                {/* Generated Image rendering */}
+              <div className="max-w-full w-full space-y-8">
                 {msg.imageUrl && (
-                  <div className="mb-6 rounded overflow-hidden border border-gray-800 shadow-[0_0_30px_rgba(0,0,0,0.5)] relative group">
+                  <div className="mb-10 rounded-2xl overflow-hidden border border-gray-800 shadow-[0_0_50px_rgba(0,0,0,0.7)] relative group max-w-2xl">
                     <img 
                       src={msg.imageUrl} 
                       alt="Neural hallucination" 
-                      className="w-full h-auto opacity-80 group-hover:opacity-100 transition-opacity duration-1000 grayscale hover:grayscale-0"
+                      className="w-full h-auto opacity-90 group-hover:opacity-100 transition-all duration-1500 grayscale hover:grayscale-0 scale-105 hover:scale-100"
                     />
-                    <div className="absolute bottom-2 right-2 bg-black/60 px-2 py-1 text-[10px] text-gray-400 font-mono flex items-center gap-1 uppercase tracking-widest backdrop-blur-sm border border-gray-700">
-                      <Image className="w-3 h-3" /> Neural Visualization
+                    <div className="absolute bottom-4 right-4 bg-black/70 px-4 py-2 text-xs text-gray-300 font-mono flex items-center gap-2 uppercase tracking-[0.3em] backdrop-blur-md border border-gray-700 rounded-lg">
+                      <Image className="w-4 h-4" /> Neural Projection
                     </div>
                   </div>
                 )}
                 
-                <div className="prose prose-invert prose-p:font-serif prose-p:text-gray-300 prose-p:leading-relaxed prose-headings:font-sans prose-headings:tracking-widest prose-headings:text-gray-500 prose-strong:text-green-200 max-w-full w-full">
+                <div className="prose prose-invert prose-p:font-serif prose-p:text-gray-200 prose-p:leading-[1.7] prose-headings:font-sans prose-headings:tracking-[0.3em] prose-headings:text-gray-400 prose-strong:text-green-300 max-w-none w-full">
                   {msg.text.split('\n').map((line, i) => {
-                    if (!line.trim()) return <div key={i} className="h-2" />;
-                    
-                    // Skip footnote definitions in main text body (they are rendered separately)
+                    if (!line.trim()) return <div key={i} className="h-6" />;
                     if (line.match(/^\[\^\d+\]:/)) return null;
 
                     const isBlockquote = line.trim().startsWith('>');
@@ -234,9 +206,9 @@ export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, activeCl
                     return (
                       <p 
                         key={i} 
-                        className={`mb-3 text-lg ${
+                        className={`mb-8 text-2xl tracking-wide ${
                           isBlockquote 
-                            ? 'pl-6 border-l-4 border-haunt-gold/70 italic text-gray-300 font-serif text-xl tracking-wide my-8 py-4 bg-black/40 rounded-r shadow-[inset_10px_0_20px_-10px_rgba(0,0,0,0.8)]' 
+                            ? 'pl-10 border-l-8 border-haunt-gold/80 italic text-gray-200 font-serif text-3xl tracking-[0.05em] my-16 py-8 bg-black/60 rounded-r-xl shadow-2xl' 
                             : ''
                         }`}
                       >
@@ -248,23 +220,21 @@ export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, activeCl
               </div>
             )}
             
-            {/* Timestamp / Meta */}
-            <span className="text-[10px] text-gray-700 mt-2 font-mono uppercase">
-              {msg.role === 'user' ? 'YOU' : 'ARCHITECT'} • {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            <span className="text-xs text-gray-600 mt-6 font-mono uppercase tracking-[0.4em] opacity-60">
+              {msg.role === 'user' ? 'CONSCIOUSNESS' : 'ARCHITECT'} • {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
           </div>
         ))}
         
-        {/* ERGODIC FOOTNOTE RENDERER */}
         {footnotes.length > 0 && (
-            <div className="mt-12 pt-6 border-t border-gray-800/50">
-                <div className="flex items-center gap-2 mb-4 text-xs font-mono text-gray-500 uppercase tracking-widest">
-                    <FileText className="w-3 h-3" /> Footnotes / Addendum
+            <div className="mt-20 pt-10 border-t border-gray-800/80">
+                <div className="flex items-center gap-3 mb-8 text-sm font-mono text-gray-500 uppercase tracking-[0.4em]">
+                    <FileText className="w-5 h-5" /> Sub-Neural Addendum
                 </div>
-                <ul className="space-y-3">
+                <ul className="space-y-6">
                     {footnotes.map((note, i) => (
-                        <li key={i} className="text-xs text-gray-400 font-serif leading-relaxed pl-4 border-l border-gray-800">
-                            <span className="font-bold text-haunt-gold mr-2">[{note.split('.')[0]}]</span>
+                        <li key={i} className="text-lg text-gray-400 font-serif leading-relaxed pl-6 border-l-2 border-gray-800 transition-colors hover:border-haunt-gold/50">
+                            <span className="font-bold text-haunt-gold mr-3">[{note.split('.')[0]}]</span>
                             <FormattedText text={note.split('.').slice(1).join('.')} cluster={activeCluster} />
                         </li>
                     ))}
@@ -273,7 +243,7 @@ export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, activeCl
         )}
 
         {isLoading && (
-          <SigilLoader cluster={activeCluster} text="Simulating Consequences..." />
+          <SigilLoader cluster={activeCluster} text="Synchronizing Temporal Anomalies..." />
         )}
 
         <div ref={bottomRef} />

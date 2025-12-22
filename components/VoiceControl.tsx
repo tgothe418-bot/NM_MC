@@ -247,17 +247,17 @@ export const VoiceControl: React.FC<VoiceControlProps> = ({ onProcessAction, onI
             className={`bg-black/80 p-2 rounded-sm border backdrop-blur transition-all flex items-center gap-2 group w-full
               ${isConnected 
                   ? 'border-red-500 text-red-500 hover:bg-red-900/20' 
-                  : 'border-gray-700 text-gray-400 hover:border-gray-500 hover:text-gray-200'
+                  : 'border-gray-700 text-gray-200 hover:border-gray-500 hover:text-white'
               }`}
             title={isConnected ? "Disconnect Voice" : "Open Audio Settings"}
           >
             {isConnected ? (
-               <Mic className="w-5 h-5 animate-pulse" />
+               <Mic className="w-4 h-4 animate-pulse" />
             ) : (
-               <MicOff className="w-5 h-5" />
+               <MicOff className="w-4 h-4" />
             )}
             
-            <span className="hidden group-hover:block font-mono text-xs uppercase tracking-widest whitespace-nowrap">
+            <span className="hidden group-hover:block font-mono text-[10px] uppercase tracking-widest whitespace-nowrap">
                 {isConnected ? "Disconnect" : "Audio Link"}
             </span>
           </button>
@@ -269,12 +269,12 @@ export const VoiceControl: React.FC<VoiceControlProps> = ({ onProcessAction, onI
                className={`bg-black/80 p-2 rounded-sm border backdrop-blur transition-all flex items-center gap-2 group w-full
                  ${ttsEnabled 
                      ? 'border-system-green text-system-green hover:bg-green-900/20' 
-                     : 'border-gray-700 text-gray-600 hover:border-gray-500 hover:text-gray-400'
+                     : 'border-gray-700 text-gray-500 hover:border-gray-500 hover:text-gray-300'
                  }`}
                title={ttsEnabled ? "Mute Narration" : "Enable Narration"}
              >
-               {ttsEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
-               <span className="hidden group-hover:block font-mono text-xs uppercase tracking-widest whitespace-nowrap">
+               {ttsEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+               <span className="hidden group-hover:block font-mono text-[10px] uppercase tracking-widest whitespace-nowrap">
                    {ttsEnabled ? "Narrating" : "Muted"}
                </span>
              </button>
