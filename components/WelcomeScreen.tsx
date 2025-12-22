@@ -34,20 +34,21 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
   const [filterSeed, setFilterSeed] = useState(0);
 
   useEffect(() => {
+    // Frequency slowed by another 50% relative to previous version (800ms -> 1600ms)
     const interval = setInterval(() => {
       // Periodic cursed text updates
-      setCursedThe(generateCursedText("THE", 0.1));
-      setCursedMachine(generateCursedText("NIGHTMARE MACHINE", 0.12));
+      setCursedThe(generateCursedText("THE", 0.08));
+      setCursedMachine(generateCursedText("NIGHTMARE MACHINE", 0.1));
       
       // Update SVG filter seed for "vibrating" displacement
       setFilterSeed(Math.random() * 100);
 
-      // Random high-intensity glitch bursts remain rare and short
-      if (Math.random() > 0.92) {
+      // Glitch burst checks slowed and made even rarer
+      if (Math.random() > 0.98) {
         setIsGlitching(true);
-        setTimeout(() => setIsGlitching(false), 80);
+        setTimeout(() => setIsGlitching(false), 120);
       }
-    }, 200);
+    }, 1600);
     return () => clearInterval(interval);
   }, []);
 
@@ -58,16 +59,16 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
         <defs>
           <filter id="distort">
             <feTurbulence type="fractalNoise" baseFrequency="0.01 0.1" numOctaves="2" seed={filterSeed} result="noise" />
-            <feDisplacementMap in="SourceGraphic" in2="noise" scale={isGlitching ? "20" : "2"} xChannelSelector="R" yChannelSelector="G" />
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale={isGlitching ? "25" : "1.5"} xChannelSelector="R" yChannelSelector="G" />
           </filter>
         </defs>
       </svg>
 
-      {/* AMIGA Copper Bars Background Effect */}
+      {/* AMIGA Copper Bars Background Effect - Doubled animation durations for smoothness */}
       <div className="absolute inset-0 pointer-events-none opacity-20">
-        <div className="absolute top-1/4 w-full h-12 bg-gradient-to-r from-transparent via-red-600 to-transparent blur-3xl animate-[copper_4s_ease-in-out_infinite]"></div>
-        <div className="absolute top-1/2 w-full h-12 bg-gradient-to-r from-transparent via-purple-600 to-transparent blur-3xl animate-[copper_5s_ease-in-out_infinite_reverse]"></div>
-        <div className="absolute top-3/4 w-full h-12 bg-gradient-to-r from-transparent via-blue-600 to-transparent blur-3xl animate-[copper_6s_ease-in-out_infinite]"></div>
+        <div className="absolute top-1/4 w-full h-12 bg-gradient-to-r from-transparent via-red-600 to-transparent blur-3xl animate-[copper_32s_ease-in-out_infinite]"></div>
+        <div className="absolute top-1/2 w-full h-12 bg-gradient-to-r from-transparent via-purple-600 to-transparent blur-3xl animate-[copper_40s_ease-in-out_infinite_reverse]"></div>
+        <div className="absolute top-3/4 w-full h-12 bg-gradient-to-r from-transparent via-blue-600 to-transparent blur-3xl animate-[copper_48s_ease-in-out_infinite]"></div>
       </div>
 
       {/* CRT Scanline Overlay */}
@@ -76,60 +77,49 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
       {/* Main Layout Container */}
       <div className="relative z-10 flex flex-col items-center justify-between w-full h-full max-w-7xl px-10 py-10 gap-4">
         
-        {/* TOP: "THE" - Positioned higher and sized larger */}
-        <div className="relative flex items-center justify-center overflow-visible mt-2">
-            <div 
-              className={`relative transition-all duration-500 ${isGlitching ? 'scale-[1.1] brightness-200' : 'scale-100'}`}
-              style={{ filter: 'url(#distort)' }}
-            >
-              <h1 className="text-7xl md:text-8xl lg:text-9xl font-bold tracking-[0.5em] uppercase text-white drop-shadow-[0_0_25px_rgba(255,255,255,0.4)] animate-[logo-throb_4s_ease-in-out_infinite] relative whitespace-nowrap">
-                  {cursedThe}
-                  <span className="absolute inset-0 text-red-600 opacity-60 -translate-x-1.5 translate-y-1 mix-blend-screen pointer-events-none animate-[aberration-red_3s_ease-in-out_infinite]">{cursedThe}</span>
-                  <span className="absolute inset-0 text-cyan-400 opacity-60 translate-x-1.5 -translate-y-1 mix-blend-screen pointer-events-none animate-[aberration-cyan_3.5s_ease-in-out_infinite]">{cursedThe}</span>
-              </h1>
-            </div>
+        {/* GROUPED TITLES: mt-24/mt-32/mt-40 pushes the logo down from the top edge to be more central */}
+        <div className="flex flex-col items-center justify-center gap-0 mt-24 md:mt-32 lg:mt-40 w-full transition-all duration-1000">
+          {/* "THE" */}
+          <div className="relative flex items-center justify-center overflow-visible z-20">
+              <div 
+                className={`relative transition-all duration-1000 ${isGlitching ? 'scale-[1.12] brightness-200' : 'scale-100'}`}
+                style={{ filter: 'url(#distort)' }}
+              >
+                <h1 className="text-7xl md:text-8xl lg:text-9xl font-bold tracking-[0.5em] uppercase text-white drop-shadow-[0_0_25px_rgba(255,255,255,0.4)] animate-[logo-throb_24s_ease-in-out_infinite] relative whitespace-nowrap">
+                    {cursedThe}
+                    <span className="absolute inset-0 text-red-600 opacity-60 -translate-x-1 translate-y-0.5 mix-blend-screen pointer-events-none animate-[aberration-red_18s_ease-in-out_infinite]">{cursedThe}</span>
+                    <span className="absolute inset-0 text-cyan-400 opacity-60 translate-x-1 -translate-y-0.5 mix-blend-screen pointer-events-none animate-[aberration-cyan_21s_ease-in-out_infinite]">{cursedThe}</span>
+                </h1>
+              </div>
+          </div>
+
+          {/* "NIGHTMARE MACHINE" - Replaced negative margin with positive to lower and separate it from "THE" */}
+          <div className="relative w-full flex items-center justify-center overflow-visible mt-6 md:mt-10 lg:mt-12 z-10">
+              <div 
+                className={`relative transition-all duration-1000 ${isGlitching ? 'scale-[1.06] translate-x-1 brightness-150' : 'scale-100'}`}
+                style={{ filter: 'url(#distort)' }}
+              >
+                {/* Main Throbbing Text - Animation slowed significantly */}
+                <h1 className="text-6xl md:text-8xl lg:text-9xl font-bold tracking-[0.3em] uppercase text-white drop-shadow-[0_0_35px_rgba(255,255,255,0.4)] animate-[logo-throb_24s_ease-in-out_infinite] relative whitespace-nowrap">
+                    <span className="relative z-10">{cursedMachine}</span>
+                    
+                    {/* Chromatic Aberration Layers - Durations further slowed */}
+                    <span className="absolute inset-0 text-red-600 opacity-60 -translate-x-2 translate-y-1 mix-blend-screen pointer-events-none animate-[aberration-red_18s_ease-in-out_infinite]">
+                    {cursedMachine}
+                    </span>
+                    <span className="absolute inset-0 text-cyan-400 opacity-60 translate-x-2 -translate-y-1 mix-blend-screen pointer-events-none animate-[aberration-cyan_21s_ease-in-out_infinite]">
+                    {cursedMachine}
+                    </span>
+                    <span className="absolute inset-0 text-green-500 opacity-40 translate-x-0.5 mix-blend-screen pointer-events-none animate-[aberration-green_30s_ease-in-out_infinite]">
+                    {cursedMachine}
+                    </span>
+                </h1>
+              </div>
+          </div>
         </div>
 
-        {/* MIDDLE: "NIGHTMARE MACHINE" */}
-        <div className="relative w-full flex items-center justify-center overflow-visible">
-            <div 
-              className={`relative transition-all duration-500 ${isGlitching ? 'scale-[1.05] translate-x-1 brightness-150' : 'scale-100'}`}
-              style={{ filter: 'url(#distort)' }}
-            >
-              {/* Ghosting layer */}
-              <h1 className="absolute inset-0 text-6xl md:text-8xl lg:text-9xl font-bold tracking-[0.3em] uppercase text-white/5 blur-sm -translate-x-3 animate-pulse pointer-events-none whitespace-nowrap">
-                  {cursedMachine}
-              </h1>
-              
-              {/* Main Throbbing Text */}
-              <h1 className="text-6xl md:text-8xl lg:text-9xl font-bold tracking-[0.3em] uppercase text-white drop-shadow-[0_0_35px_rgba(255,255,255,0.4)] animate-[logo-throb_4s_ease-in-out_infinite] relative whitespace-nowrap">
-                  <span className="relative z-10">{cursedMachine}</span>
-                  
-                  {/* Chromatic Aberration Layers - Slower and more atmospheric */}
-                  <span className="absolute inset-0 text-red-600 opacity-60 -translate-x-1.5 translate-y-1 mix-blend-screen pointer-events-none animate-[aberration-red_3s_ease-in-out_infinite]">
-                  {cursedMachine}
-                  </span>
-                  <span className="absolute inset-0 text-cyan-400 opacity-60 translate-x-1.5 -translate-y-1 mix-blend-screen pointer-events-none animate-[aberration-cyan_3.5s_ease-in-out_infinite]">
-                  {cursedMachine}
-                  </span>
-                  <span className="absolute inset-0 text-green-500 opacity-40 translate-x-0.5 mix-blend-screen pointer-events-none animate-[aberration-green_5s_ease-in-out_infinite]">
-                  {cursedMachine}
-                  </span>
-              </h1>
-
-              {/* Ethereal Glow Backdrops - Pulsing with the throb */}
-              <h1 className="absolute inset-0 text-6xl md:text-8xl lg:text-9xl font-bold tracking-[0.3em] uppercase text-red-500/10 blur-2xl translate-x-6 animate-pulse pointer-events-none whitespace-nowrap">
-                  {cursedMachine}
-              </h1>
-              <h1 className="absolute inset-0 text-6xl md:text-8xl lg:text-9xl font-bold tracking-[0.3em] uppercase text-cyan-500/10 blur-2xl -translate-x-6 animate-pulse pointer-events-none whitespace-nowrap">
-                  {cursedMachine}
-              </h1>
-            </div>
-        </div>
-
-        {/* STATIC CONTROL PANEL - Bottom Center */}
-        <div className="relative flex flex-col items-center justify-center gap-10 w-full max-w-4xl border border-indigo-500/20 bg-black/40 backdrop-blur-sm p-12 md:p-20 shadow-[0_0_50px_rgba(79,70,229,0.05)] mb-8">
-          {/* Static Corner Accents */}
+        {/* STATIC CONTROL PANEL */}
+        <div className="relative flex flex-col items-center justify-center gap-10 w-full max-w-4xl border border-indigo-500/20 bg-black/40 backdrop-blur-sm p-12 md:p-20 shadow-[0_0_50px_rgba(79,70,229,0.05)] mb-12">
           <div className="absolute -top-px -left-px w-6 h-6 border-t-2 border-l-2 border-indigo-500/40"></div>
           <div className="absolute -top-px -right-px w-6 h-6 border-t-2 border-r-2 border-indigo-500/40"></div>
           <div className="absolute -bottom-px -left-px w-6 h-6 border-b-2 border-l-2 border-indigo-500/40"></div>
@@ -148,22 +138,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
             <span className="relative z-10 flex items-center gap-4">
               Tether Consciousness <ChevronRight className="w-8 h-8" />
             </span>
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[copper_1.5s_linear_infinite]"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[copper_4s_linear_infinite]"></div>
           </button>
           
-          {/* Internal data stream decor */}
           <div className="absolute bottom-4 left-6 text-[8px] text-gray-700 uppercase tracking-widest opacity-40">
             Link: Active // Volition: Confirmed // Trauma: Queued
           </div>
         </div>
-      </div>
-
-      {/* Decorative Icons */}
-      <div className="absolute top-12 left-12 text-gray-800 animate-pulse opacity-40">
-        <Terminal className="w-12 h-12" />
-      </div>
-      <div className="absolute bottom-24 right-12 text-gray-800 animate-pulse opacity-40">
-        <Skull className="w-16 h-16" />
       </div>
 
       {/* Mandatory Psychological Disclaimer */}
@@ -186,28 +167,24 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
             filter: drop-shadow(0 0 35px rgba(255,255,255,0.4)) blur(0px);
           }
           50% { 
-            transform: scale(1.02); 
-            filter: drop-shadow(0 0 50px rgba(255,255,255,0.6)) blur(0.5px);
-          }
-          45%, 55% {
-            /* Occasional tiny jump to keep the glitch spirit */
-            transform: translate(1px, -1px) scale(1.025);
+            transform: scale(1.03); 
+            filter: drop-shadow(0 0 65px rgba(255,255,255,0.6)) blur(0.8px);
           }
         }
 
         @keyframes aberration-red {
-          0%, 100% { transform: translate(-2px, 1px); opacity: 0.6; }
-          50% { transform: translate(-6px, -2px); opacity: 0.8; }
+          0%, 100% { transform: translate(-1.5px, 0.5px); opacity: 0.6; }
+          50% { transform: translate(-6px, -3px); opacity: 0.8; }
         }
 
         @keyframes aberration-cyan {
-          0%, 100% { transform: translate(2px, -1px); opacity: 0.6; }
-          50% { transform: translate(6px, 2px); opacity: 0.8; }
+          0%, 100% { transform: translate(1.5px, -0.5px); opacity: 0.6; }
+          50% { transform: translate(6px, 3px); opacity: 0.8; }
         }
 
         @keyframes aberration-green {
           0%, 100% { transform: translate(0.5px, 0.5px); opacity: 0.4; }
-          50% { transform: translate(-1.5px, -1.5px); opacity: 0.6; }
+          50% { transform: translate(-3px, -3px); opacity: 0.6; }
         }
       `}</style>
     </div>
