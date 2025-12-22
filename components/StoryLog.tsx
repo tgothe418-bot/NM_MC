@@ -91,8 +91,19 @@ const applyTypographicAnomalies = (text: string): React.ReactNode[] => {
 };
 
 const FormattedText: React.FC<{ text: string, cluster?: string }> = ({ text, cluster }) => {
+  // Pre-process to handle accidentally leaked HTML tags
+  const cleanHtml = (str: string) => {
+    return str
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<b>(.*?)<\/b>/gi, '**$1**')
+      .replace(/<i>(.*?)<\/i>/gi, '*$1*')
+      .replace(/<strong>(.*?)<\/strong>/gi, '**$1**')
+      .replace(/<em>(.*?)<\/em>/gi, '*$1*');
+  };
+
+  const processedText = cleanHtml(text);
   const isSystem = cluster?.includes("System");
-  const parts = text.split(/(\[\^\d+\])/g);
+  const parts = processedText.split(/(\[\^\d+\])/g);
   const highlightClass = getHighlightColor(cluster);
   const accentClass = getAccentColor(cluster);
 
