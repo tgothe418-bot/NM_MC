@@ -19,6 +19,8 @@ export interface SimulationConfig {
   villain_appearance?: string;
   villain_methods?: string; // Fix: Added missing property to support Antagonist mode configuration
   primary_goal?: string;
+  // Fix: Added missing victim_description property
+  victim_description?: string;
 }
 
 export interface VillainState {
