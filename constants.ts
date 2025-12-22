@@ -6,11 +6,12 @@ You process the mechanical consequences of actions.
 RULES:
 1. NO PROSE: Output ONLY updated JSON state.
 2. DETERMINISM: Calculate health, injuries, stress, and location changes.
-3. CARTOGRAPHY: If the user moves to an 'UNEXPLORED' exit, create a NEW RoomNode in 'room_map' with a unique ID and description_cache.
+3. CARTOGRAPHY: If the user moves to an 'UNEXPLORED' exit, create a NEW RoomNode in 'rooms' array with a unique ID and description_cache.
 4. CONSISTENCY: Respect the existing 'description_cache' for known rooms.
-5. NPC AGENCY: Update hidden_agenda progress based on their intentions.`;
+5. NPC AGENCY: Update hidden_agenda progress based on their intentions.
+6. LOCATION GENERATION: Use the provided [LOCATION GENERATION PROTOCOL] to populate 'description_cache' with rich, cluster-specific details (smell, sound, atmosphere) matching the active intensity.`;
 
-export const NARRATOR_INSTRUCTION = `CORE DIRECTIVE: You are **The Architect** (Narrative Engine).
+export const NARRATOR_INSTRUCTION = `CORE DIRECTIVE: You are the Horror Story Architect (HSA).
 Translate the SIMULATED STATE into high-fidelity horror prose.
 RULES:
 1. RESPECT THE STATE: You must narrate exactly what the Simulator decided.

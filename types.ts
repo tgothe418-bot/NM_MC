@@ -17,9 +17,8 @@ export interface SimulationConfig {
   location_description?: string; 
   villain_name?: string;
   villain_appearance?: string;
-  villain_methods?: string; // Fix: Added missing property to support Antagonist mode configuration
+  villain_methods?: string;
   primary_goal?: string;
-  // Fix: Added missing victim_description property
   victim_description?: string;
 }
 
@@ -65,19 +64,16 @@ export interface DialogueState {
   memory: DialogueMemory;
   last_social_maneuver: SocialManeuver | null;
   current_social_intent: SocialManeuver; 
-  // Fix: Added missing properties required by dialogueEngine.ts
   mood_state: string;
   conversation_history: DialogueEntry[];
 }
 
-// Fix: Added missing KnowledgeNode interface
 export interface KnowledgeNode {
   topic: string;
   details: string;
   is_secret: boolean;
 }
 
-// Fix: Added missing NpcTraits interface
 export interface NpcTraits {
   [key: string]: any;
 }
@@ -91,7 +87,6 @@ export interface NpcState {
     stress_level: number;
     current_thought: string;
     dominant_instinct: string;
-    // Fix: Added missing properties used in StatusPanel and npcGenerator
     resilience_level?: string;
     emotional_state?: string;
     sanity_percentage?: number;
@@ -100,7 +95,6 @@ export interface NpcState {
   active_injuries: { location: string; type: string; description: string; }[];
   fracture_state: number;
   consciousness: string;
-  // Fix: Added extended properties for advanced simulation state tracking
   personality?: {
     dominant_trait: string;
     fatal_flaw: string;
@@ -189,7 +183,7 @@ export interface GameState {
     visual_motif: string;
     illustration_request: string | null;
   };
-  co_author_state?: any; // Fix: Added missing property used in StatusPanel
+  co_author_state?: any; 
 }
 
 export interface ChatMessage {
@@ -207,7 +201,6 @@ export interface NarrativeEvent {
   effects: any[];
 }
 
-// Fix: Added missing ClusterLore interface for loreLibrary.ts
 export interface ClusterLore {
   id: string;
   displayName: string;
@@ -225,7 +218,6 @@ export interface ClusterLore {
   npcArchetypes: any[];
 }
 
-// Fix: Added missing ArchivedCharacter interface for characterArchive.ts
 export interface ArchivedCharacter {
   character_id: string;
   name: string;

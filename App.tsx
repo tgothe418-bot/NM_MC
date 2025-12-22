@@ -12,8 +12,7 @@ import { GameState, ChatMessage, SimulationConfig } from './types';
 import { constructVoiceManifesto } from './services/dialogueEngine';
 import { constructSensoryManifesto } from './services/sensoryEngine';
 import { constructLocationManifesto, getDefaultLocationState } from './services/locationEngine';
-import { ttsService } from './services/ttsService';
-import { Terminal, Lock, Key, ExternalLink } from 'lucide-react';
+import { Terminal, Lock, Key } from 'lucide-react';
 
 const INITIAL_STATE: GameState = {
   meta: { turn: 0, perspective: "Pending", mode: 'Pending', intensity_level: "Level 1", active_cluster: "None" },
@@ -45,22 +44,32 @@ const App: React.FC = () => {
     initializeGemini();
   };
 
+  const handleWelcomeComplete = () => {
+    setIsSplashComplete(true);
+  };
+
   const handleSendMessage = async (text: string, isInitial = false): Promise<string> => {
     setIsLoading(true);
     if (!isInitial) setHistory(prev => [...prev, { role: 'user', text, timestamp: Date.now() }]);
 
     try {
-      // 1. Agent Pass (Flash)
-      const npcActions = await generateNpcActions(gameState, text);
-      // 2. Simulator Pass (Flash)
+      // Pass 0: NPC Agency (with fallback)
+      let npcActions: string[] = [];
+      try {
+        npcActions = await generateNpcActions(gameState, text);
+      } catch (err) {
+        console.warn("NPC Agency skipped due to error:", err);
+      }
+
+      // Pass 1: Simulation
       const simulated = await simulateTurn(gameState, text, npcActions);
       
-      // 3. Manifestos
       const voiceM = constructVoiceManifesto(simulated.npc_states);
       const sensoryM = constructSensoryManifesto(simulated);
       const locationM = constructLocationManifesto(simulated.location_state);
       
-      // 4. Narrator Pass (Pro)
+      // Pass 2: Narration
+      // Note: sendMessageToGemini internally handles the JSON schema correction for rooms array
       const responseText = await sendMessageToGemini(text, simulated, voiceM + sensoryM + locationM);
       const parsed = JSON.parse(responseText);
       
@@ -68,13 +77,16 @@ const App: React.FC = () => {
         ...parsed.game_state,
         location_state: {
           ...parsed.game_state.location_state,
-          room_map: { ...simulated.location_state.room_map, ...parsed.game_state.location_state.room_map }
+          // Merge map from simulated state with updates from narrator
+          room_map: { 
+              ...simulated.location_state.room_map, 
+              ...(parsed.game_state.location_state.room_map || {}) 
+          }
         }
       };
 
       setGameState(nextState);
       setHistory(prev => [...prev, { role: 'model', text: parsed.story_text, timestamp: Date.now() }]);
-      ttsService.speak(parsed.story_text);
       return parsed.story_text;
     } catch (e) {
       console.error(e);
@@ -107,12 +119,25 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen w-full bg-void text-gray-200 overflow-hidden font-sans relative">
-      <ClusterAmbience activeCluster={gameState.meta.active_cluster} threatLevel={gameState.villain_state.threat_scale} />
-      {!isSplashComplete && <WelcomeScreen onStart={() => setIsSplashComplete(true)} />}
+      {isSplashComplete && (
+        <ClusterAmbience 
+          activeCluster={gameState.meta.active_cluster} 
+          threatLevel={gameState.villain_state.threat_scale} 
+        />
+      )}
+      
+      {!isSplashComplete && <WelcomeScreen onStart={handleWelcomeComplete} />}
       {isSplashComplete && !isInitialized && <SetupOverlay onComplete={handleSetupComplete} />}
+      
       <div className={`relative z-10 flex w-full h-full bg-black/40 backdrop-blur-md transition-all duration-1000 ${isInitialized ? 'opacity-100' : 'opacity-0'}`}>
         <div className="hidden lg:block h-full">
-           <StatusPanel gameState={gameState} onProcessAction={handleSendMessage} onOpenSimulation={() => {}} isTesting={false} onAbortTest={() => {}} />
+           <StatusPanel 
+                gameState={gameState} 
+                onProcessAction={handleSendMessage} 
+                onOpenSimulation={() => {}} 
+                isTesting={false} 
+                onAbortTest={() => {}} 
+            />
         </div>
         <div className="flex-1 flex flex-col h-full overflow-hidden">
             <div className="h-16 border-b border-gray-800 flex items-center px-8 bg-black/80">

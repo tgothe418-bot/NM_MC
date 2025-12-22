@@ -1,9 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { GameState, NpcState } from '../types';
-import { Skull, Radio, Users, Eye, Brain, CloudLightning, FileJson, ChevronDown, ChevronRight, GripVertical, Activity, Heart, ZapOff, Stethoscope, Star, Frown, User, Cpu, FileText, Square } from 'lucide-react';
-import { CHARACTER_ARCHIVE } from '../characterArchive';
-import { VoiceControl } from './VoiceControl';
+import { GameState } from '../types';
+import { Skull, Radio, Users, Eye, Brain, ChevronDown, ChevronRight, GripVertical, Activity, ZapOff, Stethoscope, Cpu, FileText, Square, Target } from 'lucide-react';
 
 interface StatusPanelProps {
   gameState: GameState;
@@ -13,8 +11,14 @@ interface StatusPanelProps {
   onAbortTest: () => void;
 }
 
-export const StatusPanel: React.FC<StatusPanelProps> = ({ gameState, onProcessAction, onOpenSimulation, isTesting, onAbortTest }) => {
-  const { meta, villain_state, npc_states, co_author_state } = gameState;
+export const StatusPanel: React.FC<StatusPanelProps> = ({ 
+    gameState, 
+    onProcessAction, 
+    onOpenSimulation, 
+    isTesting, 
+    onAbortTest
+}) => {
+  const { meta, villain_state, npc_states } = gameState;
   const threatLevel = villain_state?.threat_scale || 0;
   
   const [width, setWidth] = useState(450);
@@ -115,7 +119,6 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({ gameState, onProcessAc
                 </div>
                 
                 <div className="flex items-center gap-2">
-                    <VoiceControl onProcessAction={onProcessAction} />
                     {isTesting ? (
                         <button 
                             onClick={onAbortTest} 

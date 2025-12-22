@@ -1,7 +1,8 @@
 
 import { GoogleGenAI, Chat, Type } from "@google/genai";
 import { SIMULATOR_INSTRUCTION, NARRATOR_INSTRUCTION, PLAYER_SYSTEM_INSTRUCTION, ANALYST_SYSTEM_INSTRUCTION } from "../constants";
-import { SimulationConfig, GameState } from "../types";
+import { SimulationConfig, GameState, RoomNode } from "../types";
+import { constructRoomGenerationRules } from "./locationEngine";
 
 let chatSession: Chat | null = null;
 
@@ -49,31 +50,29 @@ const NPC_STATE_SCHEMA = {
   required: ["name", "archetype", "hidden_agenda", "psychology", "active_injuries", "fracture_state", "consciousness"]
 };
 
-const ROOM_MAP_SCHEMA = {
+// Replaced map with array to avoid empty properties error
+const ROOM_SCHEMA = {
   type: Type.OBJECT,
-  additionalProperties: {
-    type: Type.OBJECT,
-    properties: {
-      id: { type: Type.STRING },
-      name: { type: Type.STRING },
-      archetype: { type: Type.STRING },
-      description_cache: { type: Type.STRING },
-      exits: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            direction: { type: Type.STRING },
-            target_node_id: { type: Type.STRING, nullable: true }
-          },
-          required: ["direction"]
-        }
-      },
-      hazards: { type: Type.ARRAY, items: { type: Type.STRING } },
-      items: { type: Type.ARRAY, items: { type: Type.STRING } }
+  properties: {
+    id: { type: Type.STRING },
+    name: { type: Type.STRING },
+    archetype: { type: Type.STRING },
+    description_cache: { type: Type.STRING },
+    exits: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          direction: { type: Type.STRING },
+          target_node_id: { type: Type.STRING, nullable: true }
+        },
+        required: ["direction"]
+      }
     },
-    required: ["id", "name", "description_cache", "exits"]
-  }
+    hazards: { type: Type.ARRAY, items: { type: Type.STRING } },
+    items: { type: Type.ARRAY, items: { type: Type.STRING } }
+  },
+  required: ["id", "name", "description_cache", "exits"]
 };
 
 const GAME_STATE_SCHEMA = {
@@ -109,13 +108,13 @@ const GAME_STATE_SCHEMA = {
       type: Type.OBJECT,
       properties: {
         current_room_id: { type: Type.STRING },
-        room_map: ROOM_MAP_SCHEMA,
+        rooms: { type: Type.ARRAY, items: ROOM_SCHEMA }, // Changed from room_map dict to rooms array
         fidelity_status: { type: Type.STRING },
         current_state: { type: Type.INTEGER },
         weather_state: { type: Type.STRING },
         time_of_day: { type: Type.STRING }
       },
-      required: ["current_room_id", "room_map", "fidelity_status", "current_state"]
+      required: ["current_room_id", "rooms", "fidelity_status", "current_state"]
     },
     narrative: {
       type: Type.OBJECT,
@@ -184,6 +183,34 @@ const withRetry = async <T>(op: () => Promise<T>): Promise<T> => {
   throw new Error("Retry failed after max attempts");
 };
 
+// Helper to convert internal Record<string, RoomNode> to Array for Gemini
+const prepareGameStateForPrompt = (gameState: GameState): any => {
+  const rooms = Object.values(gameState.location_state.room_map);
+  return {
+    ...gameState,
+    location_state: {
+      ...gameState.location_state,
+      rooms: rooms, // Pass array
+      room_map: undefined // Remove map
+    }
+  };
+};
+
+// Helper to convert Gemini Array back to Record<string, RoomNode>
+const restoreGameStateFromResponse = (parsed: any): any => {
+  if (parsed.location_state && Array.isArray(parsed.location_state.rooms)) {
+    const roomMap: Record<string, any> = {};
+    parsed.location_state.rooms.forEach((r: any) => {
+      if (r && r.id) roomMap[r.id] = r;
+    });
+    parsed.location_state.room_map = roomMap;
+    // Keep rooms array or delete it? Let's keep it for compatibility or just rely on room_map
+    // delete parsed.location_state.rooms;
+  }
+  return parsed;
+};
+
+
 /**
  * PASS 0: NPC AGENT ACTIONS (FLASH)
  */
@@ -197,9 +224,19 @@ export const generateNpcActions = async (gameState: GameState, userAction: strin
       USER ACTION: ${userAction}
       NPCS: ${JSON.stringify(gameState.npc_states.map(n => ({ 
         name: n.name, 
+        role: n.archetype,
         goal: n.hidden_agenda.goal, 
-        stress: n.psychology.stress_level,
-        thought: n.psychology.current_thought
+        psychology: {
+            instinct: n.psychology.dominant_instinct,
+            thought: n.psychology.current_thought,
+            stress: n.psychology.stress_level
+        },
+        status: {
+            injuries: n.active_injuries?.map(i => `${i.location} (${i.type})`) || [],
+            consciousness: n.consciousness,
+            fracture_state: n.fracture_state
+        },
+        personality: n.personality
       })))}
       
       Respond in JSON format as specified.
@@ -225,14 +262,18 @@ export const generateNpcActions = async (gameState: GameState, userAction: strin
 export const simulateTurn = async (gameState: GameState, userAction: string, npcActions: string[]): Promise<GameState> => {
   return withRetry(async () => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const promptState = prepareGameStateForPrompt(gameState);
+    const generationRules = constructRoomGenerationRules(gameState);
+    
     const prompt = `
       [SYSTEM INSTRUCTION]: You are the SIMULATOR. Process the mechanical consequences of the user and NPC actions.
-      [CURRENT STATE]: ${JSON.stringify(gameState)}
+      [CURRENT STATE]: ${JSON.stringify(promptState)}
       [USER ACTION]: ${userAction}
       [NPC INTENTIONS]: ${npcActions.join('\n')}
+      ${generationRules}
       
       Update all numeric metrics, injuries, and the spatial map.
-      If the user enters a new area (UNEXPLORED), create a NEW RoomNode with unique ID.
+      If the user enters a new area (UNEXPLORED), create a NEW RoomNode in 'rooms' array with unique ID.
     `;
 
     const res = await ai.models.generateContent({
@@ -246,7 +287,8 @@ export const simulateTurn = async (gameState: GameState, userAction: string, npc
       }
     });
 
-    return JSON.parse(res.text || "{}");
+    const parsed = JSON.parse(res.text || "{}");
+    return restoreGameStateFromResponse(parsed);
   });
 };
 
@@ -256,8 +298,10 @@ export const simulateTurn = async (gameState: GameState, userAction: string, npc
 export const sendMessageToGemini = async (userAction: string, simulatedState: GameState, manifestos: string): Promise<string> => {
   if (!chatSession) throw new Error("Narrator Chat Session not initialized");
   
+  const promptState = prepareGameStateForPrompt(simulatedState);
+  
   const prompt = `
-    [SIMULATED STATE - GROUND TRUTH]: ${JSON.stringify(simulatedState)}
+    [SIMULATED STATE - GROUND TRUTH]: ${JSON.stringify(promptState)}
     [USER ACTION]: ${userAction}
     ${manifestos}
     
@@ -265,7 +309,21 @@ export const sendMessageToGemini = async (userAction: string, simulatedState: Ga
   `;
   
   const res = await chatSession.sendMessage({ message: prompt });
-  return res.text || "";
+  
+  // Intercept the response to fix the room map structure in the JSON string
+  let text = res.text || "";
+  try {
+     const parsed = JSON.parse(text);
+     if (parsed.game_state) {
+         // Fix the nested game_state
+         parsed.game_state = restoreGameStateFromResponse(parsed.game_state);
+         text = JSON.stringify(parsed);
+     }
+  } catch(e) {
+      // If parsing fails, return raw text (likely empty or broken)
+  }
+  
+  return text;
 };
 
 // Fix: Added return statement to fix the missing return error

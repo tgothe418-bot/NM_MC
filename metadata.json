@@ -1,7 +1,5 @@
 {
   "name": "The Nightmare Machine",
   "description": "A high-intensity, AI-driven interactive horror narrative engine that tracks psychological state, villain proximity, and narrative themes.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
+  "requestFramePermissions": []
 }
