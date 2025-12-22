@@ -25,9 +25,24 @@ export const STYLE_GUIDE = {
 
   cluster_palettes: {
     Flesh: {
-      key_concepts: ["Biological Design Flaw", "Anatomical Honesty", "Organic Entropy"],
-      preferred_verbs: ["Oxidize", "Seep", "Fester", "Unspool", "Masticate", "Inscribe"],
-      prose_style: "High-definition medical horror. Focus on the transformation of tissue into something unrecognizable."
+      key_concepts: ["Theological Anatomism", "Anatomical Honesty", "Biological Design Flaw"],
+      preferred_verbs: ["Transfigure", "Unspool", "Sacrament", "Oxidize", "Seep", "Fester", "Masticate", "Inscribe"],
+      prose_style: "High-definition medical horror treated as religious sacrament. Focus on the transformation of tissue into sacred geometry. Contrast wet organic textures with cold clinical instruments."
+    },
+    Survival: {
+      key_concepts: ["Biblical Nihilism", "Elemental Indifference", "War Eternal"],
+      preferred_verbs: ["Clave", "Smote", "Meridian", "Grind", "Scour", "Persist", "Occupy", "Waste"],
+      prose_style: "Old Testament cadence. Use polysyndeton (repeated 'and') to create rolling, indifferent momentum. Avoid internal monologue; focus on external action and the elements."
+    },
+    Self: {
+      key_concepts: ["Narcotic Dissociation", "Ontological Corruption", "The Commodity of Self"],
+      preferred_verbs: ["Numb", "Erase", "Trade", "Brighten", "Fade", "Loop", "Overwrite", "Compress"],
+      prose_style: "Flat, transactional affect. Short, punchy sentences. Horrific events described with numbness or boredom. Focus on artificiality (neon, vinyl, concrete)."
+    },
+    Blasphemy: {
+      key_concepts: ["Transgressive Realism", "Social Decay", "Absolute Savagery"],
+      preferred_verbs: ["Degradate", "Blunt", "Strip", "Deny", "Corrupt", "Savage", "Gouge", "Violate"],
+      prose_style: "Unflinching depictions of human cruelty. Strip away metaphors; horror is the degradation of the social contract. Use aggressive, vulgar phrasing to deny comfort."
     },
     System: {
       key_concepts: ["Digital Indifference", "Ontological Corruption", "Infinite Processing"],
