@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { GameState, NpcState } from '../types';
-import { Skull, Radio, Users, Eye, Brain, CloudLightning, FileJson, ChevronDown, ChevronRight, GripVertical, Activity, Heart, ZapOff, Stethoscope, Star, Frown, User, Cpu, FileText } from 'lucide-react';
+import { Skull, Radio, Users, Eye, Brain, CloudLightning, FileJson, ChevronDown, ChevronRight, GripVertical, Activity, Heart, ZapOff, Stethoscope, Star, Frown, User, Cpu, FileText, Square } from 'lucide-react';
 import { CHARACTER_ARCHIVE } from '../characterArchive';
 import { VoiceControl } from './VoiceControl';
 
@@ -9,18 +9,17 @@ interface StatusPanelProps {
   gameState: GameState;
   onProcessAction: (action: string) => Promise<string>;
   onOpenSimulation: () => void;
-  isSimulating: boolean;
+  isTesting: boolean;
+  onAbortTest: () => void;
 }
 
-export const StatusPanel: React.FC<StatusPanelProps> = ({ gameState, onProcessAction, onOpenSimulation, isSimulating }) => {
+export const StatusPanel: React.FC<StatusPanelProps> = ({ gameState, onProcessAction, onOpenSimulation, isTesting, onAbortTest }) => {
   const { meta, villain_state, npc_states, co_author_state } = gameState;
   const threatLevel = villain_state?.threat_scale || 0;
   
-  // Resizable State
   const [width, setWidth] = useState(450);
   const [isResizing, setIsResizing] = useState(false);
   
-  // Accordion State
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     meta: true,
     villain: true,
@@ -117,21 +116,30 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({ gameState, onProcessAc
                 
                 <div className="flex items-center gap-2">
                     <VoiceControl onProcessAction={onProcessAction} />
-                    <button 
-                      onClick={onOpenSimulation} 
-                      className={`p-2 rounded-sm border border-gray-800 bg-black hover:border-system-green transition-all
-                        ${isSimulating ? 'text-system-green border-system-green animate-pulse' : 'text-gray-500 hover:text-white'}
-                      `}
-                    >
-                       <Cpu className="w-4 h-4" />
-                    </button>
+                    {isTesting ? (
+                        <button 
+                            onClick={onAbortTest} 
+                            className="p-2 rounded-sm border border-red-600 bg-red-900/20 text-red-500 hover:bg-red-600 hover:text-black transition-all animate-pulse"
+                            title="Abort Test Protocol"
+                        >
+                            <Square className="w-4 h-4 fill-current" />
+                        </button>
+                    ) : (
+                        <button 
+                            onClick={onOpenSimulation} 
+                            className="p-2 rounded-sm border border-gray-800 bg-black text-gray-500 hover:text-white hover:border-system-green transition-all"
+                            title="Open Test Protocols"
+                        >
+                            <Cpu className="w-4 h-4" />
+                        </button>
+                    )}
                 </div>
             </div>
 
             <div className="flex flex-col gap-4">
-                <div className={`flex items-center gap-3 px-5 py-1.5 rounded-sm border text-[10px] font-bold uppercase tracking-[0.2em] w-full justify-center ${meta.mode === 'Villain' ? 'border-red-900/50 text-red-500 bg-red-950/20' : 'border-system-green/30 text-system-green bg-green-950/20'}`}>
+                <div className={`flex items-center gap-3 px-5 py-1.5 rounded-sm border text-[10px] font-bold uppercase tracking-[0.2em] w-full justify-center ${isTesting ? 'border-amber-500/50 text-amber-500 bg-amber-950/20' : meta.mode === 'Villain' ? 'border-red-900/50 text-red-500 bg-red-950/20' : 'border-system-green/30 text-system-green bg-green-950/20'}`}>
                     <Radio className="w-3 h-3 animate-pulse" />
-                    {meta.mode} Protocol Active
+                    {isTesting ? 'TEST PROTOCOL ACTIVE' : `${meta.mode} Protocol Active`}
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4 text-sm">
@@ -168,7 +176,6 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({ gameState, onProcessAc
 
              {expandedSections['villain'] && (
                  <div className="p-6 bg-[#0c0c0c] space-y-6 relative overflow-hidden border-t border-gray-800">
-                     {/* Skull Watermark */}
                      <div className="absolute right-0 top-1/2 -translate-y-1/2 opacity-5 pointer-events-none pr-4">
                          <Skull className="w-32 h-32 text-white" />
                      </div>

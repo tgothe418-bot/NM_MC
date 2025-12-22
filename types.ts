@@ -12,6 +12,7 @@ export interface SimulationConfig {
   cycles: number;
   victim_count?: number; 
   visual_motif?: string; 
+  location_description?: string; 
   co_author_mode?: 'Manual' | 'Auto';
   co_author_archetype?: string;
   co_author_dominance?: number;
@@ -235,7 +236,6 @@ export interface NpcState {
   mobility_score: number; 
   manipulation_score: number; 
   perception_score: number; 
-  // Added meta property to fix dialogueEngine.ts error
   meta?: {
     intensity_level: string;
   };
@@ -245,7 +245,7 @@ export interface LocationState {
   name: string;
   archetype: string; 
   cluster_alignment: string;
-  current_state: number; 
+  current_state: number; // 0=Safe, 1=Uncanny, 2=Hostile, 3=Nightmare
   dominant_sensory_palette: {
     primary_sense: string;
     secondary_sense: string;
@@ -263,6 +263,10 @@ export interface LocationState {
   };
   spatial_logic: string; 
   relationship_to_villain: string; 
+  // Fidelity tracking additions
+  fidelity_status: 'Coherent' | 'Fraying' | 'Corrupted' | 'Dissolving';
+  architectural_notes: string[]; // List of specific room/area details to maintain consistency
+  entanglement_level: number; // 0-100, how much the location is "aware" of the specimens
 }
 
 export interface NarrativeState {
@@ -333,6 +337,7 @@ export interface ChatMessage {
   text: string;
   gameState?: GameState;
   imageUrl?: string; 
+  videoUrl?: string; // Added for Veo
   timestamp: number;
 }
 
@@ -342,7 +347,6 @@ export interface NarrativeEvent {
   effects: any[];
 }
 
-// Added ClusterLore interface for loreLibrary.ts
 export interface ClusterLore {
   id: string;
   displayName: string;
@@ -393,7 +397,6 @@ export interface ClusterLore {
   }[];
 }
 
-// Added ArchivedCharacter interface for characterArchive.ts
 export interface ArchivedCharacter {
   character_id: string;
   name: string;

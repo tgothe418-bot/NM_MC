@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, ShieldAlert, Cpu, Eye, Settings, Image, Zap, Play, Check, Users, Target, UserCheck, Skull, Wand2, Info, ChevronRight, MessageSquare, Monitor, Loader2, Sparkles, StickyNote, Bot, Activity, Layers, Timer, Clapperboard } from 'lucide-react';
+import { Terminal, ShieldAlert, Cpu, Eye, Settings, Image, Zap, Play, Check, Users, Target, UserCheck, Skull, Wand2, Info, ChevronRight, MessageSquare, Monitor, Loader2, Sparkles, StickyNote, Bot, Activity, Layers, Timer, Clapperboard, MapPin } from 'lucide-react';
 import { SimulationConfig } from '../types';
 import { generateCalibrationField } from '../services/geminiService';
 
@@ -84,13 +84,12 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
   const [selectedClusters, setSelectedClusters] = useState<string[]>(['Flesh']);
   const [intensity, setIntensity] = useState('Level 3: The Visceral');
   const [visualMotif, setVisualMotif] = useState('');
+  const [locationDescription, setLocationDescription] = useState('');
   const [isCalibrating, setIsCalibrating] = useState(false);
-  const [simulationCycles, setSimulationCycles] = useState(20);
+  const [testCycles, setTestCycles] = useState(10);
 
-  // Field Generation States
   const [generatingFields, setGeneratingFields] = useState<Record<string, boolean>>({});
 
-  // Villain Mode specific states
   const isVillain = mode.includes('Antagonist');
   const [villainName, setVillainName] = useState('');
   const [villainAppearance, setVillainAppearance] = useState('');
@@ -99,7 +98,6 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
   const [primaryGoal, setPrimaryGoal] = useState('');
   const [victimCount, setVictimCount] = useState(3);
 
-  // Guided Setup State
   const [guidedStep, setGuidedStep] = useState(0);
   const [guidedAnswers, setGuidedAnswers] = useState<string[]>([]);
   const [guidedInput, setGuidedInput] = useState('');
@@ -122,6 +120,11 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
       key: "cluster"
     },
     {
+      q: "Where does this ordeal begin? Define the architecture of the starting location.",
+      placeholder: "e.g. A sterile hospital basement, a decaying Victorian mansion, the cockpit of a dying spaceship...",
+      key: "location_description"
+    },
+    {
       q: "Describe the visual motif of this nightmare. Is it a grainy 8mm film? A neon-drenched cityscape? A desaturated oil painting of the end?",
       placeholder: "e.g. Gritty 70s slasher, Static-heavy VHS...",
       key: "visual_motif"
@@ -135,7 +138,6 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
 
   const handleGenerateField = async (field: string, useNotes: boolean = false) => {
     setGeneratingFields(prev => ({ ...prev, [field]: true }));
-    
     let existingValue = '';
     if (field === 'Entity Name') existingValue = villainName;
     else if (field === 'Form & Appearance') existingValue = villainAppearance;
@@ -143,6 +145,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
     else if (field === 'Specimen Targets') existingValue = victimDescription;
     else if (field === 'Primary Objective') existingValue = primaryGoal;
     else if (field === 'Visual Motif') existingValue = visualMotif;
+    else if (field === 'Initial Location') existingValue = locationDescription;
 
     try {
       const result = await generateCalibrationField(
@@ -152,13 +155,13 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
         field === 'Specimen Targets' ? victimCount : undefined,
         useNotes ? existingValue : undefined
       );
-      
       if (field === 'Entity Name') setVillainName(result);
       else if (field === 'Form & Appearance') setVillainAppearance(result);
       else if (field === 'Modus Operandi') setVillainMethods(result);
       else if (field === 'Specimen Targets') setVictimDescription(result);
       else if (field === 'Primary Objective') setPrimaryGoal(result);
       else if (field === 'Visual Motif') setVisualMotif(result);
+      else if (field === 'Initial Location') setLocationDescription(result);
     } catch (error) {
       console.error("Failed to generate field:", error);
     } finally {
@@ -166,28 +169,51 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
     }
   };
 
+  /**
+   * ActionButtons sub-component to trigger automated field generation or refinement.
+   */
+  const ActionButtons = ({ fieldKey, value }: { fieldKey: string; value: string }) => (
+    <div className="flex gap-2">
+      <button
+        type="button"
+        onClick={() => handleGenerateField(fieldKey)}
+        disabled={generatingFields[fieldKey]}
+        className="p-1.5 hover:bg-white/5 rounded-sm transition-colors text-gray-500 hover:text-fresh-blood disabled:opacity-50"
+        title={`Generate ${fieldKey}`}
+      >
+        {generatingFields[fieldKey] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+      </button>
+      {value?.trim() && (
+        <button
+          type="button"
+          onClick={() => handleGenerateField(fieldKey, true)}
+          disabled={generatingFields[fieldKey]}
+          className="p-1.5 hover:bg-white/5 rounded-sm transition-colors text-gray-500 hover:text-haunt-gold disabled:opacity-50"
+          title={`Refine ${fieldKey} with existing notes`}
+        >
+          {generatingFields[fieldKey] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+        </button>
+      )}
+    </div>
+  );
+
   const handleGuidedNext = (answer?: string) => {
     const val = answer || guidedInput;
     if (!val && !GUIDED_QUESTIONS[guidedStep].options) return;
-
     const currentKey = GUIDED_QUESTIONS[guidedStep].key;
     if (currentKey === 'mode') setMode(val === 'Survivor' ? 'The Survivor (Prey Protocol)' : 'The Antagonist (Predator Protocol)');
     if (currentKey === 'perspective') setPerspective(val === 'First Person' ? 'First Person (Direct Immersion)' : 'Third Person (Observational Dread)');
     if (currentKey === 'cluster') setSelectedClusters([val]);
+    if (currentKey === 'location_description') setLocationDescription(val);
     if (currentKey === 'visual_motif') setVisualMotif(val);
     if (currentKey === 'intensity') {
         const levelNum = val.split(':')[0].trim();
-        setIntensity(levelNum); // Normalize to Level X
+        setIntensity(levelNum);
     }
-
     setGuidedAnswers([...guidedAnswers, val]);
     setGuidedInput('');
-    
-    if (guidedStep < GUIDED_QUESTIONS.length - 1) {
-      setGuidedStep(guidedStep + 1);
-    } else {
-      handleStart();
-    }
+    if (guidedStep < GUIDED_QUESTIONS.length - 1) setGuidedStep(guidedStep + 1);
+    else handleStart();
   };
 
   const toggleCluster = (id: string) => {
@@ -206,9 +232,10 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
         mode: mode.includes('Survivor') ? 'Survivor' : 'Villain',
         starting_point: 'Prologue',
         cluster: selectedClusters.join(', '),
-        intensity: intensity.split(':')[0].trim(), // Send "Level X"
-        cycles: setupMode === 'simulation' ? simulationCycles : 40,
+        intensity: intensity.split(':')[0].trim(),
+        cycles: setupMode === 'simulation' ? testCycles : 0,
         visual_motif: visualMotif,
+        location_description: locationDescription,
         villain_name: isVillain ? villainName : undefined,
         villain_appearance: isVillain ? villainAppearance : undefined,
         villain_methods: isVillain ? villainMethods : undefined,
@@ -266,20 +293,20 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
 
       <button 
         onClick={() => setSetupMode('simulation')}
-        className="group relative w-full max-w-2xl p-10 border-2 border-gray-800 bg-black hover:border-system-green transition-all duration-700 rounded-sm flex flex-col items-center text-center space-y-4 shadow-[0_0_40px_rgba(0,0,0,0.8)] hover:shadow-[0_0_80px_rgba(16,185,129,0.15)]"
+        className="group relative w-full max-w-2xl p-10 border-2 border-gray-800 bg-black hover:border-amber-500 transition-all duration-700 rounded-sm flex flex-col items-center text-center space-y-4 shadow-[0_0_40px_rgba(0,0,0,0.8)] hover:shadow-[0_0_80px_rgba(245,158,11,0.15)]"
       >
         <div className="flex items-center gap-6">
-            <div className="p-4 bg-system-green/10 rounded-full border border-system-green/30 group-hover:scale-110 group-hover:bg-system-green/20 transition-all">
-                <Bot className="w-8 h-8 text-system-green" />
+            <div className="p-4 bg-amber-500/10 rounded-full border border-amber-500/30 group-hover:scale-110 group-hover:bg-amber-500/20 transition-all">
+                <Bot className="w-8 h-8 text-amber-500" />
             </div>
             <div className="text-left">
-                <h3 className="text-2xl font-mono font-bold text-system-green uppercase tracking-[0.2em]">Build Me a Story</h3>
-                <p className="text-[10px] text-gray-500 uppercase mt-1 leading-relaxed tracking-widest">Autonomous Synthesis Protocol // Automated Pathfinding</p>
+                <h3 className="text-2xl font-mono font-bold text-amber-500 uppercase tracking-[0.2em]">TEST PROTOCOL</h3>
+                <p className="text-[10px] text-gray-500 uppercase mt-1 leading-relaxed tracking-widest">Diagnostic Sequence // Autonomous Diagnostics</p>
             </div>
         </div>
-        <p className="text-[11px] text-gray-600 uppercase tracking-tight max-w-xl opacity-60">The Machine takes control. Define the technical resonance dials and allow the simulation to construct its own victims and trajectory.</p>
-        <div className="flex items-center gap-3 text-system-green text-[10px] font-bold uppercase tracking-[0.3em] opacity-0 group-hover:opacity-100 transition-opacity pt-2">
-            Simulation Synthesis Mode <ChevronRight className="w-4 h-4" />
+        <p className="text-[11px] text-gray-600 uppercase tracking-tight max-w-xl opacity-60">The Machine executes a self-contained test loop. No user input required. Used for validating narrative pathfinding and atmospheric cohesion.</p>
+        <div className="flex items-center gap-3 text-amber-500 text-[10px] font-bold uppercase tracking-[0.3em] opacity-0 group-hover:opacity-100 transition-opacity pt-2">
+            Initiate Diagnostic Loop <ChevronRight className="w-4 h-4" />
         </div>
       </button>
 
@@ -289,49 +316,20 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
     </div>
   );
 
-  const ActionButtons = ({ fieldKey, value }: { fieldKey: string, value: string }) => {
-    const isLoading = generatingFields[fieldKey];
-    const hasNotes = value.trim().length > 0;
-
-    return (
-      <div className="flex items-center gap-2">
-        {hasNotes && (
-          <button
-            onClick={(e) => { e.preventDefault(); handleGenerateField(fieldKey, true); }}
-            disabled={isLoading}
-            className={`flex items-center gap-2 text-[10px] uppercase font-mono px-3 py-1 border border-gray-800 rounded-sm hover:border-fresh-blood hover:text-fresh-blood transition-all bg-black/40 group/notes ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <StickyNote className="w-3 h-3 group-hover/notes:animate-pulse" />}
-            {isLoading ? 'Synthesizing...' : 'Follow My Notes'}
-          </button>
-        )}
-        <button
-          onClick={(e) => { e.preventDefault(); handleGenerateField(fieldKey, false); }}
-          disabled={isLoading}
-          className={`flex items-center gap-2 text-[10px] uppercase font-mono px-3 py-1 border border-gray-800 rounded-sm hover:border-haunt-gold hover:text-haunt-gold transition-all bg-black/40 group/gen ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-        >
-          {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3 group-hover/gen:animate-pulse" />}
-          {isLoading ? 'Synthesizing...' : 'Generate It For Me'}
-        </button>
-      </div>
-    );
-  };
-
   const renderSimulationMode = () => {
     const isThirdPerson = perspective.includes('Third Person');
-
     return (
       <div className="flex flex-col h-full bg-[#050505] p-12 md:p-16 animate-fadeIn relative overflow-hidden font-mono">
-         <div className="h-1.5 bg-system-green/10 relative overflow-hidden flex-shrink-0 mb-10">
-            <div className="absolute inset-0 bg-system-green/40 w-1/4 animate-[scanline_4s_linear_infinite]" />
+         <div className="h-1.5 bg-amber-500/10 relative overflow-hidden flex-shrink-0 mb-10">
+            <div className="absolute inset-0 bg-amber-500/40 w-1/4 animate-[scanline_4s_linear_infinite]" />
          </div>
 
-         <div className="flex items-center justify-between border-b border-system-green/30 pb-10 mb-12">
+         <div className="flex items-center justify-between border-b border-amber-500/30 pb-10 mb-12">
             <div className="flex items-center gap-6">
-              <Activity className="w-14 h-14 text-system-green animate-pulse" />
+              <Activity className="w-14 h-14 text-amber-500 animate-pulse" />
               <div>
-                <h2 className="text-5xl font-bold tracking-[0.25em] uppercase text-system-green">Simulation Synthesis</h2>
-                <p className="text-xs text-gray-500 tracking-[0.4em] uppercase mt-2">Autonomous Narrative Configuration // Protocol v3.1</p>
+                <h2 className="text-5xl font-bold tracking-[0.25em] uppercase text-amber-500">Test Calibration</h2>
+                <p className="text-xs text-gray-500 tracking-[0.4em] uppercase mt-2">Diagnostic Narrative Configuration // sequence v1.0</p>
               </div>
             </div>
             <button 
@@ -343,260 +341,112 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
          </div>
 
          <div className="flex-1 overflow-y-auto custom-scrollbar space-y-16 pr-6 pb-20">
-            
-            {/* Perspective & Role Section */}
             <div className="bg-black/40 p-10 border border-gray-800 rounded-sm space-y-10">
-                <div className="flex items-center gap-5 text-system-green font-mono text-lg uppercase tracking-[0.4em] border-b border-system-green/10 pb-5">
-                    <Monitor className="w-8 h-8" /> Observation Dials
+                <div className="flex items-center gap-5 text-amber-500 font-mono text-lg uppercase tracking-[0.4em] border-b border-amber-500/10 pb-5">
+                    <Monitor className="w-8 h-8" /> Diagnostic Observation
                 </div>
-                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                    <div className="space-y-4 group relative">
                       <label className="text-xs text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                        <Eye className="w-4 h-4 text-system-green" /> Perspective Lens
+                        <Eye className="w-4 h-4 text-amber-500" /> Perspective
                       </label>
                       <select 
                         value={perspective} 
                         onChange={(e) => setPerspective(e.target.value)}
-                        className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 text-lg focus:border-system-green outline-none appearance-none rounded-sm transition-all hover:bg-gray-900"
+                        className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 text-lg focus:border-amber-500 outline-none appearance-none rounded-sm transition-all hover:bg-gray-900"
                       >
-                        <option value="First Person (Direct Immersion)">First Person (Direct)</option>
-                        <option value="Third Person (Observational Dread)">Third Person (Author/Director)</option>
+                        <option value="First Person (Direct Immersion)">First Person</option>
+                        <option value="Third Person (Observational Dread)">Third Person</option>
                       </select>
-                      {isThirdPerson ? (
-                          <div className="flex items-start gap-3 mt-3 text-[10px] text-system-green/60 uppercase leading-relaxed animate-pulse">
-                             <Clapperboard className="w-4 h-4 flex-shrink-0" />
-                             <span>Authorial Mode: You act as a Director. The Machine will narrate from a cinematic distance, observing the specimen's struggle.</span>
-                          </div>
-                      ) : (
-                          <div className="flex items-start gap-3 mt-3 text-[10px] text-gray-600 uppercase leading-relaxed">
-                             <UserCheck className="w-4 h-4 flex-shrink-0" />
-                             <span>Immersion Mode: You are the specimen. All sensory data is direct.</span>
-                          </div>
-                      )}
                    </div>
-
                    <div className="space-y-4">
                       <label className="text-xs text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                        <UserCheck className="w-4 h-4 text-system-green" /> Primary Role
+                        <UserCheck className="w-4 h-4 text-amber-500" /> Role Type
                       </label>
                       <select 
                         value={mode} 
                         onChange={(e) => setMode(e.target.value)}
-                        className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 text-lg focus:border-system-green outline-none appearance-none rounded-sm transition-all hover:bg-gray-900"
+                        className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 text-lg focus:border-amber-500 outline-none appearance-none rounded-sm transition-all hover:bg-gray-900"
                       >
-                        <option value="The Survivor (Prey Protocol)">The Survivor (Subject)</option>
-                        <option value="The Antagonist (Predator Protocol)">The Antagonist (Entity)</option>
+                        <option value="The Survivor (Prey Protocol)">Survivor</option>
+                        <option value="The Antagonist (Predator Protocol)">Antagonist</option>
                       </select>
                    </div>
                 </div>
             </div>
 
-            {/* Thematic Dials */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
                <div className="space-y-4">
                   <label className="text-xs text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-system-green" /> Resonance Cluster
+                    <Layers className="w-4 h-4 text-amber-500" /> Theme
                   </label>
                   <select 
                     value={selectedClusters[0]} 
                     onChange={(e) => setSelectedClusters([e.target.value])}
-                    className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 text-lg focus:border-system-green outline-none appearance-none rounded-sm"
+                    className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 text-lg focus:border-amber-500 outline-none appearance-none rounded-sm"
                   >
                     {CLUSTER_OPTIONS.map(c => (
                       <option key={c.id} value={c.id}>{c.label}</option>
                     ))}
                   </select>
                </div>
-
                <div className="space-y-4">
                   <label className="text-xs text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-system-green" /> Neural Fidelity
+                    <Zap className="w-4 h-4 text-amber-500" /> Neural Gradient
                   </label>
                   <select 
                     value={intensity} 
                     onChange={(e) => setIntensity(e.target.value)}
-                    className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 text-lg focus:border-system-green outline-none appearance-none rounded-sm"
+                    className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 text-lg focus:border-amber-500 outline-none appearance-none rounded-sm"
                   >
                     {INTENSITY_OPTIONS.map(opt => (
                         <option key={opt.id} value={opt.id}>{opt.label}</option>
                     ))}
                   </select>
                </div>
-
-               <div className="space-y-4">
-                  <label className="text-xs text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                    <Image className="w-4 h-4 text-system-green" /> Visual Motif
-                  </label>
-                  <div className="flex flex-col gap-2">
-                      <div className="flex items-center justify-between">
-                           <ActionButtons fieldKey="Visual Motif" value={visualMotif} />
-                      </div>
-                      <input 
-                      type="text"
-                      value={visualMotif}
-                      onChange={(e) => setVisualMotif(e.target.value)}
-                      placeholder="e.g. Grainy 8mm, Static VHS..."
-                      className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 text-lg focus:border-system-green outline-none rounded-sm transition-all hover:bg-gray-900"
-                      />
-                  </div>
-               </div>
             </div>
 
-            {/* Antagonist Parameters */}
-            {isVillain && (
-              <div className="col-span-1 md:col-span-2 space-y-12 border-y-2 border-system-green/20 py-16 animate-fadeIn bg-green-950/5 px-10 rounded-sm">
-                <div className="text-system-green font-mono text-2xl font-bold uppercase tracking-[0.5em] flex items-center gap-6">
-                   <Target className="w-10 h-10 animate-pulse" /> Entity Specifications
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
-                  <div className="space-y-4 group relative">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
-                        <Skull className="w-5 h-5" /> Entity Name
-                      </label>
-                      <ActionButtons fieldKey="Entity Name" value={villainName} />
-                    </div>
-                    <input 
-                      type="text"
-                      value={villainName}
-                      onChange={(e) => setVillainName(e.target.value)}
-                      placeholder="Auto-generate or name it..."
-                      className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-sm focus:border-system-green outline-none transition-all placeholder:text-gray-900 hover:bg-gray-900 rounded-sm"
-                    />
-                  </div>
-
-                  <div className="space-y-4 group relative">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
-                        <Skull className="w-5 h-5" /> Form & Appearance
-                      </label>
-                      <ActionButtons fieldKey="Form & Appearance" value={villainAppearance} />
-                    </div>
-                    <textarea 
-                      value={villainAppearance}
-                      onChange={(e) => setVillainAppearance(e.target.value)}
-                      placeholder="Describe your manifestation..."
-                      className="w-full h-48 bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-sm focus:border-system-green outline-none transition-all resize-none custom-scrollbar placeholder:text-gray-900 hover:bg-gray-900 rounded-sm"
-                    />
-                  </div>
-
-                  <div className="space-y-4 group relative">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
-                        <Wand2 className="w-5 h-5" /> Modus Operandi
-                      </label>
-                      <ActionButtons fieldKey="Modus Operandi" value={villainMethods} />
-                    </div>
-                    <textarea 
-                      value={villainMethods}
-                      onChange={(e) => setVillainMethods(e.target.value)}
-                      placeholder="How does it hunt?"
-                      className="w-full h-48 bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-sm focus:border-system-green outline-none transition-all resize-none custom-scrollbar placeholder:text-gray-900 hover:bg-gray-900 rounded-sm"
-                    />
-                  </div>
-
-                  <div className="space-y-4 group relative">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
-                        <Users className="w-5 h-5" /> Target Subjects
-                      </label>
-                      <ActionButtons fieldKey="Specimen Targets" value={victimDescription} />
-                    </div>
-                    <textarea 
-                      value={victimDescription}
-                      onChange={(e) => setVictimDescription(e.target.value)}
-                      placeholder="Who are the specimens?"
-                      className="w-full h-48 bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-sm focus:border-system-green outline-none transition-all resize-none custom-scrollbar placeholder:text-gray-900 hover:bg-gray-900 rounded-sm"
-                    />
-                  </div>
-
-                  <div className="space-y-4 group relative">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
-                        <Target className="w-5 h-5" /> Primary Goal
-                      </label>
-                      <ActionButtons fieldKey="Primary Objective" value={primaryGoal} />
-                    </div>
-                    <input 
-                      type="text"
-                      value={primaryGoal}
-                      onChange={(e) => setPrimaryGoal(e.target.value)}
-                      placeholder="Ultimate objective..."
-                      className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-sm focus:border-system-green outline-none transition-all placeholder:text-gray-900 hover:bg-gray-900 rounded-sm"
-                    />
-                  </div>
-
-                  <div className="space-y-4 group relative">
-                    <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
-                      <Users className="w-5 h-5" /> Specimen Count
-                    </label>
-                    <div className="flex items-center gap-6 bg-black border-2 border-gray-800 p-6 rounded-sm">
-                      <input 
-                        type="range"
-                        min="1"
-                        max="10"
-                        value={victimCount}
-                        onChange={(e) => setVictimCount(parseInt(e.target.value) || 1)}
-                        className="flex-1 accent-system-green h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer"
-                      />
-                      <span className="text-system-green font-mono text-xl w-8 font-bold">{victimCount}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Simulation Cycles */}
             <div className="space-y-10">
-              <div className="flex items-center gap-5 text-system-green font-mono text-lg uppercase tracking-[0.5em] border-b border-system-green/10 pb-6">
-                  <Timer className="w-8 h-8" /> Iterative Loops
+              <div className="flex items-center gap-5 text-amber-500 font-mono text-lg uppercase tracking-[0.5em] border-b border-amber-500/10 pb-6">
+                  <Timer className="w-8 h-8" /> Loop Count
               </div>
               <div className="flex items-center gap-12 bg-black/60 p-10 border-2 border-gray-800 rounded-sm">
                  <input 
                    type="range" 
-                   min="5" 
-                   max="200" 
-                   value={simulationCycles} 
-                   onChange={(e) => setSimulationCycles(parseInt(e.target.value))}
-                   className="flex-1 accent-system-green h-4 bg-gray-800 rounded-lg appearance-none cursor-pointer"
+                   min="1" 
+                   max="50" 
+                   value={testCycles} 
+                   onChange={(e) => setTestCycles(parseInt(e.target.value))}
+                   className="flex-1 accent-amber-500 h-4 bg-gray-800 rounded-lg appearance-none cursor-pointer"
                  />
                  <div className="flex flex-col items-center min-w-[140px]">
-                   <span className="text-6xl font-mono text-system-green font-bold leading-none">{simulationCycles}</span>
-                   <span className="text-[10px] text-gray-600 uppercase tracking-widest mt-3">Total Cycles</span>
+                   <span className="text-6xl font-mono text-amber-500 font-bold leading-none">{testCycles}</span>
+                   <span className="text-[10px] text-gray-600 uppercase tracking-widest mt-3">Test Steps</span>
                  </div>
               </div>
-              <p className="text-xs text-gray-600 font-mono uppercase tracking-widest text-center opacity-40">
-                The engine will simulate {simulationCycles} recursive turns between user/proxy and NPCs before terminating for analysis.
-              </p>
             </div>
          </div>
 
-         <div className="pt-16 pb-12 border-t border-system-green/20 flex flex-col items-center flex-shrink-0">
+         <div className="pt-16 pb-12 border-t border-amber-500/20 flex flex-col items-center flex-shrink-0">
             <button
               onClick={handleStart}
               disabled={isCalibrating}
-              className={`group relative w-full max-w-3xl py-10 bg-system-green text-black font-bold uppercase tracking-[0.8em] transition-all hover:bg-green-400 active:scale-[0.98] ${isCalibrating ? 'opacity-50 cursor-not-allowed' : ''} shadow-[0_0_80px_rgba(16,185,129,0.4)] rounded-sm text-3xl`}
+              className={`group relative w-full max-w-3xl py-10 bg-amber-500 text-black font-bold uppercase tracking-[0.8em] transition-all hover:bg-amber-400 active:scale-[0.98] ${isCalibrating ? 'opacity-50 cursor-not-allowed' : ''} shadow-[0_0_80px_rgba(245,158,11,0.4)] rounded-sm text-3xl`}
             >
               <span className="relative z-10 flex items-center justify-center gap-8">
                 {isCalibrating ? (
                   <>
                     <Loader2 className="w-10 h-10 animate-spin" />
-                    SYNTHESIZING PROTOCOL...
+                    QUEUING TEST...
                   </>
                 ) : (
                   <>
                     <Play className="w-10 h-10 fill-black" />
-                    INITIATE SYNTHESIS
+                    RUN TEST PROTOCOL
                   </>
                 )}
               </span>
-              <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
             </button>
-            <p className="mt-12 text-sm text-gray-600 text-center uppercase tracking-[0.5em] max-w-5xl leading-relaxed opacity-60 px-6">
-              AUTONOMOUS EXECUTION ENGAGED. UPON INITIALIZATION, THE ARCHITECT WILL ASSUME PLAYER CONTROL FOR THE DURATION OF THE CYCLE LOOP.
-            </p>
          </div>
       </div>
     );
@@ -607,7 +457,6 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
       <div className="h-2 bg-fresh-blood/20 relative overflow-hidden flex-shrink-0">
         <div className="absolute inset-0 bg-fresh-blood w-1/4 animate-[scanline_2s_linear_infinite]" />
       </div>
-
       <div className="flex-1 p-12 md:p-16 space-y-12 overflow-y-auto custom-scrollbar">
         <div className="flex items-center justify-between border-b border-fresh-blood/30 pb-10">
           <div className="flex items-center gap-6">
@@ -624,7 +473,6 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
             Switch Mode
           </button>
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
           <div className="space-y-4 group relative">
             <label className="text-sm font-mono text-gray-400 uppercase flex items-center gap-3 tracking-[0.3em]">
@@ -638,9 +486,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
               <option value="First Person (Direct Immersion)">First Person (Direct Immersion)</option>
               <option value="Third Person (Observational Dread)">Third Person (Observational Dread)</option>
             </select>
-            <Tooltip text="Direct immersion places you inside the character's senses. Observational dread maintains a cinematic distance, focusing on structural horror." />
           </div>
-
           <div className="space-y-4 group relative">
             <label className="text-sm font-mono text-gray-400 uppercase flex items-center gap-3 tracking-[0.3em]">
               <Cpu className="w-6 h-6 text-fresh-blood" /> Specimen Role
@@ -653,9 +499,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
               <option value="The Survivor (Prey Protocol)">The Survivor (Prey Protocol)</option>
               <option value="The Antagonist (Predator Protocol)">The Antagonist (Predator Protocol)</option>
             </select>
-            <Tooltip text={mode.includes('Survivor') ? "Focus on evasion, resource scarcity, and the psychological weight of survival." : "Architect the hunt. Control manifestation, manipulate victims, and manage your own growing obsession."} />
           </div>
-
           <div className="col-span-1 md:col-span-2 space-y-6">
             <label className="text-sm font-mono text-gray-400 uppercase flex items-center gap-3 tracking-[0.3em]">
               <Settings className="w-6 h-6 text-fresh-blood" /> Thematic Resonance Clusters
@@ -683,13 +527,61 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
               ))}
             </div>
           </div>
-
+          <div className="col-span-1 md:col-span-2 bg-terminal/40 p-10 border border-gray-800 space-y-10 rounded-sm">
+             <div className="text-fresh-blood font-mono text-xl font-bold uppercase tracking-[0.4em] flex items-center gap-5 border-b border-fresh-blood/10 pb-5">
+                <MapPin className="w-8 h-8" /> Environmental Matrix
+             </div>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                <div className="space-y-4 group relative">
+                    <div className="flex items-center justify-between">
+                        <label className="text-sm font-mono text-gray-400 uppercase flex items-center gap-3 tracking-[0.3em]">
+                            Initial Location
+                        </label>
+                        <ActionButtons fieldKey="Initial Location" value={locationDescription} />
+                    </div>
+                    <textarea 
+                        value={locationDescription}
+                        onChange={(e) => setLocationDescription(e.target.value)}
+                        placeholder="Describe the architecture of the starting ordeal..."
+                        className="w-full h-32 bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-sm focus:border-fresh-blood outline-none transition-all resize-none custom-scrollbar placeholder:text-gray-900 hover:bg-gray-900 rounded-sm"
+                    />
+                </div>
+                <div className="space-y-4 group relative">
+                    <div className="flex items-center justify-between">
+                        <label className="text-sm font-mono text-gray-400 uppercase flex items-center gap-3 tracking-[0.3em]">
+                            <Image className="w-6 h-6 text-fresh-blood" /> Visual Motif
+                        </label>
+                        <ActionButtons fieldKey="Visual Motif" value={visualMotif} />
+                    </div>
+                    <input 
+                        type="text"
+                        value={visualMotif}
+                        onChange={(e) => setVisualMotif(e.target.value)}
+                        placeholder="e.g. Grainy 8mm film, Neon Noir..."
+                        className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-lg focus:border-fresh-blood outline-none transition-all placeholder:text-gray-900 hover:bg-gray-900 rounded-sm"
+                    />
+                </div>
+             </div>
+          </div>
+          <div className="space-y-4 group relative">
+            <label className="text-sm font-mono text-gray-400 uppercase flex items-center gap-3 tracking-[0.3em]">
+              <Zap className="w-6 h-6 text-fresh-blood" /> Fidelity Level
+            </label>
+            <select 
+              value={intensity} 
+              onChange={(e) => setIntensity(e.target.value)}
+              className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-lg focus:border-fresh-blood outline-none transition-all hover:bg-gray-900 cursor-pointer appearance-none rounded-sm"
+            >
+                {INTENSITY_OPTIONS.map(opt => (
+                    <option key={opt.id} value={opt.id}>{opt.label}</option>
+                ))}
+            </select>
+          </div>
           {isVillain && (
             <div className="col-span-1 md:col-span-2 space-y-12 border-y-2 border-fresh-blood/20 py-16 animate-fadeIn bg-red-950/5 px-8">
               <div className="text-red-500 font-mono text-2xl font-bold uppercase tracking-[0.5em] flex items-center gap-6">
                  <Target className="w-10 h-10 animate-pulse" /> Antagonist Specifications
               </div>
-              
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
                 <div className="space-y-4 group relative">
                   <div className="flex items-center justify-between">
@@ -706,7 +598,6 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
                     className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-sm focus:border-red-600 outline-none transition-all placeholder:text-gray-900 hover:bg-gray-900 rounded-sm"
                   />
                 </div>
-
                 <div className="space-y-4 group relative">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
@@ -721,7 +612,6 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
                     className="w-full h-48 bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-sm focus:border-red-600 outline-none transition-all resize-none custom-scrollbar placeholder:text-gray-900 hover:bg-gray-900 rounded-sm"
                   />
                 </div>
-
                 <div className="space-y-4 group relative">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
@@ -736,7 +626,6 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
                     className="w-full h-48 bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-sm focus:border-red-600 outline-none transition-all resize-none custom-scrollbar placeholder:text-gray-900 hover:bg-gray-900 rounded-sm"
                   />
                 </div>
-
                 <div className="space-y-4 group relative">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
@@ -751,7 +640,6 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
                     className="w-full h-48 bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-sm focus:border-red-600 outline-none transition-all resize-none custom-scrollbar placeholder:text-gray-900 hover:bg-gray-900 rounded-sm"
                   />
                 </div>
-
                 <div className="space-y-4 group relative">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
@@ -767,10 +655,9 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
                     className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-sm focus:border-red-600 outline-none transition-all placeholder:text-gray-900 hover:bg-gray-900 rounded-sm"
                   />
                 </div>
-
                 <div className="space-y-4 group relative">
                   <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
-                    <Users className="w-5 h-5" /> Population Count
+                    Population Count
                   </label>
                   <div className="flex items-center gap-6 bg-black border-2 border-gray-800 p-6 rounded-sm">
                     <input 
@@ -787,41 +674,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
               </div>
             </div>
           )}
-
-          <div className="space-y-4 group relative">
-            <label className="text-sm font-mono text-gray-400 uppercase flex items-center gap-3 tracking-[0.3em]">
-              <Zap className="w-6 h-6 text-fresh-blood" /> Fidelity Level
-            </label>
-            <select 
-              value={intensity} 
-              onChange={(e) => setIntensity(e.target.value)}
-              className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-lg focus:border-fresh-blood outline-none transition-all hover:bg-gray-900 cursor-pointer appearance-none rounded-sm"
-            >
-                {INTENSITY_OPTIONS.map(opt => (
-                    <option key={opt.id} value={opt.id}>{opt.label}</option>
-                ))}
-            </select>
-            <Tooltip text="Determines the focus, violence constraint, and psychological goal of the simulation." />
-          </div>
-
-          <div className="space-y-4 group relative">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-mono text-gray-400 uppercase flex items-center gap-3 tracking-[0.3em]">
-                <Image className="w-6 h-6 text-fresh-blood" /> Visual Motif
-              </label>
-              <ActionButtons fieldKey="Visual Motif" value={visualMotif} />
-            </div>
-            <input 
-              type="text"
-              value={visualMotif}
-              onChange={(e) => setVisualMotif(e.target.value)}
-              placeholder="e.g. Grainy 8mm film, Neon Noir..."
-              className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-lg focus:border-fresh-blood outline-none transition-all placeholder:text-gray-900 hover:bg-gray-900 rounded-sm"
-            />
-            <Tooltip text="Sets the aesthetic palette for neural snapshots and descriptive prose." />
-          </div>
         </div>
-
         <div className="pt-16 pb-12 border-t-2 border-fresh-blood/10 flex flex-col items-center flex-shrink-0 bg-black/20">
           <button
             onClick={handleStart}
@@ -829,20 +682,9 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
             className={`group relative w-full max-w-2xl py-8 bg-fresh-blood text-black font-mono font-bold uppercase tracking-[0.6em] transition-all hover:bg-red-700 active:scale-[0.98] ${isCalibrating ? 'opacity-50 cursor-not-allowed' : ''} shadow-[0_0_50px_rgba(136,8,8,0.5)] rounded-sm text-xl`}
           >
             <span className="relative z-10 flex items-center justify-center gap-6">
-              {isCalibrating ? (
-                <>CALIBRATING SENSORS...</>
-              ) : (
-                <>
-                  <Play className="w-8 h-8 fill-black" />
-                  INITIALIZE SIMULATION
-                </>
-              )}
+              {isCalibrating ? <>CALIBRATING SENSORS...</> : <><Play className="w-8 h-8 fill-black" /> INITIALIZE SIMULATION</>}
             </span>
-            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
           </button>
-          <p className="mt-12 text-sm font-mono text-gray-600 text-center uppercase tracking-[0.4em] max-w-4xl leading-relaxed opacity-60 px-6">
-            BY INITIALIZING, YOU ACCEPT ALL PSYCHOLOGICAL OUTCOMES. THE MACHINE IS INDIFFERENT TO YOUR REGRET. ACCESSING NEURAL LINK...
-          </p>
         </div>
       </div>
     </div>
@@ -850,21 +692,14 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
 
   const renderGuidedMode = () => {
     const currentQuestion = GUIDED_QUESTIONS[guidedStep];
-    
     return (
       <div className="flex flex-col h-full bg-[#030303] animate-fadeIn p-8 md:p-16 relative overflow-hidden font-serif">
-        {/* Progress indicator */}
         <div className="flex gap-2 mb-12">
           {GUIDED_QUESTIONS.map((_, i) => (
-            <div 
-              key={i} 
-              className={`h-1 flex-1 transition-all duration-1000 ${i <= guidedStep ? 'bg-haunt-gold' : 'bg-gray-800'}`} 
-            />
+            <div key={i} className={`h-1 flex-1 transition-all duration-1000 ${i <= guidedStep ? 'bg-haunt-gold' : 'bg-gray-800'}`} />
           ))}
         </div>
-
         <div className="flex-1 overflow-y-auto custom-scrollbar pr-4 space-y-12">
-          {/* History of answers */}
           <div className="space-y-8 opacity-40">
             {guidedAnswers.map((ans, i) => (
               <div key={i} className="animate-fadeIn">
@@ -873,13 +708,8 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
               </div>
             ))}
           </div>
-
-          {/* Current Question */}
           <div className="space-y-10 animate-fadeIn" key={guidedStep}>
-             <h2 className="text-3xl md:text-4xl text-gray-200 leading-relaxed italic max-w-4xl">
-               {currentQuestion.q}
-             </h2>
-
+             <h2 className="text-3xl md:text-4xl text-gray-200 leading-relaxed italic max-w-4xl">{currentQuestion.q}</h2>
              {currentQuestion.options ? (
                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-3xl">
                  {currentQuestion.options.map((opt) => (
@@ -904,11 +734,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
                    autoFocus
                    className="w-full bg-transparent border-b-2 border-gray-800 text-gray-100 text-2xl py-4 focus:outline-none focus:border-haunt-gold transition-all font-serif italic"
                  />
-                 <button 
-                   onClick={() => handleGuidedNext()}
-                   disabled={!guidedInput.trim()}
-                   className="flex items-center gap-3 text-haunt-gold font-mono text-xs font-bold uppercase tracking-[0.4em] hover:text-white transition-colors disabled:opacity-20"
-                 >
+                 <button onClick={() => handleGuidedNext()} disabled={!guidedInput.trim()} className="flex items-center gap-3 text-haunt-gold font-mono text-xs font-bold uppercase tracking-[0.4em] hover:text-white transition-colors disabled:opacity-20">
                    Confirm Neural Seed <ChevronRight className="w-4 h-4" />
                  </button>
                </div>
@@ -916,17 +742,9 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
           </div>
           <div ref={guidedEndRef} />
         </div>
-
         <div className="pt-12 flex justify-between items-center border-t border-gray-900">
-           <button 
-             onClick={() => setSetupMode('choice')}
-             className="text-gray-600 hover:text-white transition-colors text-xs font-mono uppercase tracking-[0.4em]"
-           >
-             Disconnect Session
-           </button>
-           <div className="text-[10px] font-mono text-gray-800 uppercase tracking-[0.5em]">
-             Calibration in Progress // Step {guidedStep + 1} of {GUIDED_QUESTIONS.length}
-           </div>
+           <button onClick={() => setSetupMode('choice')} className="text-gray-600 hover:text-white transition-colors text-xs font-mono uppercase tracking-[0.4em]">Disconnect Session</button>
+           <div className="text-[10px] font-mono text-gray-800 uppercase tracking-[0.5em]">Calibration in Progress // Step {guidedStep + 1} of {GUIDED_QUESTIONS.length}</div>
         </div>
       </div>
     );
@@ -934,18 +752,14 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
 
   return (
     <div className="fixed inset-0 z-[100] bg-void flex items-center justify-center p-0">
-      {/* Background Glitch Effect */}
       <div className="absolute inset-0 opacity-10 pointer-events-none overflow-hidden">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[size:100%_2px,3px_100%] z-[100] pointer-events-none"></div>
       </div>
-
       <div className="bg-terminal border-2 border-fresh-blood w-[98%] h-[98%] rounded-sm shadow-[0_0_120px_rgba(136,8,8,0.4)] flex flex-col relative overflow-hidden animate-fadeIn backdrop-blur-md">
         {setupMode === 'choice' && renderChoiceMode()}
         {setupMode === 'guided' && renderGuidedMode()}
         {setupMode === 'manual' && renderManualMode()}
         {setupMode === 'simulation' && renderSimulationMode()}
-        
-        {/* Decorative CRT Jitter */}
         <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-5 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]"></div>
       </div>
     </div>

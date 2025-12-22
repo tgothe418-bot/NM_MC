@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StatusPanel } from './components/StatusPanel';
 import { StoryLog } from './components/StoryLog';
 import { InputArea } from './components/InputArea';
@@ -7,13 +7,14 @@ import { ClusterAmbience } from './components/ClusterAmbience';
 import { SimulationModal } from './components/SimulationModal';
 import { SetupOverlay } from './components/SetupOverlay';
 import { WelcomeScreen } from './components/WelcomeScreen';
-import { sendMessageToGemini, initializeGemini, generateAutoPlayerAction, generateSimulationAnalysis, generateHorrorImage } from './services/geminiService';
-import { GameState, ChatMessage, NpcState, SimulationConfig } from './types';
+import { sendMessageToGemini, initializeGemini, generateAutoPlayerAction, generateSimulationAnalysis, generateHorrorImage, generateCinematicVideo } from './services/geminiService';
+import { GameState, ChatMessage, NpcState, SimulationConfig, LocationState } from './types';
 import { parseResponse } from './utils';
 import { constructVoiceManifesto, updateDialogueState } from './services/dialogueEngine';
 import { constructSensoryManifesto } from './services/sensoryEngine';
+import { updateLocationState, constructLocationManifesto, getDefaultLocationState } from './services/locationEngine';
 import { ttsService } from './services/ttsService';
-import { Terminal } from 'lucide-react';
+import { Terminal, Key, Lock, ExternalLink } from 'lucide-react';
 
 const INITIAL_STATE: GameState = {
   meta: {
@@ -62,29 +63,7 @@ const INITIAL_STATE: GameState = {
     manifestation_style: "Unknown"
   },
   npc_states: [],
-  location_state: {
-    name: "Unknown",
-    archetype: "Unknown",
-    cluster_alignment: "None",
-    current_state: 0,
-    dominant_sensory_palette: {
-      primary_sense: "None",
-      secondary_sense: "None",
-      intensity: "Low"
-    },
-    time_of_day: "Unknown",
-    weather_state: "Unknown",
-    active_hazards: [],
-    hidden_resources: [],
-    location_secret: {
-      nature: "Unknown",
-      revelation_trigger: "Unknown",
-      consequence: "Unknown",
-      discovery_state: "Hidden"
-    },
-    spatial_logic: "Euclidean",
-    relationship_to_villain: "Neutral"
-  },
+  location_state: getDefaultLocationState(),
   narrative: {
     active_prices: [],
     sensory_focus: "Silence",
@@ -135,47 +114,87 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSplashComplete, setIsSplashComplete] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [isSimulating, setIsSimulating] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
   const [simulationConfig, setSimulationConfig] = useState<SimulationConfig | null>(null);
   const [simulationReport, setSimulationReport] = useState<string | null>(null);
   const [showSimModal, setShowSimModal] = useState(false);
-  const [simulationEndTurn, setSimulationEndTurn] = useState<number>(0);
-  
+  const [testEndTurn, setTestEndTurn] = useState<number>(0);
+  const [hasApiKey, setHasApiKey] = useState<boolean>(false);
+  const [showKeySelection, setShowKeySelection] = useState<boolean>(true);
+
   useEffect(() => {
-    if (process.env.API_KEY) initializeGemini();
+    const checkApiKey = async () => {
+      const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+      setHasApiKey(hasKey);
+      if (hasKey) {
+        setShowKeySelection(false);
+        initializeGemini();
+      }
+    };
+    checkApiKey();
   }, []);
+
+  const handleSelectKey = async () => {
+    await (window as any).aistudio.openSelectKey();
+    setHasApiKey(true);
+    setShowKeySelection(false);
+    initializeGemini();
+  };
 
   const handleSendMessage = async (text: string, isInternalInitialCall: boolean = false): Promise<string> => {
     setIsLoading(true);
     if (!isInternalInitialCall) {
-      const userMsg: ChatMessage = { role: 'user', text, timestamp: Date.now() };
-      setHistory(prev => [...prev, userMsg]);
+      setHistory(prev => [...prev, { role: 'user', text, timestamp: Date.now() }]);
     }
     
     try {
       const updatedNpcsPreCall = gameState.npc_states.map(npc => updateDialogueState(npc, "User", text));
+      const updatedLocationState = updateLocationState(gameState.location_state, gameState);
       const voiceManifesto = constructVoiceManifesto(updatedNpcsPreCall);
       const sensoryManifesto = constructSensoryManifesto(gameState);
+      const locationManifesto = constructLocationManifesto(updatedLocationState);
       
-      const responseText = await sendMessageToGemini(text, gameState.narrative.active_events, voiceManifesto, sensoryManifesto);
+      const responseText = await sendMessageToGemini(
+        text, 
+        gameState.narrative.active_events, 
+        voiceManifesto, 
+        sensoryManifesto + locationManifesto
+      );
+      
       const { gameState: newGameState, storyText } = parseResponse(responseText);
       
       if (newGameState) {
+        const rawLocation = (newGameState.location_state || {}) as any;
+        const sanitizedLocation: Partial<LocationState> = {
+            ...rawLocation,
+            architectural_notes: Array.isArray(rawLocation.architectural_notes) 
+                ? rawLocation.architectural_notes 
+                : (typeof rawLocation.architectural_notes === 'string' ? [rawLocation.architectural_notes] : []),
+            active_hazards: Array.isArray(rawLocation.active_hazards) 
+                ? rawLocation.active_hazards 
+                : (typeof rawLocation.active_hazards === 'string' ? [rawLocation.active_hazards] : [])
+        };
+
         setGameState(prev => ({
           ...prev,
           ...newGameState,
           npc_states: hydrateNpcStates(newGameState.npc_states || []),
-          meta: { ...prev.meta, ...newGameState.meta }
+          meta: { ...prev.meta, ...newGameState.meta },
+          location_state: {
+            ...updatedLocationState,
+            ...sanitizedLocation as any
+          }
         }));
       }
 
       setHistory(prev => [...prev, { role: 'model', text: storyText, gameState: newGameState || undefined, timestamp: Date.now() }]);
       if (ttsService.getEnabled()) ttsService.speak(storyText);
-      
       return storyText;
-
-    } catch (error) {
+    } catch (error: any) {
       console.error("Interaction failed:", error);
+      if (error?.message?.includes("Requested entity was not found")) {
+        setShowKeySelection(true);
+      }
       const errorMsg = "[SYSTEM CRITICAL FAILURE] Architect unresponsive.";
       setHistory(prev => [...prev, { role: 'model', text: errorMsg, timestamp: Date.now() }]);
       return errorMsg;
@@ -184,132 +203,136 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSnapshot = async () => {
+    setIsLoading(true);
+    const lastMsg = history[history.length - 1]?.text || "A terrifying scene from the nightmare machine.";
+    try {
+      const imageUrl = await generateHorrorImage(lastMsg, { activeCluster: gameState.meta.active_cluster, highQuality: true });
+      if (imageUrl) {
+        setHistory(prev => [...prev, { role: 'model', text: "( The Machine projects a high-fidelity neural snapshot of your reality. )", imageUrl, timestamp: Date.now() }]);
+      }
+    } catch (e) { console.error(e); } finally { setIsLoading(false); }
+  };
+
+  const handleVideoCutscene = async () => {
+    setIsLoading(true);
+    const lastMsg = history[history.length - 1]?.text || "A cinematic horror scene unfolds.";
+    try {
+      const videoUrl = await generateCinematicVideo(lastMsg, { aspectRatio: "16:9", resolution: "720p" });
+      if (videoUrl) {
+        setHistory(prev => [...prev, { role: 'model', text: "( The Machine forced a temporal cutscene into your sensory stream. )", videoUrl, timestamp: Date.now() }]);
+      }
+    } catch (e) { console.error(e); } finally { setIsLoading(false); }
+  };
+
   const handleSetupComplete = async (config: SimulationConfig) => {
+    const initialLocation = {
+        ...getDefaultLocationState(config.cluster),
+        name: config.location_description ? "Defined Threshold" : "Initial Entry",
+        architectural_notes: config.location_description ? [config.location_description] : []
+    };
+
     setGameState(prev => ({
       ...prev,
-      meta: {
-        ...prev.meta,
-        perspective: config.perspective,
-        mode: config.mode as 'Survivor' | 'Villain',
-        starting_point: config.starting_point,
-        intensity_level: config.intensity,
-        active_cluster: config.cluster
-      }
+      location_state: initialLocation,
+      meta: { ...prev.meta, perspective: config.perspective, mode: config.mode as 'Survivor' | 'Villain', starting_point: config.starting_point, intensity_level: config.intensity, active_cluster: config.cluster }
     }));
     setIsInitialized(true);
-    
-    let startPrompt = `INITIALIZE SIMULATION: 
-Perspective: ${config.perspective}
-Mode: ${config.mode}
-Starting Point: ${config.starting_point}
-Cluster: ${config.cluster}
-Intensity: ${config.intensity}
-Visual Motif: ${config.visual_motif || "Default specific to Cluster"}`;
-
-    if (config.mode === 'Villain') {
-        startPrompt += `\n\nUSER-DEFINED ANTAGONIST PROFILE:
-- Entity Name: ${config.villain_name || "Unknown"}
-- Form & Appearance: ${config.villain_appearance || "N/A"}
-- Modus Operandi & Methods: ${config.villain_methods || "N/A"}
-- Primary Goal: ${config.primary_goal || "N/A"}
-- Target Victims: ${config.victim_description || "N/A"}
-- Initial Victim Count: ${config.victim_count || 3}
-
-INSTRUCTION: You MUST respect the user's choices for their villain persona and the victims provided. Set up the opening scene from the perspective of the Predator.`;
+    let startPrompt = `INITIALIZE SIMULATION: Perspective: ${config.perspective}, Mode: ${config.mode}, Starting Point: ${config.starting_point}, Cluster: ${config.cluster}, Intensity: ${config.intensity}`;
+    if (config.location_description) {
+        startPrompt += `\nINITIAL LOCATION: ${config.location_description}`;
     }
-
-    startPrompt += `\n\nTASK: Generate the opening 'Tales From the Crypt' style greeting. Then ask for the user's name (or title of terror if Villain) to tether them to the machine.`;
-    
+    if (config.visual_motif) {
+        startPrompt += `\nVISUAL MOTIF: ${config.visual_motif}`;
+    }
+    if (config.mode === 'Villain') {
+        startPrompt += `\n\nUSER ANTAGONIST: Name: ${config.villain_name}, Desc: ${config.villain_appearance}, Goal: ${config.primary_goal}`;
+    }
     await handleSendMessage(startPrompt, true);
-
-    // If cycle count is defined (Simulation Synthesis mode), start autonomous turns immediately IF requested
-    // "Simulation Mode is an option. It is never a default." 
-    // This logic ensures that even if SetupOverlay path leads here, 
-    // it's treated as an initialization choice.
+    
+    // Automatic Test Mode check - renamed from 'simulation' path
+    // IMPORTANT: It ONLY triggers if specifically requested via 'test' mode in SetupOverlay
     if (config.cycles > 0) {
         setSimulationConfig(config);
-        setSimulationEndTurn(gameState.meta.turn + config.cycles);
-        setIsSimulating(true);
+        setTestEndTurn(gameState.meta.turn + config.cycles);
+        setIsTesting(true);
     }
   };
 
-  const handleRunSimulation = (config: SimulationConfig) => {
+  const handleRunTest = (config: SimulationConfig) => {
     setSimulationConfig(config);
-    setSimulationEndTurn(gameState.meta.turn + config.cycles);
-    setIsSimulating(true);
+    setTestEndTurn(gameState.meta.turn + config.cycles);
+    setIsTesting(true);
     setShowSimModal(false);
   };
 
+  const handleAbortTest = () => {
+    setIsTesting(false);
+  };
+
   useEffect(() => {
-    if (isSimulating && !isLoading && simulationConfig) {
-       const runSimulationTurn = async () => {
-           if (gameState.meta.turn >= simulationEndTurn) {
-               setIsSimulating(false);
+    if (isTesting && !isLoading && simulationConfig) {
+       const runTestTurn = async () => {
+           if (gameState.meta.turn >= testEndTurn) {
+               setIsTesting(false);
                const analysis = await generateSimulationAnalysis(history.map(m => `[${m.role.toUpperCase()}]: ${m.text}`).join('\n'));
                setSimulationReport(analysis);
-               setShowSimModal(true); // Show report when finished
+               setShowSimModal(true);
                return;
            }
            const action = await generateAutoPlayerAction(history.slice(-5).map(m => `[${m.role.toUpperCase()}]: ${m.text}`).join('\n'), gameState, simulationConfig);
            await handleSendMessage(action);
        };
-       const timer = setTimeout(runSimulationTurn, 3000); 
+       const timer = setTimeout(runTestTurn, 3000); 
        return () => clearTimeout(timer);
     }
-  }, [isSimulating, isLoading, gameState.meta.turn, simulationEndTurn]);
+  }, [isTesting, isLoading, gameState.meta.turn, testEndTurn, simulationConfig, history, gameState]);
+
+  if (showKeySelection) {
+    return (
+      <div className="fixed inset-0 bg-void flex items-center justify-center p-6 z-[300]">
+        <div className="bg-terminal border border-fresh-blood p-12 max-w-xl w-full text-center space-y-10 shadow-[0_0_50px_rgba(136,8,8,0.3)]">
+          <div className="flex justify-center"><Lock className="w-20 h-20 text-fresh-blood animate-pulse" /></div>
+          <h2 className="text-3xl font-mono uppercase tracking-[0.2em] text-white">Neural Key Required</h2>
+          <p className="text-gray-400 font-mono text-sm leading-relaxed">
+            High-fidelity simulation (Veo/Gemini Pro) requires a paid API Key from a valid GCP project.
+          </p>
+          <div className="pt-4 space-y-4">
+            <button onClick={handleSelectKey} className="w-full bg-fresh-blood hover:bg-red-800 text-black font-bold py-6 px-4 font-mono tracking-widest flex items-center justify-center gap-4 transition-all uppercase">
+              <Key className="w-6 h-6" /> Select Neural Key
+            </button>
+            <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 text-[10px] text-gray-600 hover:text-white transition-colors uppercase font-mono tracking-widest">
+              Billing Documentation <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-full bg-void text-gray-200 overflow-hidden font-sans relative items-center justify-center">
-      <ClusterAmbience 
-          activeCluster={gameState.meta.active_cluster} 
-          weatherState={gameState.location_state.weather_state}
-          threatLevel={gameState.villain_state.threat_scale}
-          locationState={gameState.location_state.current_state}
-          visualMotif={gameState.narrative.visual_motif}
-      />
-
-      {!isSplashComplete && (
-        <WelcomeScreen onStart={() => setIsSplashComplete(true)} />
-      )}
-
-      {isSplashComplete && !isInitialized && (
-        <SetupOverlay onComplete={handleSetupComplete} />
-      )}
-
+      <ClusterAmbience activeCluster={gameState.meta.active_cluster} weatherState={gameState.location_state.weather_state} threatLevel={gameState.villain_state.threat_scale} locationState={gameState.location_state.current_state} visualMotif={gameState.narrative.visual_motif} />
+      {!isSplashComplete && <WelcomeScreen onStart={() => setIsSplashComplete(true)} />}
+      {isSplashComplete && !isInitialized && <SetupOverlay onComplete={handleSetupComplete} />}
       <div className={`relative z-10 flex w-[95%] h-[92%] border border-gray-900 shadow-[0_0_120px_rgba(0,0,0,0.9)] bg-black/50 backdrop-blur-xl transition-all duration-1000 overflow-hidden rounded-xl ${isInitialized ? 'opacity-100' : 'opacity-0 pointer-events-none translate-y-4'}`}>
         <div className="hidden lg:block h-full bg-black/60 relative z-20">
-           <StatusPanel 
-            gameState={gameState} 
-            onProcessAction={handleSendMessage}
-            onOpenSimulation={() => { setSimulationReport(null); setShowSimModal(true); }}
-            isSimulating={isSimulating}
-           />
+           <StatusPanel gameState={gameState} onProcessAction={handleSendMessage} onOpenSimulation={() => { setSimulationReport(null); setShowSimModal(true); }} isTesting={isTesting} onAbortTest={handleAbortTest} />
         </div>
         <div className="flex-1 flex flex-col h-full relative z-10 overflow-hidden">
             <div className="h-20 border-b border-gray-800 flex items-center justify-between px-10 bg-black/80 backdrop-blur">
                 <div className="flex items-center gap-5">
                    <Terminal className="w-8 h-8 text-gray-500" />
-                   <h1 className="font-serif text-3xl tracking-widest text-gray-100">THE NIGHTMARE MACHINE <span className="text-sm font-mono text-gray-600 align-top ml-2">v3.1</span></h1>
+                   <h1 className="font-serif text-3xl tracking-widest text-gray-100">THE NIGHTMARE MACHINE <span className="text-sm font-mono text-gray-600 align-top ml-2">v3.2</span></h1>
                 </div>
             </div>
             <StoryLog history={history} isLoading={isLoading} activeCluster={gameState.meta.active_cluster} />
             <div className="px-10 py-10 bg-gradient-to-t from-black via-black/90 to-transparent">
-                <InputArea onSend={handleSendMessage} isLoading={isLoading || isSimulating} />
+                <InputArea onSend={handleSendMessage} onSnapshot={handleSnapshot} onVideoCutscene={handleVideoCutscene} isLoading={isLoading || isTesting} />
             </div>
         </div>
       </div>
-      <SimulationModal 
-        isOpen={showSimModal} 
-        onClose={() => setShowSimModal(false)} 
-        onRunSimulation={handleRunSimulation} 
-        isSimulating={isSimulating} 
-        simulationReport={simulationReport}
-        initialPerspective={gameState.meta.perspective}
-        initialMode={gameState.meta.mode}
-        initialCluster={gameState.meta.active_cluster}
-        initialIntensity={gameState.meta.intensity_level}
-        isSessionActive={gameState.meta.turn > 1}
-      />
+      <SimulationModal isOpen={showSimModal} onClose={() => setShowSimModal(false)} onRunSimulation={handleRunTest} isTesting={isTesting} simulationReport={simulationReport} initialPerspective={gameState.meta.perspective} initialMode={gameState.meta.mode} initialCluster={gameState.meta.active_cluster} initialIntensity={gameState.meta.intensity_level} isSessionActive={gameState.meta.turn > 1} />
     </div>
   );
 };

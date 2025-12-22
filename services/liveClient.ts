@@ -27,7 +27,7 @@ type ActionProcessor = (action: string) => Promise<string>;
 type InputProgressCallback = (text: string, isFinal: boolean) => void;
 
 export class LiveClient {
-  private ai: GoogleGenAI;
+  private ai: GoogleGenAI | null = null;
   private sessionPromise: Promise<any> | null = null;
   private inputContext: AudioContext | null = null;
   private outputContext: AudioContext | null = null;
@@ -39,13 +39,15 @@ export class LiveClient {
   private onInputProgress: InputProgressCallback | null = null;
 
   constructor(onAction: ActionProcessor, onInputProgress?: InputProgressCallback) {
-    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     this.onAction = onAction;
     if (onInputProgress) this.onInputProgress = onInputProgress;
   }
 
   async connect(config: VoiceConfig, systemInstruction: string) {
     this.disconnect(); // Ensure clean state
+
+    // CRITICAL: Create a new GoogleGenAI instance right before making an API call to ensure it uses the most up-to-date API key.
+    this.ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     this.inputContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
     this.outputContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
@@ -192,6 +194,7 @@ export class LiveClient {
     this.inputContext = null;
     this.outputContext = null;
     this.sessionPromise = null;
+    this.ai = null;
     this.nextStartTime = 0;
   }
 }

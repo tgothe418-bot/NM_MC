@@ -7,7 +7,7 @@ interface SimulationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onRunSimulation: (config: SimulationConfig) => void;
-  isSimulating: boolean;
+  isTesting: boolean;
   simulationReport: string | null;
   initialPerspective?: string;
   initialMode?: string;
@@ -29,7 +29,7 @@ export const SimulationModal: React.FC<SimulationModalProps> = ({
   isOpen, 
   onClose, 
   onRunSimulation, 
-  isSimulating,
+  isTesting,
   simulationReport,
   initialPerspective = "First Person",
   initialMode = "Survivor",
@@ -38,8 +38,7 @@ export const SimulationModal: React.FC<SimulationModalProps> = ({
   initialIntensity = "Level 3",
   isSessionActive = false
 }) => {
-  const [cycles, setCycles] = useState(20);
-  
+  const [cycles, setCycles] = useState(10);
   const [perspective, setPerspective] = useState(initialPerspective);
   const [mode, setMode] = useState(initialMode);
   const [startingPoint, setStartingPoint] = useState(initialStart);
@@ -91,24 +90,22 @@ export const SimulationModal: React.FC<SimulationModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/95 z-[150] flex items-center justify-center p-6 backdrop-blur-md">
-      <div className="bg-terminal border-2 border-system-green/40 max-w-5xl w-full rounded-sm shadow-[0_0_100px_rgba(16,185,129,0.15)] flex flex-col max-h-[90vh] relative overflow-hidden animate-fadeIn">
+      <div className="bg-terminal border-2 border-amber-500/40 max-w-5xl w-full rounded-sm shadow-[0_0_100px_rgba(245,158,11,0.1)] flex flex-col max-h-[90vh] relative overflow-hidden animate-fadeIn">
         
-        {/* Decorative Scanning Header */}
-        <div className="h-1 bg-system-green/20 relative overflow-hidden flex-shrink-0">
-          <div className="absolute inset-0 bg-system-green w-1/3 animate-[scanline_3s_linear_infinite]" />
+        <div className="h-1 bg-amber-500/20 relative overflow-hidden flex-shrink-0">
+          <div className="absolute inset-0 bg-amber-500 w-1/3 animate-[scanline_3s_linear_infinite]" />
         </div>
 
-        {/* Modal Header */}
-        <div className="p-6 border-b border-system-green/20 flex justify-between items-center bg-green-950/10">
+        <div className="p-6 border-b border-amber-500/20 flex justify-between items-center bg-amber-950/10">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-system-green/10 rounded-sm border border-system-green/30">
-              <Cpu className="w-8 h-8 text-system-green animate-pulse" />
+            <div className="p-3 bg-amber-500/10 rounded-sm border border-amber-500/30">
+              <Cpu className="w-8 h-8 text-amber-500 animate-pulse" />
             </div>
             <div>
-              <h2 className="font-mono text-2xl font-bold tracking-[0.2em] uppercase text-system-green">
-                {isSessionActive ? "Sequence Initializer" : "Simulation Protocol"}
+              <h2 className="font-mono text-2xl font-bold tracking-[0.2em] uppercase text-amber-500">
+                TEST PROTOCOL
               </h2>
-              <p className="text-[10px] font-mono text-gray-500 tracking-[0.4em] uppercase mt-1">Autonomous Execution // Neural Pathfinding</p>
+              <p className="text-[10px] font-mono text-gray-500 tracking-[0.4em] uppercase mt-1">Autonomous Diagnostic Execution // Sequence Testing</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 text-gray-600 hover:text-white hover:bg-white/5 transition-all rounded-sm">
@@ -116,17 +113,14 @@ export const SimulationModal: React.FC<SimulationModalProps> = ({
           </button>
         </div>
 
-        {/* Main Content Area */}
         <div className="p-8 overflow-y-auto flex-1 custom-scrollbar space-y-10">
-          
-          {/* Active Session Status */}
           {isSessionActive && (
-            <div className="bg-system-green/5 border border-system-green/30 p-5 flex items-center justify-between rounded-sm">
+            <div className="bg-amber-500/5 border border-amber-500/30 p-5 flex items-center justify-between rounded-sm">
                 <div className="flex items-center gap-4">
-                    <RefreshCw className="w-5 h-5 text-system-green animate-spin-slow" />
+                    <RefreshCw className="w-5 h-5 text-amber-500 animate-spin-slow" />
                     <div>
-                        <p className="text-xs font-mono text-system-green font-bold tracking-widest uppercase">Live Session Connected</p>
-                        <p className="text-[10px] font-mono text-gray-500 uppercase mt-0.5">Parameters inherited from active narrative</p>
+                        <p className="text-xs font-mono text-amber-500 font-bold tracking-widest uppercase">Live Session Tethered</p>
+                        <p className="text-[10px] font-mono text-gray-500 uppercase mt-0.5">Test will proceed from active game state</p>
                     </div>
                 </div>
                 <div className="flex gap-2">
@@ -142,12 +136,10 @@ export const SimulationModal: React.FC<SimulationModalProps> = ({
 
           {!simulationReport && (
             <div className="space-y-12">
-               
-               {/* Parameter Settings (Only show if not session active OR user wants to tweak - user said "existing settings" though) */}
                {!isSessionActive && (
                  <div className="space-y-6">
-                    <div className="flex items-center gap-4 text-system-green font-mono text-xs uppercase tracking-[0.4em] border-b border-system-green/10 pb-3">
-                        <Settings className="w-4 h-4" /> Dread Dials
+                    <div className="flex items-center gap-4 text-amber-500 font-mono text-xs uppercase tracking-[0.4em] border-b border-amber-500/10 pb-3">
+                        <Settings className="w-4 h-4" /> Parameters
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -155,7 +147,7 @@ export const SimulationModal: React.FC<SimulationModalProps> = ({
                             <label className="text-[10px] font-mono text-gray-500 uppercase tracking-widest flex items-center gap-2">
                                 <Eye className="w-3 h-3" /> Perspective
                             </label>
-                            <select value={perspective} onChange={(e) => setPerspective(e.target.value)} className="w-full bg-black border border-gray-800 text-gray-200 p-3 text-xs font-mono focus:border-system-green outline-none transition-all rounded-sm appearance-none">
+                            <select value={perspective} onChange={(e) => setPerspective(e.target.value)} className="w-full bg-black border border-gray-800 text-gray-200 p-3 text-xs font-mono focus:border-amber-500 outline-none transition-all rounded-sm appearance-none">
                                 <option value="First Person">First Person (Direct)</option>
                                 <option value="Third Person">Third Person (Cinematic)</option>
                             </select>
@@ -165,7 +157,7 @@ export const SimulationModal: React.FC<SimulationModalProps> = ({
                             <label className="text-[10px] font-mono text-gray-500 uppercase tracking-widest flex items-center gap-2">
                                 <Users className="w-3 h-3" /> Role
                             </label>
-                            <select value={mode} onChange={(e) => setMode(e.target.value)} className="w-full bg-black border border-gray-800 text-gray-200 p-3 text-xs font-mono focus:border-system-green outline-none transition-all rounded-sm appearance-none">
+                            <select value={mode} onChange={(e) => setMode(e.target.value)} className="w-full bg-black border border-gray-800 text-gray-200 p-3 text-xs font-mono focus:border-amber-500 outline-none transition-all rounded-sm appearance-none">
                                 <option value="Survivor">The Survivor</option>
                                 <option value="Villain">The Antagonist</option>
                             </select>
@@ -175,7 +167,7 @@ export const SimulationModal: React.FC<SimulationModalProps> = ({
                             <label className="text-[10px] font-mono text-gray-500 uppercase tracking-widest flex items-center gap-2">
                                 <Zap className="w-3 h-3" /> Fidelity
                             </label>
-                            <select value={intensity} onChange={(e) => setIntensity(e.target.value)} className="w-full bg-black border border-gray-800 text-gray-200 p-3 text-xs font-mono focus:border-system-green outline-none transition-all rounded-sm appearance-none">
+                            <select value={intensity} onChange={(e) => setIntensity(e.target.value)} className="w-full bg-black border border-gray-800 text-gray-200 p-3 text-xs font-mono focus:border-amber-500 outline-none transition-all rounded-sm appearance-none">
                                 {INTENSITY_OPTIONS.map(opt => (
                                     <option key={opt.id} value={opt.id}>{opt.label}</option>
                                 ))}
@@ -185,53 +177,48 @@ export const SimulationModal: React.FC<SimulationModalProps> = ({
                  </div>
                )}
 
-               {/* SIMULATION DURATION - ALWAYS REQUESTED */}
                <div className="space-y-6">
-                 <div className="flex items-center gap-4 text-system-green font-mono text-xs uppercase tracking-[0.4em] border-b border-system-green/10 pb-3">
-                     <Timer className="w-4 h-4" /> Cycle Parameters
+                 <div className="flex items-center gap-4 text-amber-500 font-mono text-xs uppercase tracking-[0.4em] border-b border-amber-500/10 pb-3">
+                     <Timer className="w-4 h-4" /> Test Duration
                  </div>
                  <div className="p-8 bg-black/40 border border-gray-800 rounded-sm flex flex-col items-center gap-6">
                     <p className="text-xs font-mono text-gray-500 uppercase tracking-[0.2em] text-center max-w-md">
-                        Specify the number of autonomous turns the Machine should process before returning control to the Architect.
+                        Autonomous test mode is meant for sequence analysis. Manual control is suspended during the test.
                     </p>
                     <div className="flex items-center gap-10 w-full">
                         <input 
                             type="range" 
                             min="1" 
-                            max="100" 
+                            max="50" 
                             value={cycles} 
                             onChange={(e) => setCycles(parseInt(e.target.value))} 
-                            className="flex-1 accent-system-green h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer" 
+                            className="flex-1 accent-amber-500 h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer" 
                         />
                         <div className="flex flex-col items-center min-w-[80px]">
-                            <span className="text-5xl font-mono text-system-green font-bold leading-none">{cycles}</span>
+                            <span className="text-5xl font-mono text-amber-500 font-bold leading-none">{cycles}</span>
                             <span className="text-[9px] text-gray-600 uppercase tracking-widest mt-2">Cycles</span>
                         </div>
                     </div>
                  </div>
                </div>
 
-               {/* ACTION BUTTON */}
                <div className="pt-4 flex flex-col items-center">
-                   <button onClick={handleRun} disabled={isSimulating} className={`group relative w-full max-w-xl py-6 font-mono font-bold uppercase tracking-[0.5em] text-xl transition-all border-2 rounded-sm ${isSimulating ? 'bg-red-900/20 text-red-500 border-red-900 cursor-not-allowed' : 'bg-system-green text-black border-system-green hover:bg-green-400 active:scale-[0.98]'}`}>
+                   <button onClick={handleRun} disabled={isTesting} className={`group relative w-full max-w-xl py-6 font-mono font-bold uppercase tracking-[0.5em] text-xl transition-all border-2 rounded-sm ${isTesting ? 'bg-red-900/20 text-red-500 border-red-900 cursor-not-allowed' : 'bg-amber-500 text-black border-amber-500 hover:bg-amber-400 active:scale-[0.98]'}`}>
                       <span className="relative z-10 flex items-center justify-center gap-4">
-                        {isSimulating ? <><Activity className="w-6 h-6 animate-spin" /> SEQUENCE ENGAGED</> : <><Play className="w-6 h-6 fill-black" /> INITIALIZE SEQUENCE</>}
+                        {isTesting ? <><Activity className="w-6 h-6 animate-spin" /> SEQUENCE ACTIVE</> : <><Play className="w-6 h-6 fill-black" /> INITIATE TEST SEQUENCE</>}
                       </span>
                    </button>
-                   {isSessionActive && (
-                        <p className="text-[10px] text-gray-600 font-mono uppercase tracking-widest mt-4 animate-pulse">
-                            Warning: Machine autonomy will ignore manual override during sequence processing.
-                        </p>
-                   )}
+                   <p className="text-[10px] text-gray-600 font-mono uppercase tracking-widest mt-4">
+                       Tests can be aborted via the status panel at any time.
+                   </p>
                </div>
             </div>
           )}
 
-          {/* Analysis Report Output */}
           {simulationReport && (
             <div className="animate-fadeIn space-y-6">
                 <div className="flex items-center gap-4 text-haunt-gold font-mono text-lg uppercase tracking-[0.4em] border-b border-haunt-gold/20 pb-3">
-                    <Terminal className="w-6 h-6" /> Sequential Analysis
+                    <Terminal className="w-6 h-6" /> Test Sequence Analysis
                 </div>
                 <div ref={reportRef} className="bg-black border-2 border-gray-800 p-8 rounded-sm text-base font-serif text-gray-300 whitespace-pre-wrap leading-[1.8] h-[400px] overflow-y-auto custom-scrollbar shadow-inner italic">
                     {simulationReport}
@@ -241,7 +228,7 @@ export const SimulationModal: React.FC<SimulationModalProps> = ({
                         onClick={() => { onClose(); }} 
                         className="px-10 py-3 bg-haunt-gold text-black font-bold uppercase font-mono tracking-widest text-sm rounded-sm hover:bg-amber-400 transition-colors"
                     >
-                        Resume Architect Control
+                        Exit Test Diagnostic
                     </button>
                 </div>
             </div>

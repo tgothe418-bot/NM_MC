@@ -86,7 +86,9 @@ const synthesizeMemory = (memory: DialogueMemory): string => {
     if (memory.short_term_buffer && memory.short_term_buffer.length > 0) {
         summary += `IMMEDIATE CONTEXT:\n`;
         memory.short_term_buffer.forEach(entry => {
-            summary += `   - ${entry.speaker}: "${entry.text.substring(0, 60)}..."\n`;
+            // Added safety check for entry.text to avoid "Cannot read properties of undefined (reading 'substring')"
+            const textContent = entry.text || "";
+            summary += `   - ${entry.speaker}: "${textContent.substring(0, 60)}..."\n`;
         });
     }
     return summary;

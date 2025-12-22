@@ -23,7 +23,6 @@ export const initializeGemini = () => {
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Robust Retry Wrapper for API Calls
 const withRetry = async <T>(
   operation: () => Promise<T>, 
   context: string = "API Call"
@@ -37,8 +36,6 @@ const withRetry = async <T>(
       return await operation();
     } catch (error: any) {
       attempt++;
-      
-      // Identify retryable errors (Rate Limits, Server Overload)
       const isRetryable = error.status === 429 || 
                          error.status === 503 || 
                          (error.message && (
@@ -49,18 +46,14 @@ const withRetry = async <T>(
 
       if (isRetryable && attempt < maxAttempts) {
         let delay = baseDelay * Math.pow(2, attempt - 1);
-        
-        // Smart Delay: Parse specific retry duration from Gemini error message
         const match = error.message?.match(/retry in ([0-9.]+)s/);
         if (match && match[1]) {
            delay = Math.ceil(parseFloat(match[1]) * 1000) + 1000;
         }
-        
         console.warn(`Gemini API busy (${context}). Retrying in ${Math.round(delay/1000)}s...`);
         await wait(delay);
         continue;
       }
-      
       console.error(`Gemini API Error (${context}):`, error);
       throw error;
     }
@@ -77,7 +70,6 @@ export const generateCalibrationField = async (
 ): Promise<string> => {
   return withRetry(async () => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
     let instructions = `Be creative, unsettling, and highly detailed. Stay true to the specific tropes and aesthetics of the selected cluster. 
 Output ONLY the generated text. No preamble, no quotes.`;
 
@@ -91,16 +83,20 @@ Output ONLY the expanded text. No preamble, no quotes.`;
 For each character, include their name, archetype, and a 'Genesis Sin' or a deep psychological vulnerability that makes them a target for the Machine. 
 Format as a structured list or catalog of specimens. Use a tone appropriate for the ${cluster} cluster and ${intensity} intensity.`;
       }
-
       if (field === 'Primary Objective') {
         instructions = `Generate a very brief, simple, and vague primary objective. It should be evocative and unsettling but lack specific mechanical detail. One short sentence maximum. 
 Stay true to the ${cluster} theme. Output ONLY the text.`;
       }
-
       if (field === 'Entity Name') {
         instructions = `Generate a single, terrifying, and thematically appropriate name or title for a horror antagonist. 
 Appropriate for ${cluster} cluster and ${intensity} intensity. 
 Output ONLY the name. No quotes, no descriptions.`;
+      }
+      if (field === 'Initial Location') {
+        instructions = `Generate a detailed and atmospheric description of the starting location for this nightmare. 
+Focus on sensory details (smell, temperature, sound) and the "Wrongness" of the space. 
+Incorporate elements unique to the ${cluster} cluster and ${intensity} intensity. 
+Describe the location from the perspective of an architect of trauma. Output ONLY the description.`;
       }
     }
 
@@ -113,9 +109,7 @@ ${instructions}`;
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
-      config: {
-        temperature: 0.8,
-      },
+      config: { temperature: 0.8 },
     });
     return response.text?.trim() || "";
   }, `Generate Calibration Field: ${field}`);
@@ -130,30 +124,15 @@ export const sendMessageToGemini = async (
   if (!chatSession) {
     throw new Error("Gemini API not initialized. Please provide an API Key.");
   }
-
-  // Explicitly structure the prompt to separate User Action from System Injections
   let finalMessage = `USER ACTION: ${message}`;
-  
-  // 1. Inject Narrative Events
   if (injectedEvents && injectedEvents.length > 0) {
     const eventDescriptions = injectedEvents.map(e => 
       `EVENT TRIGGERED: "${e.name}" - ${e.description}. Required Effects: ${JSON.stringify(e.effects)}`
     ).join('\n');
-    
     finalMessage += `\n\n*** SYSTEM ALERT: NARRATIVE EVENTS TRIGGERED ***\n[INSTRUCTION: Integrate these events into the immediate narrative and update Game State accordingly.]\n${eventDescriptions}`;
   }
-
-  // 2. Inject Dialogue Manifesto (The New Dynamic Engine)
-  if (dialogueManifesto) {
-      finalMessage += dialogueManifesto;
-  }
-
-  // 3. Inject Sensory Manifesto
-  if (sensoryManifesto) {
-      finalMessage += sensoryManifesto;
-  }
-
-  // 4. State Update Instruction - Reinforced
+  if (dialogueManifesto) finalMessage += dialogueManifesto;
+  if (sensoryManifesto) finalMessage += sensoryManifesto;
   finalMessage += `\n\n[SYSTEM INSTRUCTION]:\n1. You MUST update 'long_term_summary' in 'dialogue_state.memory' for any active NPCs to compress key events from this turn.\n2. Maintain the specified Social Intent for each NPC.`;
 
   return withRetry(async () => {
@@ -165,9 +144,7 @@ export const sendMessageToGemini = async (
 export const generateAutoPlayerAction = async (historyText: string, gameState: any, config?: SimulationConfig): Promise<string> => {
   return withRetry(async () => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
     let instructions = PLAYER_SYSTEM_INSTRUCTION;
-    
     if (config) {
         instructions += `\n\nSIMULATION PARAMETERS:
 - Perspective: ${config.perspective}
@@ -176,23 +153,15 @@ export const generateAutoPlayerAction = async (historyText: string, gameState: a
 - Entry Point: ${config.starting_point}
 - Intensity: ${config.intensity}
 - Visual Motif: ${config.visual_motif || "Default specific to Cluster"}`;
-        
-        if (config.mode === 'Villain' && config.victim_count) {
-             instructions += `\n- Victim Count: ${config.victim_count}`;
-        }
-
-instructions += `\n\nCRITICAL INSTRUCTION:
+        if (config.mode === 'Villain' && config.victim_count) instructions += `\n- Victim Count: ${config.victim_count}`;
+        instructions += `\n\nCRITICAL INSTRUCTION:
 If asked about Visual Motif, describe: "${config.visual_motif || "A terrifying, cinematic scene matching the active cluster"}".
 If the simulation is already in progress, act according to the assigned Role (${config.mode}).`;
     }
-
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `CURRENT NARRATIVE:\n${historyText}\n\nCURRENT STATE:\n${JSON.stringify(gameState)}`,
-        config: {
-        systemInstruction: instructions,
-        temperature: 1.0, 
-        }
+        config: { systemInstruction: instructions, temperature: 1.0 }
     });
     return response.text?.trim() || "I hesitate, unsure what to do.";
   }, "Auto-Player Action");
@@ -204,9 +173,7 @@ export const generateSimulationAnalysis = async (gameLog: string): Promise<strin
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `GAMEPLAY LOG:\n${gameLog}`,
-        config: {
-        systemInstruction: ANALYST_SYSTEM_INSTRUCTION
-        }
+        config: { systemInstruction: ANALYST_SYSTEM_INSTRUCTION }
     });
     return response.text || "Analysis incomplete.";
   }, "Simulation Analysis");
@@ -216,6 +183,7 @@ export interface ImageGenerationOptions {
   activeCluster?: string;
   styleOverride?: string;
   aspectRatio?: "1:1" | "3:4" | "4:3" | "9:16" | "16:9";
+  highQuality?: boolean;
 }
 
 export const generateHorrorImage = async (
@@ -224,52 +192,60 @@ export const generateHorrorImage = async (
 ): Promise<string | null> => {
   return withRetry(async () => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
-    // Determine style based on Active Cluster
     let aestheticStyle = "Dark atmospheric horror art, highly detailed, cinematic lighting, 8k resolution.";
     const cluster = options.activeCluster || "";
 
-    if (cluster.includes("System") || prompt.includes("System")) {
-        aestheticStyle = "Datamoshing aesthetic, compression artifacts, glitch art, high contrast cyan and black, industrial noise texture, CRT distortion.";
-    } else if (cluster.includes("Flesh") || prompt.includes("Flesh")) {
-        aestheticStyle = "New French Extremity style, visceral body horror, medical lighting, wet organic textures, dark crimson palette, Francis Bacon style.";
-    } else if (cluster.includes("Blasphemy") || prompt.includes("Blasphemy")) {
-        aestheticStyle = "Cinema of Transgression style, grainy 16mm film texture, punk zine aesthetic, high contrast black and white photocopy style, gritty, occult symbols.";
-    } else if (cluster.includes("Survival") || prompt.includes("Survival")) {
-        aestheticStyle = "The Void aesthetic, vast empty landscapes, liminal space, whiteout fog, minimalist horror, cold blue and grey palette.";
-    } else if (cluster.includes("Haunting") || prompt.includes("Haunting")) {
-        aestheticStyle = "Gothic horror aesthetic, spectral lighting, dust particles, decaying victorian textures, eerie shadows, sepia undertones.";
-    } else if (cluster.includes("Self") || prompt.includes("Self")) {
-        aestheticStyle = "Surrealist horror, hall of mirrors, shattered glass, impossible geometry, psychological distortion, dream logic.";
-    } else if (cluster.includes("Desire") || prompt.includes("Desire")) {
-        aestheticStyle = "Dark Romanticism aesthetic, lush red velvet textures, soft focus, chiaroscuro lighting, decadent decay, ominous beauty.";
-    }
+    if (cluster.includes("System")) aestheticStyle = "Datamoshing aesthetic, compression artifacts, glitch art, industrial noise texture, CRT distortion.";
+    else if (cluster.includes("Flesh")) aestheticStyle = "New French Extremity style, visceral body horror, medical lighting, wet organic textures, dark crimson palette.";
+    else if (cluster.includes("Blasphemy")) aestheticStyle = "Cinema of Transgression style, grainy 16mm film texture, high contrast black and white photocopy style, occult symbols.";
+    else if (cluster.includes("Survival")) aestheticStyle = "The Void aesthetic, vast empty landscapes, liminal space, whiteout fog, cold blue and grey palette.";
+    else if (cluster.includes("Haunting")) aestheticStyle = "Gothic horror aesthetic, spectral lighting, dust particles, decaying victorian textures.";
+    else if (cluster.includes("Self")) aestheticStyle = "Surrealist horror, hall of mirrors, shattered glass, impossible geometry, psychological distortion.";
+    else if (cluster.includes("Desire")) aestheticStyle = "Dark Romanticism aesthetic, lush red velvet textures, soft focus, chiaroscuro lighting.";
 
     const effectiveStyle = options.styleOverride || aestheticStyle;
-    const aspectRatio = options.aspectRatio || "1:1";
-
     const styledPrompt = `${effectiveStyle} Context: ${prompt}`;
 
+    const model = options.highQuality ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: {
-        parts: [{ text: styledPrompt }]
-      },
-      config: {
-        imageConfig: {
-            aspectRatio: aspectRatio
-        }
-      }
+      model: model,
+      contents: { parts: [{ text: styledPrompt }] },
+      config: { imageConfig: { aspectRatio: options.aspectRatio || "1:1", ...(options.highQuality ? { imageSize: "1K" } : {}) } }
     });
 
     if (response.candidates && response.candidates[0].content.parts) {
       for (const part of response.candidates[0].content.parts) {
-        if (part.inlineData) {
-          const mimeType = part.inlineData.mimeType || 'image/png';
-          return `data:${mimeType};base64,${part.inlineData.data}`;
-        }
+        if (part.inlineData) return `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
       }
     }
     return null;
   }, "Image Generation");
+};
+
+export const generateCinematicVideo = async (prompt: string, config: { aspectRatio: "16:9" | "9:16", resolution: "720p" | "1080p" }): Promise<string | null> => {
+  return withRetry(async () => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    let operation = await ai.models.generateVideos({
+      model: 'veo-3.1-fast-generate-preview',
+      prompt: `Cinematic horror cutscene, dark atmospheric, 4k detail. Scene: ${prompt}`,
+      config: {
+        numberOfVideos: 1,
+        resolution: config.resolution,
+        aspectRatio: config.aspectRatio
+      }
+    });
+
+    while (!operation.done) {
+      await new Promise(resolve => setTimeout(resolve, 10000));
+      operation = await ai.operations.getVideosOperation({ operation: operation });
+    }
+
+    const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+    if (downloadLink) {
+      const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+      const blob = await response.blob();
+      return URL.createObjectURL(blob);
+    }
+    return null;
+  }, "Video Generation");
 };
