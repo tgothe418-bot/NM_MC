@@ -45,29 +45,29 @@ export const LORE_LIBRARY: Record<string, ClusterLore> = {
     ],
     sensoryInjectors: {
       smell: [
-        "Coagulated milk", "Iodine and antiseptic", "Wet dog", "Humidity", "Spoiled sweetbreads", "Yeast", 
+        "Coagulated milk", "Iodine and antiseptic", "Wet dog", "Odor of damp basement humidity", "Spoiled sweetbreads", "Yeast", 
         "Periodontal decay", "Old bandages", "Sour stomach acid", "Formaldehyde",
         "Singed hair", "Rancid butter", "Copper and bleach", "Open bowel", "Old sweat",
-        "Musk of terrified animals", "Stagnant pond water", "Acetone", "Burnt sugar", "Raw meat left in the sun",
-        "A heavy sickish sweetness", "Cut flowers in stagnant water", "Camphor", "Mothballs",
-        "The alkaline sharp of fresh bone marrow", "Exposed intestinal bile", "The metallic steam of an open thoracic cavity"
+        "Musk of terrified animals", "Stagnant pond water", "Acetone", "Burnt sugar", "Raw meat in heat",
+        "Rotting floral decay", "Cut flowers in stagnant water", "Camphor", "Mothballs",
+        "Mineral sharp of exposed marrow", "Intestinal bile", "Metallic steam of an open thoracic cavity"
       ],
       sound: [
-        "Wet tearing", "Heavy breathing", "Guttural grunts", "The snap of cartilage", "Suction", 
+        "Wet tearing", "Heavy breathing", "Guttural grunts", "The click of cartilage", "Suction", 
         "A low, purring vibration", "Fluids dripping on linoleum", "The squelch of walking in mud", "Teeth grinding",
-        "Joints popping wetly", "Skin peeling like tape", "Gurgling drain", "Fist hitting raw meat", "Choking gasp",
+        "Joints popping", "Skin peeling like tape", "Gurgling drain", "Thud of density meeting tissue", "Choking gasp",
         "A wet cough from the dark", "Friction of skin on glass", "Flies buzzing in a closed jar", "A muffled scream behind a door",
-        "The rhythmic wet-thud of an exposed heart", "The forensic grind of a saw meeting femur", "The hiss of air escaping a punctured lung"
+        "Rhythmic thud of an exposed heart", "The forensic grind of a saw meeting bone", "The hiss of air escaping a punctured lung"
       ],
       touch: [
         "Slick membranes", "Warmth", "Pulsing veins", "Sticky residue", "Velvet", 
-        "Degloved texture", "Fever-hot skin", "Greasy hair", "Something wet that dries sticky",
+        "Raw, exposed texture", "Fever-hot skin", "Greasy hair", "Something wet that dries sticky",
         "Oily film", "Warm gelatin", "Rough tongue", "Loose tooth", "Sweaty palm",
         "Pulsing warmth under the floor", "Wet wool", "Sticky condensation", "Soft spots in the wall",
-        "The heat of fresh arterial spray", "Tactile grit of bone fragments", "The slick recoil of exposed muscle tissue"
+        "The heat of fresh arterial spray", "Grit of bone fragments", "Slick recoil of exposed muscle tissue"
       ],
       taste: [
-        "Salt", "Iron", "Bile", "Sweetness of rot", "Metallic tang", "Fat", "Sour milk",
+        "Salt", "Iron", "Bile", "Rotting fruit sweetness", "Metallic tang", "Fat", "Sour milk",
         "Metallic saliva", "Sour gastric fluid", "Clotted cream", "Raw steak", "Copper penny",
         "Raw marrow", "Old fillings", "Stale adrenaline", "Moldy bread", "Hot saliva", "Unbuttered toast"
       ]

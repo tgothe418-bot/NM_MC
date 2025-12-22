@@ -1,16 +1,10 @@
 
 import { GameState } from '../types';
 import { LORE_LIBRARY } from '../loreLibrary';
+import { STYLE_GUIDE } from './styleGuide';
 
 /**
- * THE SENSORY ENGINE (Sensorium V3.0)
- * 
- * This module replaces the static text lists in constants.ts.
- * It dynamically constructs a "Sensory Manifesto" based on the Active Cluster
- * and the current Location State (intensity).
- * 
- * This ensures the LLM stays "in character" for the specific sub-genre of horror
- * (e.g., sticking to "Flesh" descriptions without drifting into "Cosmic" ones).
+ * THE SENSORY ENGINE (Sensorium V4.0 - Style Aware)
  */
 
 const getRandomElements = (arr: string[], count: number): string[] => {
@@ -24,62 +18,56 @@ export const constructSensoryManifesto = (gameState: GameState): string => {
     const activeClusterName = gameState.meta?.active_cluster || "None";
     if (activeClusterName === "None") return "";
 
-    // Find the matching lore entry
-    // Handles "Cluster 1 (Flesh)" matching "Flesh"
     const clusterKey = Object.keys(LORE_LIBRARY).find(key => activeClusterName.includes(key));
-    
     if (!clusterKey) return "";
     const lore = LORE_LIBRARY[clusterKey];
+    const style = STYLE_GUIDE.cluster_palettes[clusterKey as keyof typeof STYLE_GUIDE.cluster_palettes] || STYLE_GUIDE.cluster_palettes.Flesh;
 
-    // 2. Determine Intensity based on Location State & Threat
+    // 2. Determine Intensity
     const locationState = gameState.location_state?.current_state || 0;
     const threatLevel = gameState.villain_state?.threat_scale || 0;
     
     let intensityDescriptor = "SUBTLE / BACKGROUND";
-    let quantity = 3; // Number of sensory details to pick
+    let quantity = 2; // Reduced quantity for better restraint
 
     if (locationState >= 3 || threatLevel >= 4) {
         intensityDescriptor = "OVERWHELMING / NIGHTMARE";
-        quantity = 6;
+        quantity = 4;
     } else if (locationState >= 2 || threatLevel >= 3) {
         intensityDescriptor = "INTENSE / VISCERAL";
-        quantity = 5;
-    } else if (locationState >= 1) {
-        intensityDescriptor = "UNCANNY / NOTICEABLE";
-        quantity = 4;
+        quantity = 3;
     }
 
-    // 3. Select Specific Sensory Details
+    // 3. Select Sensory Seeds
     const smells = getRandomElements(lore.sensoryInjectors.smell, quantity);
     const sounds = getRandomElements(lore.sensoryInjectors.sound, quantity);
     const touches = getRandomElements(lore.sensoryInjectors.touch, quantity);
     
-    // 4. Construct the Manifesto String
-    let manifesto = `\n\n*** SENSORY ENGINE MANIFESTO (CLUSTER: ${lore.displayName.toUpperCase()}) ***\n`;
-    manifesto += `CONTEXT: The user is currently in a ${intensityDescriptor} state of reality.\n`;
-    manifesto += `CORE AXIOM: "${lore.coreAxiom}"\n`;
-    manifesto += `INSTRUCTION: You MUST weave the following specific sensory details into your response.\n`;
+    // 4. Construct the Manifesto
+    let manifesto = `\n\n*** SENSORY & STYLE MANIFESTO (CLUSTER: ${lore.displayName.toUpperCase()}) ***\n`;
+    manifesto += `AESTHETIC PROTOCOL: ${style.prose_style}\n`;
+    manifesto += `CORE CONCEPTS: ${style.key_concepts.join(", ")}\n`;
     
-    manifesto += `CRITICAL INTEGRATION RULES:\n`;
-    manifesto += `   1. **NO RAW DATA**: Do not paste technical terms (like 'Pantone 448 C') or exact list items if they sound mechanical. Transform them into descriptive prose (e.g., 'the color of bruised liver').\n`;
-    manifesto += `   2. **SHOW, DON'T TELL**: Do not say "You smell X". Describe the sensation of X filling the lungs.\n`;
-    manifesto += `   3. **PALETTE**: Use THESE specific textures:\n`;
+    manifesto += `\nCRITICAL INTEGRATION RULES (STRICT):\n`;
+    STYLE_GUIDE.narrative_rules.forEach(rule => {
+      manifesto += ` - ${rule}\n`;
+    });
+
+    manifesto += `\nVOCABULARY BLACKLIST (NEVER USE THESE VERBATIM):\n`;
+    STYLE_GUIDE.vocabulary_blacklist.forEach(word => {
+      manifesto += ` - "${word}"\n`;
+    });
     
-    manifesto += `   - OLFACTORY (Smell): ${smells.join(", ")}\n`;
-    manifesto += `   - AUDITORY (Sound): ${sounds.join(", ")}\n`;
-    manifesto += `   - TACTILE (Touch): ${touches.join(", ")}\n`;
+    manifesto += `\nSENSORY ANCHORS (USE AS CONCEPTUAL SEEDS ONLY):\n`;
+    manifesto += ` - SMELL: ${smells.join(", ")}\n`;
+    manifesto += ` - SOUND: ${sounds.join(", ")}\n`;
+    manifesto += ` - TOUCH: ${touches.join(", ")}\n`;
     
-    // Add weather context if applicable
     if (gameState.location_state?.weather_state) {
-        manifesto += `   - ATMOSPHERE: ${gameState.location_state.weather_state} (Time: ${gameState.location_state.time_of_day})\n`;
+        manifesto += `\nATMOSPHERE: ${gameState.location_state.weather_state} (Time: ${gameState.location_state.time_of_day})\n`;
     }
 
-    // Add visual motif suggestion
-    if (gameState.narrative?.visual_motif) {
-        manifesto += `   - VISUAL GUIDE: ${gameState.narrative.visual_motif} (Use this as an aesthetic guide, do not quote it verbatim)\n`;
-    }
-
-    manifesto += `*** END SENSORY MANIFESTO ***\n`;
+    manifesto += `\n*** END MANIFESTO ***\n`;
 
     return manifesto;
 };

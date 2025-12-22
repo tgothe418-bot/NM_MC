@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, ShieldAlert, Cpu, Eye, Settings, Image, Zap, Play, Check, Users, Target, UserCheck, Skull, Wand2, Info, ChevronRight, MessageSquare, Monitor, Loader2, Sparkles } from 'lucide-react';
+import { Terminal, ShieldAlert, Cpu, Eye, Settings, Image, Zap, Play, Check, Users, Target, UserCheck, Skull, Wand2, Info, ChevronRight, MessageSquare, Monitor, Loader2, Sparkles, StickyNote } from 'lucide-react';
 import { SimulationConfig } from '../types';
 import { generateCalibrationField } from '../services/geminiService';
 
@@ -124,15 +124,27 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
     }
   ];
 
-  const handleGenerateField = async (field: string) => {
+  const handleGenerateField = async (field: string, useNotes: boolean = false) => {
     setGeneratingFields(prev => ({ ...prev, [field]: true }));
+    
+    // Determine existing value based on field
+    let existingValue = '';
+    if (field === 'Entity Name') existingValue = villainName;
+    else if (field === 'Form & Appearance') existingValue = villainAppearance;
+    else if (field === 'Modus Operandi') existingValue = villainMethods;
+    else if (field === 'Specimen Targets') existingValue = victimDescription;
+    else if (field === 'Primary Objective') existingValue = primaryGoal;
+    else if (field === 'Visual Motif') existingValue = visualMotif;
+
     try {
       const result = await generateCalibrationField(
         field, 
         selectedClusters.join(', '), 
         intensity,
-        field === 'Specimen Targets' ? victimCount : undefined
+        field === 'Specimen Targets' ? victimCount : undefined,
+        useNotes ? existingValue : undefined
       );
+      
       if (field === 'Entity Name') setVillainName(result);
       else if (field === 'Form & Appearance') setVillainAppearance(result);
       else if (field === 'Modus Operandi') setVillainMethods(result);
@@ -328,16 +340,33 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
     </div>
   );
 
-  const GenerateButton = ({ fieldKey, onClick, isLoading }: { fieldKey: string, onClick: () => void, isLoading: boolean }) => (
-    <button
-      onClick={(e) => { e.preventDefault(); onClick(); }}
-      disabled={isLoading}
-      className={`flex items-center gap-2 text-[10px] uppercase font-mono px-3 py-1 border border-gray-800 rounded-sm hover:border-haunt-gold hover:text-haunt-gold transition-all bg-black/40 group/gen ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-    >
-      {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3 group-hover/gen:animate-pulse" />}
-      {isLoading ? 'Synthesizing...' : 'Generate It For Me'}
-    </button>
-  );
+  const ActionButtons = ({ fieldKey, value }: { fieldKey: string, value: string }) => {
+    const isLoading = generatingFields[fieldKey];
+    const hasNotes = value.trim().length > 0;
+
+    return (
+      <div className="flex items-center gap-2">
+        {hasNotes && (
+          <button
+            onClick={(e) => { e.preventDefault(); handleGenerateField(fieldKey, true); }}
+            disabled={isLoading}
+            className={`flex items-center gap-2 text-[10px] uppercase font-mono px-3 py-1 border border-gray-800 rounded-sm hover:border-fresh-blood hover:text-fresh-blood transition-all bg-black/40 group/notes ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <StickyNote className="w-3 h-3 group-hover/notes:animate-pulse" />}
+            {isLoading ? 'Synthesizing...' : 'Follow My Notes'}
+          </button>
+        )}
+        <button
+          onClick={(e) => { e.preventDefault(); handleGenerateField(fieldKey, false); }}
+          disabled={isLoading}
+          className={`flex items-center gap-2 text-[10px] uppercase font-mono px-3 py-1 border border-gray-800 rounded-sm hover:border-haunt-gold hover:text-haunt-gold transition-all bg-black/40 group/gen ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
+          {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3 group-hover/gen:animate-pulse" />}
+          {isLoading ? 'Synthesizing...' : 'Generate It For Me'}
+        </button>
+      </div>
+    );
+  };
 
   const renderManualMode = () => (
     <div className="flex flex-col h-full overflow-hidden">
@@ -438,7 +467,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
                     <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
                       <Skull className="w-5 h-5" /> Entity Name
                     </label>
-                    <GenerateButton fieldKey="Entity Name" isLoading={generatingFields['Entity Name']} onClick={() => handleGenerateField('Entity Name')} />
+                    <ActionButtons fieldKey="Entity Name" value={villainName} />
                   </div>
                   <input 
                     type="text"
@@ -454,7 +483,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
                     <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
                       <Skull className="w-5 h-5" /> Form & Appearance
                     </label>
-                    <GenerateButton fieldKey="Form & Appearance" isLoading={generatingFields['Form & Appearance']} onClick={() => handleGenerateField('Form & Appearance')} />
+                    <ActionButtons fieldKey="Form & Appearance" value={villainAppearance} />
                   </div>
                   <textarea 
                     value={villainAppearance}
@@ -469,7 +498,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
                     <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
                       <Wand2 className="w-5 h-5" /> Modus Operandi
                     </label>
-                    <GenerateButton fieldKey="Modus Operandi" isLoading={generatingFields['Modus Operandi']} onClick={() => handleGenerateField('Modus Operandi')} />
+                    <ActionButtons fieldKey="Modus Operandi" value={villainMethods} />
                   </div>
                   <textarea 
                     value={villainMethods}
@@ -484,7 +513,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
                     <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
                       <Users className="w-5 h-5" /> Specimen Targets
                     </label>
-                    <GenerateButton fieldKey="Specimen Targets" isLoading={generatingFields['Specimen Targets']} onClick={() => handleGenerateField('Specimen Targets')} />
+                    <ActionButtons fieldKey="Specimen Targets" value={victimDescription} />
                   </div>
                   <textarea 
                     value={victimDescription}
@@ -499,7 +528,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
                     <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
                       <Target className="w-5 h-5" /> Primary Objective
                     </label>
-                    <GenerateButton fieldKey="Primary Objective" isLoading={generatingFields['Primary Objective']} onClick={() => handleGenerateField('Primary Objective')} />
+                    <ActionButtons fieldKey="Primary Objective" value={primaryGoal} />
                   </div>
                   <input 
                     type="text"
@@ -553,7 +582,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
               <label className="text-sm font-mono text-gray-400 uppercase flex items-center gap-3 tracking-[0.3em]">
                 <Image className="w-6 h-6 text-fresh-blood" /> Visual Motif
               </label>
-              <GenerateButton fieldKey="Visual Motif" isLoading={generatingFields['Visual Motif']} onClick={() => handleGenerateField('Visual Motif')} />
+              <ActionButtons fieldKey="Visual Motif" value={visualMotif} />
             </div>
             <input 
               type="text"

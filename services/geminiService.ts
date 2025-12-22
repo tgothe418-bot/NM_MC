@@ -68,28 +68,40 @@ const withRetry = async <T>(
   throw new Error(`Failed ${context} after ${maxAttempts} attempts.`);
 };
 
-export const generateCalibrationField = async (field: string, cluster: string, intensity: string, count?: number): Promise<string> => {
+export const generateCalibrationField = async (
+  field: string, 
+  cluster: string, 
+  intensity: string, 
+  count?: number, 
+  existingValue?: string
+): Promise<string> => {
   return withRetry(async () => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     let instructions = `Be creative, unsettling, and highly detailed. Stay true to the specific tropes and aesthetics of the selected cluster. 
 Output ONLY the generated text. No preamble, no quotes.`;
 
-    if (field === 'Specimen Targets' && count) {
-      instructions = `Generate exactly ${count} named characters with evocative backgrounds who will serve as the victims/survivors in this story. 
+    if (existingValue && existingValue.trim().length > 0) {
+      instructions = `The user has provided some initial notes: "${existingValue}". 
+Your task is to EXPAND and REFINE these notes. Maintain the core idea but add depth, atmospheric detail, and transgressive weight appropriate for the ${cluster} cluster and ${intensity} intensity. 
+Output ONLY the expanded text. No preamble, no quotes.`;
+    } else {
+      if (field === 'Specimen Targets' && count) {
+        instructions = `Generate exactly ${count} named characters with evocative backgrounds who will serve as the victims/survivors in this story. 
 For each character, include their name, archetype, and a 'Genesis Sin' or a deep psychological vulnerability that makes them a target for the Machine. 
 Format as a structured list or catalog of specimens. Use a tone appropriate for the ${cluster} cluster and ${intensity} intensity.`;
-    }
+      }
 
-    if (field === 'Primary Objective') {
-      instructions = `Generate a very brief, simple, and vague primary objective. It should be evocative and unsettling but lack specific mechanical detail. One short sentence maximum. 
+      if (field === 'Primary Objective') {
+        instructions = `Generate a very brief, simple, and vague primary objective. It should be evocative and unsettling but lack specific mechanical detail. One short sentence maximum. 
 Stay true to the ${cluster} theme. Output ONLY the text.`;
-    }
+      }
 
-    if (field === 'Entity Name') {
-      instructions = `Generate a single, terrifying, and thematically appropriate name or title for a horror antagonist. 
+      if (field === 'Entity Name') {
+        instructions = `Generate a single, terrifying, and thematically appropriate name or title for a horror antagonist. 
 Appropriate for ${cluster} cluster and ${intensity} intensity. 
 Output ONLY the name. No quotes, no descriptions.`;
+      }
     }
 
     const prompt = `As the Horror Story Architect, generate a relevant entry for the field "${field}" in an interactive horror simulation.
