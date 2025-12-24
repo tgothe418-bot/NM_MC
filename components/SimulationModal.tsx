@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bot, Play, Square, Activity, Terminal, X, Cpu, Settings, Users, Image, CloudLightning, ToggleLeft, ToggleRight, Eye, Zap, Layers, Timer, RefreshCw, Lock, AlertTriangle, FileText, Download, Target, Skull, Wand2, ArrowRightCircle } from 'lucide-react';
+import { Bot, Play, Square, Activity, Terminal, X, Cpu, Settings, Users, Image, CloudLightning, ToggleLeft, ToggleRight, Eye, Zap, Layers, Timer, RefreshCw, Lock, AlertTriangle, FileText, Download, Target, Skull, Wand2, ArrowRightCircle, Hourglass } from 'lucide-react';
 import { SimulationConfig, GameState, VillainState } from '../types';
 import { runStressTest } from '../services/geminiService';
 import { getDefaultLocationState } from '../services/locationEngine';
@@ -25,6 +25,12 @@ const INTENSITY_OPTIONS = [
   { id: 'Level 3', label: 'Level 3: The Visceral' },
   { id: 'Level 4', label: 'Level 4: The Grotesque' },
   { id: 'Level 5', label: 'Level 5: The Transgressive' },
+];
+
+const STARTING_POINT_OPTIONS = [
+  { id: 'Prologue', label: 'Prologue' },
+  { id: 'In Media Res', label: 'In Media Res' },
+  { id: 'Climax', label: 'The Climax' },
 ];
 
 export const SimulationModal: React.FC<SimulationModalProps> = ({ 
@@ -243,7 +249,7 @@ export const SimulationModal: React.FC<SimulationModalProps> = ({
                         <Settings className="w-4 h-4" /> Parameters
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <div className="space-y-2">
                             <label className="text-[10px] font-mono text-gray-500 uppercase tracking-widest flex items-center gap-2">
                                 <Eye className="w-3 h-3" /> Perspective
@@ -270,6 +276,17 @@ export const SimulationModal: React.FC<SimulationModalProps> = ({
                             </label>
                             <select value={intensity} onChange={(e) => setIntensity(e.target.value)} className="w-full bg-black border border-gray-800 text-gray-200 p-3 text-xs font-mono focus:border-gray-600 outline-none transition-all rounded-sm appearance-none">
                                 {INTENSITY_OPTIONS.map(opt => (
+                                    <option key={opt.id} value={opt.id}>{opt.label}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                         <div className="space-y-2">
+                            <label className="text-[10px] font-mono text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                                <Hourglass className="w-3 h-3" /> Entry Point
+                            </label>
+                            <select value={startingPoint} onChange={(e) => setStartingPoint(e.target.value)} className="w-full bg-black border border-gray-800 text-gray-200 p-3 text-xs font-mono focus:border-gray-600 outline-none transition-all rounded-sm appearance-none">
+                                {STARTING_POINT_OPTIONS.map(opt => (
                                     <option key={opt.id} value={opt.id}>{opt.label}</option>
                                 ))}
                             </select>

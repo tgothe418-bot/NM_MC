@@ -1,11 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, ShieldAlert, Cpu, Eye, Settings, Image, Zap, Play, Check, Users, Target, UserCheck, Skull, Wand2, Info, ChevronRight, MessageSquare, Monitor, Loader2, Sparkles, StickyNote, Bot, Activity, Layers, Timer, Clapperboard, MapPin } from 'lucide-react';
+import { Terminal, ShieldAlert, Cpu, Eye, Settings, Image, Zap, Play, Check, Users, Target, UserCheck, Skull, Wand2, Info, ChevronRight, MessageSquare, Monitor, Loader2, Sparkles, StickyNote, Bot, Activity, Layers, Timer, Clapperboard, MapPin, Hourglass } from 'lucide-react';
 import { SimulationConfig } from '../types';
 import { generateCalibrationField } from '../services/geminiService';
 
 interface SetupOverlayProps {
   onComplete: (config: SimulationConfig) => void;
 }
+
+const STARTING_POINT_OPTIONS = [
+  { id: 'Prologue', label: 'Prologue', desc: 'The Slow Burn (Turns 0-10)' },
+  { id: 'In Media Res', label: 'In Media Res', desc: 'Active Threat (Turns 15-25)' },
+  { id: 'Climax', label: 'The Climax', desc: 'Immediate Finale (Turns 40+)' },
+];
 
 const CLUSTER_OPTIONS = [
   { 
@@ -80,6 +86,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
   const [setupMode, setSetupMode] = useState<'choice' | 'manual' | 'guided' | 'simulation'>('choice');
   const [perspective, setPerspective] = useState('First Person (Direct Immersion)');
   const [mode, setMode] = useState('The Survivor (Prey Protocol)');
+  const [startingPoint, setStartingPoint] = useState('Prologue');
   const [selectedClusters, setSelectedClusters] = useState<string[]>(['Flesh']);
   const [intensity, setIntensity] = useState('Level 3: The Visceral');
   const [visualMotif, setVisualMotif] = useState('');
@@ -112,6 +119,11 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
       q: "And through which lens shall we observe the decay? Do you wish to feel the heat of the trauma directly, or observe from a cinematic distance?",
       options: ["First Person", "Third Person"],
       key: "perspective"
+    },
+    {
+      q: "When do we enter the nightmare? At the slow beginning, the chaotic middle, or the bloody end?",
+      options: ["Prologue", "In Media Res", "Climax"],
+      key: "starting_point"
     },
     {
       q: "Choose your resonance. Which flavor of despair speaks to you? Flesh, System, Haunting, Self, Blasphemy, Void, or Hunger?",
@@ -202,6 +214,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
     const currentKey = GUIDED_QUESTIONS[guidedStep].key;
     if (currentKey === 'mode') setMode(val === 'Survivor' ? 'The Survivor (Prey Protocol)' : 'The Antagonist (Predator Protocol)');
     if (currentKey === 'perspective') setPerspective(val === 'First Person' ? 'First Person (Direct Immersion)' : 'Third Person (Observational Dread)');
+    if (currentKey === 'starting_point') setStartingPoint(val);
     if (currentKey === 'cluster') setSelectedClusters([val]);
     if (currentKey === 'location_description') setLocationDescription(val);
     if (currentKey === 'visual_motif') setVisualMotif(val);
@@ -229,7 +242,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
       onComplete({
         perspective: perspective.split(' (')[0],
         mode: mode.includes('Survivor') ? 'Survivor' : 'Villain',
-        starting_point: 'Prologue',
+        starting_point: startingPoint,
         cluster: selectedClusters.join(', '),
         intensity: intensity.split(':')[0].trim(),
         cycles: setupMode === 'simulation' ? testCycles : 0,
@@ -406,6 +419,20 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
                     ))}
                   </select>
                </div>
+               <div className="space-y-4">
+                  <label className="text-xs text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                    <Hourglass className="w-4 h-4 text-amber-500" /> Temporal Entry
+                  </label>
+                  <select 
+                    value={startingPoint} 
+                    onChange={(e) => setStartingPoint(e.target.value)}
+                    className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 text-lg focus:border-amber-500 outline-none appearance-none rounded-sm"
+                  >
+                    {STARTING_POINT_OPTIONS.map(opt => (
+                        <option key={opt.id} value={opt.id}>{opt.label}</option>
+                    ))}
+                  </select>
+               </div>
             </div>
 
             <div className="space-y-10">
@@ -475,7 +502,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
             Switch Mode
           </button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-16">
           <div className="space-y-4 group relative">
             <label className="text-sm font-mono text-gray-400 uppercase flex items-center gap-3 tracking-[0.3em]">
               <Eye className="w-6 h-6 text-fresh-blood" /> Narrative Lens
@@ -502,7 +529,22 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
               <option value="The Antagonist (Predator Protocol)">The Antagonist (Predator Protocol)</option>
             </select>
           </div>
-          <div className="col-span-1 md:col-span-2 space-y-6">
+          <div className="space-y-4 group relative">
+            <label className="text-sm font-mono text-gray-400 uppercase flex items-center gap-3 tracking-[0.3em]">
+              <Hourglass className="w-6 h-6 text-fresh-blood" /> Temporal Point
+            </label>
+            <select 
+              value={startingPoint} 
+              onChange={(e) => setStartingPoint(e.target.value)}
+              className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-lg focus:border-fresh-blood outline-none transition-all hover:bg-gray-900 cursor-pointer appearance-none rounded-sm"
+            >
+              {STARTING_POINT_OPTIONS.map(opt => (
+                  <option key={opt.id} value={opt.id}>{opt.label} - {opt.desc}</option>
+              ))}
+            </select>
+          </div>
+          
+          <div className="col-span-1 md:col-span-2 lg:col-span-3 space-y-6">
             <label className="text-sm font-mono text-gray-400 uppercase flex items-center gap-3 tracking-[0.3em]">
               <Settings className="w-6 h-6 text-fresh-blood" /> Thematic Resonance Clusters
             </label>
@@ -529,7 +571,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
               ))}
             </div>
           </div>
-          <div className="col-span-1 md:col-span-2 bg-terminal/40 p-10 border border-gray-800 space-y-10 rounded-sm">
+          <div className="col-span-1 md:col-span-2 lg:col-span-3 bg-terminal/40 p-10 border border-gray-800 space-y-10 rounded-sm">
              <div className="text-fresh-blood font-mono text-xl font-bold uppercase tracking-[0.4em] flex items-center gap-5 border-b border-fresh-blood/10 pb-5">
                 <MapPin className="w-8 h-8" /> Environmental Matrix
              </div>
@@ -565,7 +607,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
                 </div>
              </div>
           </div>
-          <div className="space-y-4 group relative">
+          <div className="col-span-1 md:col-span-2 lg:col-span-3 space-y-4 group relative">
             <label className="text-sm font-mono text-gray-400 uppercase flex items-center gap-3 tracking-[0.3em]">
               <Zap className="w-6 h-6 text-fresh-blood" /> Fidelity Level
             </label>
@@ -580,7 +622,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
             </select>
           </div>
           {isVillain && (
-            <div className="col-span-1 md:col-span-2 space-y-12 border-y-2 border-fresh-blood/20 py-16 animate-fadeIn bg-red-950/5 px-8">
+            <div className="col-span-1 md:col-span-2 lg:col-span-3 space-y-12 border-y-2 border-fresh-blood/20 py-16 animate-fadeIn bg-red-950/5 px-8">
               <div className="text-red-500 font-mono text-2xl font-bold uppercase tracking-[0.5em] flex items-center gap-6">
                  <Target className="w-10 h-10 animate-pulse" /> Antagonist Specifications
               </div>

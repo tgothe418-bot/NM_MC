@@ -283,6 +283,12 @@ export const simulateTurn = async (gameState: GameState, userAction: string, npc
       [NPC INTENTIONS]: ${npcActions.join('\n')}
       ${generationRules}
       
+      CORE DIRECTIVE: MAINTAIN FIDELITY.
+      1. Do NOT overwrite the user-defined 'visual_motif', 'villain_state.name', 'villain_state.archetype' or 'villain_state.primary_goal' unless the narrative explicitly changes them.
+      2. Keep the 'meta.mode' and 'meta.perspective' consistent with the provided state.
+      3. Update all numeric metrics, injuries, and the spatial map.
+      4. If the user enters a new area (UNEXPLORED), create a NEW RoomNode in 'rooms' array with a unique ID and description_cache.
+      
       Update all numeric metrics, injuries, and the spatial map.
       If the user enters a new area (UNEXPLORED), create a NEW RoomNode in 'rooms' array with a unique ID and description_cache.
     `;

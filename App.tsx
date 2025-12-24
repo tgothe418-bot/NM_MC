@@ -52,25 +52,29 @@ const App: React.FC = () => {
     setIsSplashComplete(true);
   };
 
-  const handleSendMessage = async (text: string, isInitial = false): Promise<string> => {
+  const handleSendMessage = async (text: string, isInitial = false, stateOverride?: GameState): Promise<string> => {
     setIsLoading(true);
     if (!isInitial) setHistory(prev => [...prev, { role: 'user', text, timestamp: Date.now() }]);
+
+    // Use override if provided, otherwise current state
+    const currentState = stateOverride || gameState;
 
     try {
       // Pass 0: NPC Agency (with fallback)
       let npcActions: string[] = [];
       try {
-        npcActions = await generateNpcActions(gameState, text);
+        // We must use currentState here to ensure initial conditions are respected
+        npcActions = await generateNpcActions(currentState, text);
       } catch (err) {
         console.warn("NPC Agency skipped due to error:", err);
       }
 
       // Pass 1: Simulation
-      let simulated = await simulateTurn(gameState, text, npcActions);
+      let simulated = await simulateTurn(currentState, text, npcActions);
       
       // Pass 1.5: Room Enrichment
       // If the user moved to a new room, we ensure the description is rich and cluster-specific.
-      const prevRoomId = gameState.location_state.current_room_id;
+      const prevRoomId = currentState.location_state.current_room_id;
       const currRoomId = simulated.location_state.current_room_id;
       
       if (currRoomId !== prevRoomId) {
@@ -133,8 +137,102 @@ const App: React.FC = () => {
 
   const handleSetupComplete = async (config: SimulationConfig) => {
     setIsInitialized(true);
-    const startPrompt = `INITIALIZE: Cluster: ${config.cluster}, Intensity: ${config.intensity}, Role: ${config.mode}`;
-    await handleSendMessage(startPrompt, true);
+
+    // Determine pacing vars based on starting_point
+    let startTurn = 1;
+    let startThreat = 1;
+    let pacingInstruction = "PACING: SLOW BURN. Establish atmosphere before threat.";
+
+    if (config.starting_point === 'In Media Res') {
+        startTurn = 20;
+        startThreat = 3;
+        pacingInstruction = "PACING: IMMEDIATE ACTION. The user is already in danger. Bypass introductions. The threat is active and present.";
+    } else if (config.starting_point === 'Climax') {
+        startTurn = 45;
+        startThreat = 5;
+        pacingInstruction = "PACING: CLIMAX. The end is here. High stakes, immediate confrontation. Maximum intensity. No buildup.";
+    }
+    
+    // CONSTRUCT INITIAL STATE FROM CONFIG
+    // This ensures fidelity from Turn 0 by passing the configured state directly to the simulator
+    // instead of relying on generic defaults or prompts alone.
+    
+    // 1. Location
+    const initialLocation = getDefaultLocationState(config.cluster);
+    if (config.location_description) {
+        const startRoomId = initialLocation.current_room_id;
+        initialLocation.room_map[startRoomId].description_cache = config.location_description;
+        initialLocation.room_map[startRoomId].name = "Starting Location";
+    }
+
+    // 2. Villain
+    const initialVillainState = {
+        name: config.villain_name || "Unknown Entity",
+        archetype: config.villain_appearance || "Unknown Archetype",
+        threat_scale: startThreat,
+        primary_goal: config.primary_goal || "Unknown",
+        current_tactic: config.villain_methods || "Dormant"
+    };
+
+    // 3. Meta & Narrative
+    const initialMeta = {
+        turn: startTurn,
+        perspective: config.perspective,
+        mode: config.mode as any,
+        intensity_level: config.intensity,
+        active_cluster: config.cluster
+    };
+    
+    const initialNarrative = {
+        visual_motif: config.visual_motif || "",
+        illustration_request: null
+    };
+
+    const initialState: GameState = {
+        ...INITIAL_STATE,
+        meta: initialMeta,
+        villain_state: initialVillainState,
+        location_state: initialLocation,
+        narrative: initialNarrative,
+        npc_states: [] // Simulator will populate based on prompts
+    };
+
+    setGameState(initialState);
+    
+    // Construct Prompt
+    let startPrompt = `INITIALIZE SIMULATION.
+    [CONFIGURATION]
+    - Mode: ${config.mode}
+    - Perspective: ${config.perspective}
+    - Theme: ${config.cluster} (${config.intensity})
+    - Visual Style: ${config.visual_motif || "Standard"}
+    - Starting Location: ${config.location_description || "Standard"}
+    - Temporal Point: ${config.starting_point} (Start at Turn ${startTurn})
+    
+    ${pacingInstruction}
+    `;
+
+    if (config.mode === 'Villain') {
+        startPrompt += `
+    [ANTAGONIST SETUP]
+    - Name: ${config.villain_name}
+    - Goal: ${config.primary_goal}
+    - Methods: ${config.villain_methods}
+    - Targets: ${config.victim_description} (${config.victim_count || 3} subjects)
+    
+    DIRECTIVE: Generate ${config.victim_count || 3} NPC subjects based on the 'Targets' description. They should be in the starting location.
+        `;
+    } else {
+        startPrompt += `
+    [SURVIVAL SETUP]
+    - Threat: ${config.villain_name || "Hidden"}
+    
+    DIRECTIVE: Establish the atmosphere. The threat is present but maybe not yet visible.
+        `;
+    }
+
+    // Pass the fully constructed initial state to the engine
+    await handleSendMessage(startPrompt, true, initialState);
   };
 
   // --- Modal & Test Handlers ---
@@ -171,6 +269,7 @@ SYSTEM OVERRIDE: PARAMETER RE-CALIBRATION
 - Mode: ${config.mode}
 - Intensity: ${config.intensity}
 - Cluster: ${config.cluster}
+- Temporal Adjustment: ${config.starting_point}
 ${config.mode === 'Villain' ? `
 - Villain Identity: ${config.villain_name || "Unchanged"}
 - Goal: ${config.primary_goal || "Unchanged"}
@@ -184,16 +283,12 @@ If the Mode changed (e.g., to Villain), shift the narrative voice immediately.
     } else {
         // Reset Standard
         setHistory([]);
-        setGameState(INITIAL_STATE);
         setIsInitialized(true);
         
-        // Slight delay to allow state clear
+        // Slight delay to allow UI to clear
         setTimeout(async () => {
-           let startPrompt = `RE-CALIBRATE: Cluster: ${config.cluster}, Intensity: ${config.intensity}, Role: ${config.mode}, Perspective: ${config.perspective}`;
-           if (config.mode === 'Villain') {
-               startPrompt += `\nVILLAIN CONFIG: Name: ${config.villain_name}, Goal: ${config.primary_goal}, Appearance: ${config.villain_appearance}, Methods: ${config.villain_methods}, Victims: ${config.victim_description}`;
-           }
-           await handleSendMessage(startPrompt, true);
+           // We reuse the explicit initialization logic logic for fidelity
+           await handleSetupComplete(config);
         }, 500);
     }
   };

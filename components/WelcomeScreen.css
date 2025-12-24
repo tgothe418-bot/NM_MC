@@ -1,0 +1,167 @@
+/* Container: Deep, dark gradient for depth instead of flat black */
+.welcome-container {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    /* A very deep charcoal-to-blood gradient */
+    background: linear-gradient(135deg, #050505 0%, #1a0505 100%);
+    overflow: hidden;
+    font-family: 'Courier New', Courier, monospace;
+    user-select: none;
+}
+
+/* Texture: CRT Scanlines */
+.scanlines {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    /* Creates a subtle horizontal line pattern */
+    background: linear-gradient(to bottom, rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%);
+    background-size: 100% 4px;
+    z-index: 210;
+}
+
+/* Animation: Smooth Entrance (Fade In + Slide Up) */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.content-entrance {
+    /* Plays the entrance animation once on load */
+    animation: fadeInUp 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4rem; /* Generous spacing for a premium feel */
+    z-index: 220;
+    width: 100%;
+    max-width: 90vw;
+}
+
+/* Typography: The Main "THE" */
+.title-primary {
+    font-size: clamp(4rem, 10vw, 8rem); /* Responsive sizing */
+    font-weight: 900;
+    letter-spacing: 0.2em; /* Wide spacing */
+    color: #e0e0e0;
+    text-transform: uppercase;
+    position: relative;
+    line-height: 1;
+    /* Subtle throb animation */
+    animation: text-throb 4s ease-in-out infinite;
+}
+
+/* Typography: "NIGHTMARE MACHINE" */
+.title-secondary {
+    font-size: clamp(1.5rem, 4vw, 3rem);
+    font-weight: 700;
+    letter-spacing: 0.4em; /* Extremely wide spacing */
+    color: #a0a0a0;
+    text-transform: uppercase;
+    position: relative;
+    text-align: center;
+    margin-top: 1rem;
+    animation: text-throb 5s ease-in-out infinite reverse;
+}
+
+/* Effects: Chromatic Aberration (The red/blue split) */
+.aberration-layer {
+    position: absolute;
+    inset: 0;
+    mix-blend-mode: screen;
+    pointer-events: none;
+    user-select: none;
+}
+
+.aberration-red {
+    color: #ff0000;
+    opacity: 0.6;
+    animation: glitch-anim-1 2.5s infinite linear alternate-reverse;
+}
+
+.aberration-cyan {
+    color: #00ffff;
+    opacity: 0.6;
+    animation: glitch-anim-2 3s infinite linear alternate-reverse;
+}
+
+/* Effects: Background Fog/Lights */
+.fog-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.3;
+}
+.fog-beam {
+    position: absolute;
+    width: 100%;
+    height: 100px;
+    background: linear-gradient(90deg, transparent, rgba(255, 0, 0, 0.1), transparent);
+    filter: blur(40px);
+    animation: beam-slide 10s ease-in-out infinite;
+}
+
+/* Button Styling */
+.enter-button {
+    position: relative;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #ff3333;
+    padding: 1.5rem 4rem;
+    font-size: 1.25rem;
+    letter-spacing: 0.5em;
+    font-weight: 700;
+    text-transform: uppercase;
+    cursor: pointer;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.enter-button:hover {
+    background: rgba(255, 0, 0, 0.05);
+    border-color: #ff3333;
+    box-shadow: 0 0 30px rgba(255, 0, 0, 0.2);
+    letter-spacing: 0.6em; /* Expands slightly on hover */
+}
+
+/* Keyframes */
+@keyframes text-throb {
+    0%, 100% { filter: drop-shadow(0 0 10px rgba(255,255,255,0.1)); opacity: 1; }
+    50% { filter: drop-shadow(0 0 25px rgba(255,255,255,0.3)); opacity: 0.9; }
+}
+
+@keyframes glitch-anim-1 {
+    0% { clip-path: inset(20% 0 80% 0); transform: translate(-2px, 1px); }
+    20% { clip-path: inset(60% 0 1% 0); transform: translate(1px, -1px); }
+    40% { clip-path: inset(40% 0 20% 0); transform: translate(2px, 2px); }
+    60% { clip-path: inset(80% 0 5% 0); transform: translate(-1px, -2px); }
+    80% { clip-path: inset(10% 0 60% 0); transform: translate(1px, 1px); }
+    100% { clip-path: inset(30% 0 50% 0); transform: translate(-2px, -1px); }
+}
+
+@keyframes glitch-anim-2 {
+    0% { clip-path: inset(10% 0 60% 0); transform: translate(2px, -1px); }
+    20% { clip-path: inset(80% 0 5% 0); transform: translate(-1px, 2px); }
+    40% { clip-path: inset(30% 0 20% 0); transform: translate(-2px, -2px); }
+    60% { clip-path: inset(10% 0 80% 0); transform: translate(1px, 1px); }
+    80% { clip-path: inset(50% 0 30% 0); transform: translate(-1px, -1px); }
+    100% { clip-path: inset(20% 0 40% 0); transform: translate(2px, 2px); }
+}
+
+@keyframes beam-slide {
+    0%, 100% { transform: translateY(20vh) translateX(-50%); opacity: 0; }
+    50% { opacity: 1; }
+    100% { transform: translateY(80vh) translateX(50%); opacity: 0; }
+}
