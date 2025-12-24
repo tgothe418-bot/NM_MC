@@ -1,4 +1,5 @@
 
+
 // Types for the Nightmare Machine simulation engine
 
 export interface ClusterWeights {
@@ -54,6 +55,14 @@ export interface DialogueMemory {
   long_term_summary: string; 
 }
 
+export interface VoiceSignature {
+  rhythm: 'Staccato' | 'Lyrical' | 'Breathless' | 'Monotone' | 'Erratic';
+  syntax_complexity: 'Simple' | 'Academic' | 'Broken' | 'Flowery';
+  catchphrases: string[];
+  ticks: string[]; 
+  cultural_markers: string[]; 
+}
+
 export interface DialogueState {
   voice_profile: {
     tone: string;
@@ -61,6 +70,7 @@ export interface DialogueState {
     quirks: string[];
     forbidden_topics: string[];
   };
+  voice_signature?: VoiceSignature; 
   memory: DialogueMemory;
   last_social_maneuver: SocialManeuver | null;
   current_social_intent: SocialManeuver; 
@@ -78,10 +88,30 @@ export interface NpcTraits {
   [key: string]: any;
 }
 
+export interface PsychologicalProfile {
+  archetype: string;
+  core_trauma: string;
+  breaking_point_trigger: string;
+  shadow_self: string; 
+  moral_compass: 'Altruistic' | 'Utilitarian' | 'Self-Preserving' | 'Nihilistic';
+}
+
+export interface ClusterResonance {
+  primary_cluster: string; 
+  secondary_cluster: string; 
+  resonance_score: number; 
+}
+
 export interface NpcState {
   name: string;
   archetype: string; 
   background_origin: string;
+  origin?: {
+    region: string;
+    ethnicity: string;
+    native_language: string;
+  };
+  resonance_signature?: ClusterResonance;
   hidden_agenda: HiddenAgenda;
   psychology: {
     stress_level: number;
@@ -90,6 +120,7 @@ export interface NpcState {
     resilience_level?: string;
     emotional_state?: string;
     sanity_percentage?: number;
+    profile?: PsychologicalProfile;
   };
   dialogue_state: DialogueState;
   active_injuries: { location: string; type: string; description: string; }[];

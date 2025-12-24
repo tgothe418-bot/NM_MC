@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Terminal, ShieldAlert, Cpu, Eye, Settings, Image, Zap, Play, Check, Users, Target, UserCheck, Skull, Wand2, Info, ChevronRight, MessageSquare, Monitor, Loader2, Sparkles, StickyNote, Bot, Activity, Layers, Timer, Clapperboard, MapPin, Hourglass } from 'lucide-react';
 import { SimulationConfig } from '../types';
@@ -96,7 +97,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
 
   const [generatingFields, setGeneratingFields] = useState<Record<string, boolean>>({});
 
-  const isVillain = mode.includes('Antagonist');
+  const isVillain = mode.includes('Antagonist') || mode.includes('Predator');
   const [villainName, setVillainName] = useState('');
   const [villainAppearance, setVillainAppearance] = useState('');
   const [villainMethods, setVillainMethods] = useState('');
@@ -209,9 +210,16 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
   );
 
   const handleGuidedNext = (answer?: string) => {
+    if (isCalibrating) return;
+
     const val = answer || guidedInput;
-    if (!val && !GUIDED_QUESTIONS[guidedStep].options) return;
-    const currentKey = GUIDED_QUESTIONS[guidedStep].key;
+    const currentQ = GUIDED_QUESTIONS[guidedStep];
+
+    if (!currentQ) return;
+
+    if (!val && !currentQ.options) return;
+
+    const currentKey = currentQ.key;
     if (currentKey === 'mode') setMode(val === 'Survivor' ? 'The Survivor (Prey Protocol)' : 'The Antagonist (Predator Protocol)');
     if (currentKey === 'perspective') setPerspective(val === 'First Person' ? 'First Person (Direct Immersion)' : 'Third Person (Observational Dread)');
     if (currentKey === 'starting_point') setStartingPoint(val);
@@ -332,7 +340,6 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
   );
 
   const renderSimulationMode = () => {
-    const isThirdPerson = perspective.includes('Third Person');
     return (
       <div className="flex flex-col h-full bg-[#050505] p-12 md:p-16 animate-fadeIn relative overflow-hidden font-mono">
          <div className="h-1.5 bg-amber-500/10 relative overflow-hidden flex-shrink-0 mb-10">
@@ -435,6 +442,44 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
                </div>
             </div>
 
+            {/* ENVIRONMENTAL MATRIX FOR SIMULATION MODE */}
+            <div className="bg-black/40 p-10 border border-gray-800 rounded-sm space-y-10">
+                 <div className="text-amber-500 font-mono text-xl font-bold uppercase tracking-[0.4em] flex items-center gap-5 border-b border-amber-500/10 pb-5">
+                    <MapPin className="w-8 h-8" /> Environmental Matrix
+                 </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                    <div className="space-y-4 group relative">
+                        <div className="flex items-center justify-between">
+                            <label className="text-sm font-mono text-gray-400 uppercase flex items-center gap-3 tracking-[0.3em]">
+                                Initial Location
+                            </label>
+                            <ActionButtons fieldKey="Initial Location" value={locationDescription} />
+                        </div>
+                        <textarea 
+                            value={locationDescription}
+                            onChange={(e) => setLocationDescription(e.target.value)}
+                            placeholder="Describe the architecture of the starting ordeal..."
+                            className="w-full h-32 bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-sm focus:border-amber-500 outline-none transition-all resize-none custom-scrollbar placeholder:text-gray-900 hover:bg-gray-900 rounded-sm"
+                        />
+                    </div>
+                    <div className="space-y-4 group relative">
+                        <div className="flex items-center justify-between">
+                            <label className="text-sm font-mono text-gray-400 uppercase flex items-center gap-3 tracking-[0.3em]">
+                                <Image className="w-6 h-6 text-amber-500" /> Visual Motif
+                            </label>
+                            <ActionButtons fieldKey="Visual Motif" value={visualMotif} />
+                        </div>
+                        <input 
+                            type="text"
+                            value={visualMotif}
+                            onChange={(e) => setVisualMotif(e.target.value)}
+                            placeholder="e.g. Grainy 8mm film, Neon Noir..."
+                            className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-lg focus:border-amber-500 outline-none transition-all placeholder:text-gray-900 hover:bg-gray-900 rounded-sm"
+                        />
+                    </div>
+                 </div>
+            </div>
+
             <div className="space-y-10">
               <div className="flex items-center gap-5 text-amber-500 font-mono text-lg uppercase tracking-[0.5em] border-b border-amber-500/10 pb-6">
                   <Timer className="w-8 h-8" /> Loop Count
@@ -454,6 +499,105 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
                  </div>
               </div>
             </div>
+
+            {/* VILLAIN INJECTION FOR AUTOMATED MODE */}
+            {isVillain && (
+                <div className="space-y-12 border-y-2 border-amber-500/20 py-16 animate-fadeIn bg-amber-950/5 px-8 mt-10">
+                  <div className="text-amber-500 font-mono text-2xl font-bold uppercase tracking-[0.5em] flex items-center gap-6">
+                     <Target className="w-10 h-10 animate-pulse" /> Antagonist Specifications (Auto-Pilot)
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
+                    <div className="space-y-4 group relative">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
+                          <Skull className="w-5 h-5 text-amber-500" /> Entity Name
+                        </label>
+                        <ActionButtons fieldKey="Entity Name" value={villainName} />
+                      </div>
+                      <input 
+                        type="text"
+                        value={villainName}
+                        onChange={(e) => setVillainName(e.target.value)}
+                        placeholder="Enter your name or title..."
+                        className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-sm focus:border-amber-500 outline-none transition-all placeholder:text-gray-900 hover:bg-gray-900 rounded-sm"
+                      />
+                    </div>
+                    <div className="space-y-4 group relative">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
+                          <Skull className="w-5 h-5 text-amber-500" /> Form & Appearance
+                        </label>
+                        <ActionButtons fieldKey="Form & Appearance" value={villainAppearance} />
+                      </div>
+                      <textarea 
+                        value={villainAppearance}
+                        onChange={(e) => setVillainAppearance(e.target.value)}
+                        placeholder="Describe your physical form..."
+                        className="w-full h-48 bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-sm focus:border-amber-500 outline-none transition-all resize-none custom-scrollbar placeholder:text-gray-900 hover:bg-gray-900 rounded-sm"
+                      />
+                    </div>
+                    <div className="space-y-4 group relative">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
+                          <Wand2 className="w-5 h-5 text-amber-500" /> Modus Operandi
+                        </label>
+                        <ActionButtons fieldKey="Modus Operandi" value={villainMethods} />
+                      </div>
+                      <textarea 
+                        value={villainMethods}
+                        onChange={(e) => setVillainMethods(e.target.value)}
+                        placeholder="How do you stalk?"
+                        className="w-full h-48 bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-sm focus:border-amber-500 outline-none transition-all resize-none custom-scrollbar placeholder:text-gray-900 hover:bg-gray-900 rounded-sm"
+                      />
+                    </div>
+                    <div className="space-y-4 group relative">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
+                          <Users className="w-5 h-5 text-amber-500" /> Specimen Targets
+                        </label>
+                        <ActionButtons fieldKey="Specimen Targets" value={victimDescription} />
+                      </div>
+                      <textarea 
+                        value={victimDescription}
+                        onChange={(e) => setVictimDescription(e.target.value)}
+                        placeholder="Who are the victims?"
+                        className="w-full h-48 bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-sm focus:border-amber-500 outline-none transition-all resize-none custom-scrollbar placeholder:text-gray-900 hover:bg-gray-900 rounded-sm"
+                      />
+                    </div>
+                    <div className="space-y-4 group relative">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
+                          <Target className="w-5 h-5 text-amber-500" /> Primary Objective
+                        </label>
+                        <ActionButtons fieldKey="Primary Objective" value={primaryGoal} />
+                      </div>
+                      <input 
+                        type="text"
+                        value={primaryGoal}
+                        onChange={(e) => setPrimaryGoal(e.target.value)}
+                        placeholder="What is your ultimate goal?"
+                        className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-sm focus:border-amber-500 outline-none transition-all placeholder:text-gray-900 hover:bg-gray-900 rounded-sm"
+                      />
+                    </div>
+                    <div className="space-y-4 group relative">
+                      <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
+                        Population Count
+                      </label>
+                      <div className="flex items-center gap-6 bg-black border-2 border-gray-800 p-6 rounded-sm">
+                        <input 
+                          type="range"
+                          min="1"
+                          max="10"
+                          value={victimCount}
+                          onChange={(e) => setVictimCount(parseInt(e.target.value) || 1)}
+                          className="flex-1 accent-amber-500 h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer"
+                        />
+                        <span className="text-amber-500 font-mono text-xl w-8 font-bold">{victimCount}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+            )}
          </div>
 
          <div className="pt-16 pb-12 border-t border-amber-500/20 flex flex-col items-center flex-shrink-0">
@@ -736,6 +880,8 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
 
   const renderGuidedMode = () => {
     const currentQuestion = GUIDED_QUESTIONS[guidedStep];
+    if (!currentQuestion) return null;
+
     return (
       <div className="flex flex-col h-full bg-[#030303] animate-fadeIn p-8 md:p-16 relative overflow-hidden font-serif">
         <div className="flex gap-2 mb-12">
@@ -745,12 +891,16 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
         </div>
         <div className="flex-1 overflow-y-auto custom-scrollbar pr-4 space-y-12">
           <div className="space-y-8 opacity-40">
-            {guidedAnswers.map((ans, i) => (
-              <div key={i} className="animate-fadeIn">
-                <p className="text-gray-500 italic text-lg mb-2">{GUIDED_QUESTIONS[i].q}</p>
-                <p className="text-haunt-gold font-bold uppercase tracking-widest text-sm">{ans}</p>
-              </div>
-            ))}
+            {guidedAnswers.map((ans, i) => {
+               const q = GUIDED_QUESTIONS[i];
+               if (!q) return null;
+               return (
+                  <div key={i} className="animate-fadeIn">
+                    <p className="text-gray-500 italic text-lg mb-2">{q.q}</p>
+                    <p className="text-haunt-gold font-bold uppercase tracking-widest text-sm">{ans}</p>
+                  </div>
+               );
+            })}
           </div>
           <div className="space-y-10 animate-fadeIn" key={guidedStep}>
              <h2 className="text-3xl md:text-4xl text-gray-200 leading-relaxed italic max-w-4xl">{currentQuestion.q}</h2>
@@ -760,7 +910,8 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
                    <button
                      key={opt}
                      onClick={() => handleGuidedNext(opt)}
-                     className="p-6 border border-gray-800 bg-black/40 text-left hover:border-haunt-gold hover:text-haunt-gold transition-all group rounded-sm"
+                     disabled={isCalibrating}
+                     className={`p-6 border border-gray-800 bg-black/40 text-left hover:border-haunt-gold hover:text-haunt-gold transition-all group rounded-sm ${isCalibrating ? 'opacity-50 cursor-not-allowed' : ''}`}
                    >
                      <div className="text-xs font-mono text-gray-500 group-hover:text-haunt-gold/60 uppercase tracking-widest mb-1">Option</div>
                      <div className="text-xl uppercase tracking-wider">{opt}</div>
@@ -776,9 +927,14 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
                    onKeyDown={(e) => e.key === 'Enter' && handleGuidedNext()}
                    placeholder={currentQuestion.placeholder}
                    autoFocus
-                   className="w-full bg-transparent border-b-2 border-gray-800 text-gray-100 text-2xl py-4 focus:outline-none focus:border-haunt-gold transition-all font-serif italic"
+                   disabled={isCalibrating}
+                   className="w-full bg-transparent border-b-2 border-gray-800 text-gray-100 text-2xl py-4 focus:outline-none focus:border-haunt-gold transition-all font-serif italic disabled:opacity-50"
                  />
-                 <button onClick={() => handleGuidedNext()} disabled={!guidedInput.trim()} className="flex items-center gap-3 text-haunt-gold font-mono text-xs font-bold uppercase tracking-[0.4em] hover:text-white transition-colors disabled:opacity-20">
+                 <button 
+                    onClick={() => handleGuidedNext()} 
+                    disabled={!guidedInput.trim() || isCalibrating} 
+                    className="flex items-center gap-3 text-haunt-gold font-mono text-xs font-bold uppercase tracking-[0.4em] hover:text-white transition-colors disabled:opacity-20"
+                 >
                    Confirm Neural Seed <ChevronRight className="w-4 h-4" />
                  </button>
                </div>

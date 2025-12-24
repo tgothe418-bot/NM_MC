@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { StatusPanel } from './components/StatusPanel';
 import { StoryLog } from './components/StoryLog';
 import { InputArea } from './components/InputArea';
@@ -7,11 +8,12 @@ import { SimulationModal } from './components/SimulationModal';
 import { SetupOverlay } from './components/SetupOverlay';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { sendMessageToGemini, initializeGemini, generateAutoPlayerAction, generateSimulationAnalysis, generateHorrorImage, generateCinematicVideo, generateNpcActions, simulateTurn, generateCalibrationField } from './services/geminiService';
-import { GameState, ChatMessage, SimulationConfig } from './types';
+import { GameState, ChatMessage, SimulationConfig, NpcState } from './types';
 import { constructVoiceManifesto } from './services/dialogueEngine';
 import { constructSensoryManifesto } from './services/sensoryEngine';
 import { constructLocationManifesto, getDefaultLocationState, constructRoomGenerationRules } from './services/locationEngine';
-import { Terminal, Lock, Key } from 'lucide-react';
+import { createNpcFactory } from './services/npcGenerator';
+import { Terminal, Lock, Key, Activity } from 'lucide-react';
 
 const INITIAL_STATE: GameState = {
   meta: { turn: 0, perspective: "Pending", mode: 'Pending', intensity_level: "Level 1", active_cluster: "None" },
@@ -28,6 +30,12 @@ const App: React.FC = () => {
   const [isSplashComplete, setIsSplashComplete] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [showKeySelection, setShowKeySelection] = useState(true);
+
+  // Auto-Pilot State
+  const [autoMode, setAutoMode] = useState<{ active: boolean; remainingCycles: number }>({
+    active: false,
+    remainingCycles: 0
+  });
 
   // Simulation Modal State
   const [isSimulationModalOpen, setIsSimulationModalOpen] = useState(false);
@@ -51,6 +59,38 @@ const App: React.FC = () => {
   const handleWelcomeComplete = () => {
     setIsSplashComplete(true);
   };
+
+  // --- AUTO-PILOT LOGIC ---
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
+    const runAutoTurn = async () => {
+      if (autoMode.active && autoMode.remainingCycles > 0 && !isLoading && isInitialized) {
+        // Delay slightly for realism/pacing
+        timeoutId = setTimeout(async () => {
+          try {
+            // Generate action based on current state
+            const action = await generateAutoPlayerAction(gameState);
+            if (action) {
+              // Feed action into the main loop
+              await handleSendMessage(`[AUTO-ACTION]: ${action}`);
+              // Decrement counter
+              setAutoMode(prev => ({ ...prev, remainingCycles: prev.remainingCycles - 1 }));
+            }
+          } catch (e) {
+            console.error("Auto-Pilot Failed:", e);
+            setAutoMode({ active: false, remainingCycles: 0 }); // Abort on error
+          }
+        }, 3000); // 3-second delay between turns
+      } else if (autoMode.active && autoMode.remainingCycles <= 0) {
+        setAutoMode({ active: false, remainingCycles: 0 });
+      }
+    };
+
+    runAutoTurn();
+
+    return () => clearTimeout(timeoutId);
+  }, [autoMode, isLoading, isInitialized, gameState]); // Re-run when state settles
 
   const handleSendMessage = async (text: string, isInitial = false, stateOverride?: GameState): Promise<string> => {
     setIsLoading(true);
@@ -138,6 +178,14 @@ const App: React.FC = () => {
   const handleSetupComplete = async (config: SimulationConfig) => {
     setIsInitialized(true);
 
+    // If auto-pilot cycles are requested, initialize the auto mode state
+    if (config.cycles > 0) {
+      setAutoMode({
+        active: true,
+        remainingCycles: config.cycles
+      });
+    }
+
     // Determine pacing vars based on starting_point
     let startTurn = 1;
     let startThreat = 1;
@@ -174,7 +222,23 @@ const App: React.FC = () => {
         current_tactic: config.villain_methods || "Dormant"
     };
 
-    // 3. Meta & Narrative
+    // 3. Generate NPCs (Client-Side)
+    let initialNpcs: NpcState[] = [];
+    if (config.mode === 'Villain' && config.victim_count) {
+        // First one uses the description (The "Hero" / Focus)
+        if (config.victim_description) {
+            initialNpcs.push(await createNpcFactory(config.cluster, config.intensity, config.victim_description));
+        } else {
+            initialNpcs.push(await createNpcFactory(config.cluster, config.intensity));
+        }
+        
+        // The rest are procedural fillers
+        for (let i = 1; i < (config.victim_count || 1); i++) {
+            initialNpcs.push(await createNpcFactory(config.cluster, config.intensity));
+        }
+    }
+
+    // 4. Meta & Narrative
     const initialMeta = {
         turn: startTurn,
         perspective: config.perspective,
@@ -194,7 +258,7 @@ const App: React.FC = () => {
         villain_state: initialVillainState,
         location_state: initialLocation,
         narrative: initialNarrative,
-        npc_states: [] // Simulator will populate based on prompts
+        npc_states: initialNpcs // Simulator will see these immediately
     };
 
     setGameState(initialState);
@@ -218,9 +282,11 @@ const App: React.FC = () => {
     - Name: ${config.villain_name}
     - Goal: ${config.primary_goal}
     - Methods: ${config.villain_methods}
-    - Targets: ${config.victim_description} (${config.victim_count || 3} subjects)
     
-    DIRECTIVE: Generate ${config.victim_count || 3} NPC subjects based on the 'Targets' description. They should be in the starting location.
+    [ACTIVE SUBJECTS]:
+    ${JSON.stringify(initialNpcs.map(n => ({ name: n.name, archetype: n.archetype, origin: n.background_origin })))}
+
+    DIRECTIVE: These subjects are present in the starting location. Initiate the narrative.
         `;
     } else {
         startPrompt += `
@@ -284,6 +350,7 @@ If the Mode changed (e.g., to Villain), shift the narrative voice immediately.
         // Reset Standard
         setHistory([]);
         setIsInitialized(true);
+        setAutoMode({ active: false, remainingCycles: 0 }); // Reset auto mode
         
         // Slight delay to allow UI to clear
         setTimeout(async () => {
@@ -326,18 +393,26 @@ If the Mode changed (e.g., to Villain), shift the narrative voice immediately.
                 gameState={gameState} 
                 onProcessAction={handleSendMessage} 
                 onOpenSimulation={handleOpenSimulation} 
-                isTesting={isTesting} 
-                onAbortTest={() => setIsTesting(false)} 
+                isTesting={isTesting || autoMode.active} 
+                onAbortTest={() => {
+                  setIsTesting(false);
+                  setAutoMode({ active: false, remainingCycles: 0 });
+                }} 
             />
         </div>
         <div className="flex-1 flex flex-col h-full overflow-hidden">
             <div className="h-16 border-b border-gray-800 flex items-center px-8 bg-black/80">
                 <Terminal className="w-6 h-6 mr-4 text-gray-500" />
                 <h1 className="font-serif text-2xl tracking-widest">NIGHTMARE MACHINE <span className="text-xs text-gray-600 ml-2">v3.5</span></h1>
+                {autoMode.active && (
+                  <div className="ml-auto flex items-center gap-2 px-4 py-1 bg-amber-900/30 border border-amber-600/50 rounded text-amber-500 text-xs font-mono uppercase tracking-widest animate-pulse">
+                    <Activity className="w-3 h-3" /> Auto-Pilot Active ({autoMode.remainingCycles})
+                  </div>
+                )}
             </div>
             <StoryLog history={history} isLoading={isLoading} activeCluster={gameState.meta.active_cluster} />
             <div className="p-8 bg-gradient-to-t from-black to-transparent">
-                <InputArea onSend={handleSendMessage} isLoading={isLoading} />
+                <InputArea onSend={handleSendMessage} isLoading={isLoading || autoMode.active} />
             </div>
         </div>
       </div>

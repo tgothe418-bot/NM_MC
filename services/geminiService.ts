@@ -1,6 +1,7 @@
+
 import { GoogleGenAI, Chat, Type } from "@google/genai";
 import { SIMULATOR_INSTRUCTION, NARRATOR_INSTRUCTION, PLAYER_SYSTEM_INSTRUCTION, ANALYST_SYSTEM_INSTRUCTION } from "../constants";
-import { SimulationConfig, GameState, RoomNode } from "../types";
+import { SimulationConfig, GameState, RoomNode, NpcState } from "../types";
 import { constructRoomGenerationRules } from "./locationEngine";
 
 let chatSession: Chat | null = null;
@@ -155,6 +156,45 @@ const NPC_ACTIONS_RESPONSE_SCHEMA = {
   required: ["actions"]
 };
 
+const CHARACTER_ANALYSIS_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    name: { type: Type.STRING },
+    archetype: { type: Type.STRING },
+    resonance_signature: {
+      type: Type.OBJECT,
+      properties: {
+        primary_cluster: { type: Type.STRING },
+        secondary_cluster: { type: Type.STRING },
+        resonance_score: { type: Type.NUMBER }
+      },
+      required: ["primary_cluster", "secondary_cluster", "resonance_score"]
+    },
+    voice_signature: {
+      type: Type.OBJECT,
+      properties: {
+        rhythm: { type: Type.STRING },
+        syntax_complexity: { type: Type.STRING },
+        catchphrases: { type: Type.ARRAY, items: { type: Type.STRING } },
+        ticks: { type: Type.ARRAY, items: { type: Type.STRING } },
+        cultural_markers: { type: Type.ARRAY, items: { type: Type.STRING } }
+      },
+      required: ["rhythm", "syntax_complexity", "ticks"]
+    },
+    psychology_profile: {
+      type: Type.OBJECT,
+      properties: {
+        core_trauma: { type: Type.STRING },
+        breaking_point_trigger: { type: Type.STRING },
+        shadow_self: { type: Type.STRING },
+        moral_compass: { type: Type.STRING }
+      },
+      required: ["core_trauma", "breaking_point_trigger", "shadow_self", "moral_compass"]
+    }
+  },
+  required: ["name", "archetype", "resonance_signature", "voice_signature", "psychology_profile"]
+};
+
 export const initializeGemini = () => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   chatSession = ai.chats.create({
@@ -305,7 +345,48 @@ export const simulateTurn = async (gameState: GameState, userAction: string, npc
     });
 
     const parsed = JSON.parse(res.text || "{}");
-    return restoreGameStateFromResponse(parsed);
+    let nextState = restoreGameStateFromResponse(parsed);
+
+    // --- DYNAMIC INTENSITY SCALING ---
+    // Automatically escalates intensity based on psychological fracture and stress levels.
+    if (nextState.npc_states && Array.isArray(nextState.npc_states)) {
+        let maxStress = 0;
+        let maxFracture = 0;
+
+        nextState.npc_states.forEach((npc: any) => {
+            const s = npc.psychology?.stress_level || 0;
+            const f = npc.fracture_state || 0;
+            if (s > maxStress) maxStress = s;
+            if (f > maxFracture) maxFracture = f;
+        });
+
+        let newLevel = "Level 1: The Uncanny";
+        
+        // Thresholds:
+        // Level 5: Absolute psychological break (Stress 90+ or Fracture 3+)
+        // Level 4: Extreme distress (Stress 75+)
+        // Level 3: High panic (Stress 50+)
+        // Level 2: Unease/Dread (Stress 25+)
+        
+        if (maxFracture >= 3 || maxStress >= 90) {
+            newLevel = "Level 5: The Transgressive";
+        } else if (maxStress >= 75) {
+            newLevel = "Level 4: The Grotesque";
+        } else if (maxStress >= 50) {
+            newLevel = "Level 3: The Visceral";
+        } else if (maxStress >= 25) {
+            newLevel = "Level 2: The Dread";
+        }
+
+        // Apply dynamic adjustment if valid metadata exists
+        if (nextState.meta) {
+            // We use the calculated level, overriding the previous state if the situation escalates
+            // This ensures the narrative "heats up" with the drama.
+            nextState.meta.intensity_level = newLevel;
+        }
+    }
+
+    return nextState;
   });
 };
 
@@ -416,6 +497,79 @@ export const generateCinematicVideo = async (prompt: string): Promise<string> =>
   const res = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
   const blob = await res.blob();
   return URL.createObjectURL(blob);
+};
+
+export const hydrateUserCharacter = async (userDescription: string, activeCluster: string): Promise<Partial<NpcState>> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  const prompt = `
+    ANALYSIS TASK: SEMANTIC RESONANCE MAPPING
+    
+    INPUT: User Character Description: "${userDescription}"
+    CONTEXT: The current nightmare logic is "${activeCluster}".
+    
+    OBJECTIVE: 
+    1. Analyze the input for thematic proximity to these Clusters: 
+       - FLESH (Biology, Body Horror, Wet)
+       - SYSTEM (Tech, Glitch, Cold, Industrial)
+       - HAUNTING (Ghosts, Memory, Dust)
+       - SURVIVAL (Cold, Hunger, Nature)
+       - BLASPHEMY (Religion, Dirt, Profanity)
+       - SELF (Identity, Mirrors, Psychology)
+       - DESIRE (Lust, Consumption, Heat)
+       
+    2. Construct a 'VoiceSignature' and 'PsychologicalProfile' that blends the User's description with the aesthetics of the detected Cluster.
+    
+    EXAMPLE:
+    Input: "A frantic mother looking for her son."
+    Cluster Match: HAUNTING (Primary), FLESH (Secondary - familial bond).
+    Voice: Breathless, Broken syntax.
+    Psychology: Martyr complex.
+    
+    Output must be valid JSON matching the schema.
+  `;
+
+  const res = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: prompt,
+    config: {
+      responseMimeType: 'application/json',
+      responseSchema: CHARACTER_ANALYSIS_SCHEMA,
+      temperature: 0.7
+    }
+  });
+
+  const parsed = JSON.parse(res.text || "{}");
+  
+  return {
+    name: parsed.name,
+    archetype: parsed.archetype,
+    resonance_signature: parsed.resonance_signature,
+    dialogue_state: {
+      voice_signature: parsed.voice_signature,
+      // Default legacy fields
+      voice_profile: { tone: parsed.voice_signature?.rhythm || "Neutral", vocabulary: [], quirks: [], forbidden_topics: [] },
+      memory: { short_term_buffer: [], long_term_summary: `Origin: ${userDescription}` },
+      mood_state: "Anxious",
+      last_social_maneuver: "OBSERVE",
+      current_social_intent: "OBSERVE",
+      conversation_history: []
+    },
+    psychology: {
+      profile: parsed.psychology_profile,
+      stress_level: 20,
+      current_thought: "Where am I?",
+      dominant_instinct: "Flight",
+      resilience_level: "Moderate",
+      sanity_percentage: 100,
+      emotional_state: "Anxious"
+    },
+    fracture_state: 0,
+    consciousness: "Alert",
+    active_injuries: [],
+    hidden_agenda: { goal: "Survive", constraint: "Unknown", progress_level: 0 },
+    background_origin: userDescription
+  };
 };
 
 // --- STRESS TEST ENGINE ---

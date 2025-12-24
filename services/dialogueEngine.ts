@@ -1,8 +1,9 @@
 
+
 import { NpcState, DialogueEntry, KnowledgeNode, SocialManeuver, DialogueMemory, DialogueState } from '../types';
 
 /**
- * THE DIALOGUE ENGINE V3.1 (INTENSITY AWARE)
+ * THE DIALOGUE ENGINE V4.0 (MOSAIC AWARE)
  */
 
 export const getDefaultDialogueState = (background: string = ""): DialogueState => ({
@@ -112,8 +113,8 @@ export const updateNpcMemory = (currentMemory: DialogueMemory, newEntry: Dialogu
 export const constructVoiceManifesto = (npcs: NpcState[]): string => {
     if (!npcs || npcs.length === 0) return "";
 
-    let manifesto = "\n\n*** D. DIALOGUE & PSYCHOLOGY MANIFESTO (GRADIENT V3.1) ***\n";
-    manifesto += "Follow the CALCULATED SOCIAL INTENT and MEMORY CONTEXT for each NPC.\n";
+    let manifesto = "\n\n*** D. DIALOGUE & PSYCHOLOGY MANIFESTO (MOSAIC ENGINE v4.0) ***\n";
+    manifesto += "INSTRUCTION: Adopt the specific Linguistic Fingerprint and Cultural Context for each NPC. Do not use generic 'scared' voices.\n";
     
     npcs.forEach(npc => {
         if (!npc) return;
@@ -126,16 +127,44 @@ export const constructVoiceManifesto = (npcs: NpcState[]): string => {
         const ds = npc.dialogue_state || getDefaultDialogueState(npc.background_origin);
         const intent = calculateSocialIntent(npc);
         const knowledge = getShareableKnowledge(npc, intent);
+        
+        // Mosaic Fields
+        const vs = ds.voice_signature;
+        const psych = npc.psychology?.profile;
+        const origin = npc.origin;
 
-        manifesto += `\n--- CHARACTER: ${npc.name} (${npc.archetype}) ---\n`;
+        manifesto += `\n--- SUBJECT: ${npc.name} (${npc.archetype}) ---\n`;
+        manifesto += `ORIGIN: ${origin?.region || "Unknown"} | ETHNICITY: ${origin?.ethnicity || "Unknown"}\n`;
         manifesto += `HIDDEN AGENDA: ${npc.hidden_agenda.goal} (Progress: ${npc.hidden_agenda.progress_level}%)\n`;
-        manifesto += `VOICE: ${ds.voice_profile?.tone || "Neutral"}. QUIRK: ${ds.voice_profile?.quirks?.[0] || "None"}.\n`;
-        manifesto += `PSYCHE: Stress ${npc.psychology?.stress_level || 0}/100. Intent: [${intent}].\n`;
+        
+        if (vs) {
+            manifesto += `LINGUISTIC FINGERPRINT:\n`;
+            manifesto += `  - Rhythm: ${vs.rhythm}\n`;
+            manifesto += `  - Syntax: ${vs.syntax_complexity}\n`;
+            manifesto += `  - Physical Ticks: ${vs.ticks.join(", ")}\n`;
+        } else {
+             manifesto += `VOICE: ${ds.voice_profile?.tone || "Neutral"}. QUIRK: ${ds.voice_profile?.quirks?.[0] || "None"}.\n`;
+        }
+        
+        if (psych) {
+            manifesto += `PSYCHOLOGY:\n`;
+            manifesto += `  - Moral Compass: ${psych.moral_compass}\n`;
+            manifesto += `  - BREAKING POINT TRIGGER: "${psych.breaking_point_trigger}"\n`;
+            manifesto += `  - SHADOW SELF (If Broken): Becomes "${psych.shadow_self}"\n`;
+        }
+
+        manifesto += `CURRENT STATE: Stress ${npc.psychology?.stress_level || 0}/100. Intent: [${intent}].\n`;
         manifesto += `THOUGHT: "${npc.psychology?.current_thought || "..."}"\n`;
         manifesto += synthesizeMemory(ds.memory);
         
         manifesto += `>>> DIRECTIVE: ${intent}.\n`;
         if (knowledge.length > 0) manifesto += `KNOWLEDGE:\n - ${knowledge.join("\n - ")}\n`;
+        
+        // Add Logic for Breaking Point
+        if (npc.fracture_state >= 3 && psych) {
+             manifesto += `!!! CRITICAL ALERT: SUBJECT IS FRACTURING. TRANSITION TO SHADOW SELF: ${psych.shadow_self} !!!\n`;
+        }
+        
         manifesto += `[SYSTEM]: Update 'long_term_summary' reflecting their psychological erosion.\n`;
     });
 
