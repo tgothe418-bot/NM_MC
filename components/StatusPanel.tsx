@@ -222,6 +222,7 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
                 )}
 
                 {npc_states?.map((npc, idx) => {
+                    if (!npc) return null;
                     const isExpanded = expandedNpcs[npc.name];
                     const isAnomaly = npc.fracture_state === 4;
                     const stress = npc.psychology?.stress_level || 0;

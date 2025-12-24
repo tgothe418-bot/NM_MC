@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Terminal, ShieldAlert, Cpu, Eye, Settings, Image, Zap, Play, Check, Users, Target, UserCheck, Skull, Wand2, Info, ChevronRight, MessageSquare, Monitor, Loader2, Sparkles, StickyNote, Bot, Activity, Layers, Timer, Clapperboard, MapPin } from 'lucide-react';
 import { SimulationConfig } from '../types';
@@ -266,7 +265,8 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
             <MessageSquare className="w-12 h-12 text-haunt-gold" />
           </div>
           <div>
-            <h3 className="text-3xl font-mono font-bold text-haunt-gold uppercase tracking-tighter">Guided Synthesis</h3>
+            <h3 className="text-xl font-bold text-white uppercase tracking-widest mb-2">Lets Tell A Story Together</h3>
+            <div className="text-sm font-mono font-bold text-haunt-gold uppercase tracking-[0.3em] mb-4">Guided Synthesis</div>
             <p className="text-xs text-gray-500 uppercase mt-4 leading-relaxed tracking-widest max-w-sm">The Machine acts as your guide. Through evocative questioning, we will weave the fabric of your trauma together.</p>
           </div>
           <div className="flex items-center gap-3 text-haunt-gold text-xs font-bold uppercase tracking-[0.3em] opacity-0 group-hover:opacity-100 transition-opacity">
@@ -282,7 +282,8 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
             <Settings className="w-12 h-12 text-fresh-blood" />
           </div>
           <div>
-            <h3 className="text-3xl font-mono font-bold text-fresh-blood uppercase tracking-tighter">Manual Calibration</h3>
+            <h3 className="text-xl font-bold text-white uppercase tracking-widest mb-2">I Want To Tell A Story</h3>
+            <div className="text-sm font-mono font-bold text-fresh-blood uppercase tracking-[0.3em] mb-4">Manual Calibration</div>
             <p className="text-xs text-gray-500 uppercase mt-4 leading-relaxed tracking-widest max-w-sm">Direct dashboard access. For architects who already know the exact shape of the nightmare they wish to inhabit.</p>
           </div>
           <div className="flex items-center gap-3 text-fresh-blood text-xs font-bold uppercase tracking-[0.3em] opacity-0 group-hover:opacity-100 transition-opacity">
@@ -300,8 +301,9 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
                 <Bot className="w-8 h-8 text-amber-500" />
             </div>
             <div className="text-left">
-                <h3 className="text-2xl font-mono font-bold text-amber-500 uppercase tracking-[0.2em]">TEST PROTOCOL</h3>
-                <p className="text-[10px] text-gray-500 uppercase mt-1 leading-relaxed tracking-widest">Diagnostic Sequence // Autonomous Diagnostics</p>
+                <h3 className="text-2xl font-bold text-white uppercase tracking-widest mb-1">Tell Me A Story</h3>
+                <div className="text-sm font-mono font-bold text-amber-500 uppercase tracking-[0.2em] mb-1">Test Protocol</div>
+                <p className="text-[10px] text-gray-500 uppercase leading-relaxed tracking-widest">Diagnostic Sequence // Autonomous Diagnostics</p>
             </div>
         </div>
         <p className="text-[11px] text-gray-600 uppercase tracking-tight max-w-xl opacity-60">The Machine executes a self-contained test loop. No user input required. Used for validating narrative pathfinding and atmospheric cohesion.</p>

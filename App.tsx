@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { StatusPanel } from './components/StatusPanel';
 import { StoryLog } from './components/StoryLog';
@@ -7,11 +6,11 @@ import { ClusterAmbience } from './components/ClusterAmbience';
 import { SimulationModal } from './components/SimulationModal';
 import { SetupOverlay } from './components/SetupOverlay';
 import { WelcomeScreen } from './components/WelcomeScreen';
-import { sendMessageToGemini, initializeGemini, generateAutoPlayerAction, generateSimulationAnalysis, generateHorrorImage, generateCinematicVideo, generateNpcActions, simulateTurn } from './services/geminiService';
+import { sendMessageToGemini, initializeGemini, generateAutoPlayerAction, generateSimulationAnalysis, generateHorrorImage, generateCinematicVideo, generateNpcActions, simulateTurn, generateCalibrationField } from './services/geminiService';
 import { GameState, ChatMessage, SimulationConfig } from './types';
 import { constructVoiceManifesto } from './services/dialogueEngine';
 import { constructSensoryManifesto } from './services/sensoryEngine';
-import { constructLocationManifesto, getDefaultLocationState } from './services/locationEngine';
+import { constructLocationManifesto, getDefaultLocationState, constructRoomGenerationRules } from './services/locationEngine';
 import { Terminal, Lock, Key } from 'lucide-react';
 
 const INITIAL_STATE: GameState = {
@@ -29,6 +28,11 @@ const App: React.FC = () => {
   const [isSplashComplete, setIsSplashComplete] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [showKeySelection, setShowKeySelection] = useState(true);
+
+  // Simulation Modal State
+  const [isSimulationModalOpen, setIsSimulationModalOpen] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [simulationReport, setSimulationReport] = useState<string | null>(null);
 
   useEffect(() => {
     const check = async () => {
@@ -62,8 +66,39 @@ const App: React.FC = () => {
       }
 
       // Pass 1: Simulation
-      const simulated = await simulateTurn(gameState, text, npcActions);
+      let simulated = await simulateTurn(gameState, text, npcActions);
       
+      // Pass 1.5: Room Enrichment
+      // If the user moved to a new room, we ensure the description is rich and cluster-specific.
+      const prevRoomId = gameState.location_state.current_room_id;
+      const currRoomId = simulated.location_state.current_room_id;
+      
+      if (currRoomId !== prevRoomId) {
+          const room = simulated.location_state.room_map[currRoomId];
+          // We check if it needs enrichment (always enrich new rooms for high fidelity)
+          if (room) {
+              const generationRules = constructRoomGenerationRules(simulated);
+              try {
+                const enrichedDesc = await generateCalibrationField(
+                    "Atmospheric Description",
+                    simulated.meta.active_cluster,
+                    simulated.meta.intensity_level,
+                    undefined,
+                    `Describe the location "${room.name}".\nCONTEXT: ${generationRules}.\nCURRENT DRAFT: ${room.description_cache || "None"}`
+                );
+                
+                if (enrichedDesc) {
+                    simulated.location_state.room_map[currRoomId] = {
+                        ...room,
+                        description_cache: enrichedDesc
+                    };
+                }
+              } catch (e) {
+                console.warn("Room enrichment failed, using default:", e);
+              }
+          }
+      }
+
       const voiceM = constructVoiceManifesto(simulated.npc_states);
       const sensoryM = constructSensoryManifesto(simulated);
       const locationM = constructLocationManifesto(simulated.location_state);
@@ -102,6 +137,67 @@ const App: React.FC = () => {
     await handleSendMessage(startPrompt, true);
   };
 
+  // --- Modal & Test Handlers ---
+
+  const handleOpenSimulation = () => {
+    setIsSimulationModalOpen(true);
+  };
+
+  const handleCloseSimulation = () => {
+    setIsSimulationModalOpen(false);
+  };
+
+  const handleRunSimulationFromModal = async (config: SimulationConfig, continueSession: boolean = false) => {
+    setIsSimulationModalOpen(false);
+
+    if (continueSession) {
+         // Update meta-state locally first to reflect changes immediately
+         setGameState(prev => ({
+             ...prev,
+             meta: {
+                 ...prev.meta,
+                 perspective: config.perspective,
+                 mode: config.mode as any,
+                 intensity_level: config.intensity,
+                 active_cluster: config.cluster
+             }
+         }));
+
+         // Inject into current session
+         const updatePrompt = `
+SYSTEM OVERRIDE: PARAMETER RE-CALIBRATION
+[NEW CONFIGURATION]:
+- Perspective: ${config.perspective}
+- Mode: ${config.mode}
+- Intensity: ${config.intensity}
+- Cluster: ${config.cluster}
+${config.mode === 'Villain' ? `
+- Villain Identity: ${config.villain_name || "Unchanged"}
+- Goal: ${config.primary_goal || "Unchanged"}
+- Methods: ${config.villain_methods || "Unchanged"}
+` : ''}
+
+DIRECTIVE: Acknowledge these changes and seamlessly integrate them into the ongoing narrative. 
+If the Mode changed (e.g., to Villain), shift the narrative voice immediately.
+         `;
+         await handleSendMessage(updatePrompt, false);
+    } else {
+        // Reset Standard
+        setHistory([]);
+        setGameState(INITIAL_STATE);
+        setIsInitialized(true);
+        
+        // Slight delay to allow state clear
+        setTimeout(async () => {
+           let startPrompt = `RE-CALIBRATE: Cluster: ${config.cluster}, Intensity: ${config.intensity}, Role: ${config.mode}, Perspective: ${config.perspective}`;
+           if (config.mode === 'Villain') {
+               startPrompt += `\nVILLAIN CONFIG: Name: ${config.villain_name}, Goal: ${config.primary_goal}, Appearance: ${config.villain_appearance}, Methods: ${config.villain_methods}, Victims: ${config.victim_description}`;
+           }
+           await handleSendMessage(startPrompt, true);
+        }, 500);
+    }
+  };
+
   if (showKeySelection) {
     return (
       <div className="fixed inset-0 bg-void flex items-center justify-center p-6 z-[300]">
@@ -134,9 +230,9 @@ const App: React.FC = () => {
            <StatusPanel 
                 gameState={gameState} 
                 onProcessAction={handleSendMessage} 
-                onOpenSimulation={() => {}} 
-                isTesting={false} 
-                onAbortTest={() => {}} 
+                onOpenSimulation={handleOpenSimulation} 
+                isTesting={isTesting} 
+                onAbortTest={() => setIsTesting(false)} 
             />
         </div>
         <div className="flex-1 flex flex-col h-full overflow-hidden">
@@ -150,6 +246,21 @@ const App: React.FC = () => {
             </div>
         </div>
       </div>
+
+      <SimulationModal
+        isOpen={isSimulationModalOpen}
+        onClose={handleCloseSimulation}
+        onRunSimulation={handleRunSimulationFromModal}
+        isTesting={isTesting}
+        simulationReport={simulationReport}
+        initialPerspective={gameState.meta.perspective}
+        initialMode={gameState.meta.mode}
+        initialStart="Prologue"
+        initialCluster={gameState.meta.active_cluster}
+        initialIntensity={gameState.meta.intensity_level}
+        isSessionActive={isInitialized}
+        currentVillainState={gameState.villain_state}
+      />
     </div>
   );
 };

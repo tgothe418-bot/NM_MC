@@ -56,8 +56,16 @@ export const VoiceControl: React.FC<VoiceControlProps> = ({ onProcessAction, onI
   const [selectedTtsVoiceId, setSelectedTtsVoiceId] = useState<string>(NARRATION_PROFILES[0].id);
 
   useEffect(() => {
-    // Initialize Gemini TTS voices (profiles)
-    setAvailableTtsVoices(ttsService.getVoices());
+    // The new service loads instantly (hardcoded profiles), so no polling needed.
+    const voices = ttsService.getVoices();
+    setAvailableTtsVoices(voices);
+    
+    // Default to 'The Storyteller' or first available
+    if (voices.length > 0) {
+        // We actually want to track PROFILE ID now, not voice name
+        setSelectedTtsVoiceId(voices[0].id);
+        ttsService.setProfile(voices[0].id);
+    }
     
     return () => {
       if (clientRef.current) {
@@ -98,7 +106,7 @@ export const VoiceControl: React.FC<VoiceControlProps> = ({ onProcessAction, onI
       ttsService.setEnabled(newState);
   };
 
-  const handleTtsProfileChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleProfileChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
       const id = e.target.value;
       setSelectedTtsVoiceId(id);
       ttsService.setProfile(id);
@@ -166,7 +174,7 @@ export const VoiceControl: React.FC<VoiceControlProps> = ({ onProcessAction, onI
                   <label className="text-[9px] text-gray-500 font-mono">Architectural Voice</label>
                   <select 
                       value={selectedTtsVoiceId}
-                      onChange={handleTtsProfileChange}
+                      onChange={handleProfileChange}
                       disabled={!ttsEnabled}
                       className="w-full bg-black border border-gray-700 text-gray-300 text-[10px] font-mono p-2 rounded focus:border-system-green outline-none disabled:opacity-50"
                   >
