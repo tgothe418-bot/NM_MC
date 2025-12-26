@@ -3,6 +3,8 @@ import { GoogleGenAI, Chat, Type } from "@google/genai";
 import { SIMULATOR_INSTRUCTION, NARRATOR_INSTRUCTION, PLAYER_SYSTEM_INSTRUCTION, ANALYST_SYSTEM_INSTRUCTION } from "../constants";
 import { SimulationConfig, GameState, RoomNode, NpcState } from "../types";
 import { constructRoomGenerationRules } from "./locationEngine";
+import { LORE_LIBRARY } from '../loreLibrary';
+import { STYLE_GUIDE } from './styleGuide';
 
 let chatSession: Chat | null = null;
 
@@ -502,29 +504,36 @@ export const generateCinematicVideo = async (prompt: string): Promise<string> =>
 export const hydrateUserCharacter = async (userDescription: string, activeCluster: string): Promise<Partial<NpcState>> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
+  // Dynamic construction of Lore Context
+  const loreKeys = Object.keys(LORE_LIBRARY);
+  const loreContext = loreKeys.map(k => {
+      const lore = LORE_LIBRARY[k];
+      return `- ${k.toUpperCase()}: ${lore.displayName} (${lore.mood})`;
+  }).join('\n');
+
+  // Dynamic construction of Style Context
+  const styleContext = STYLE_GUIDE.narrative_rules.join('\n');
+
   const prompt = `
-    ANALYSIS TASK: SEMANTIC RESONANCE MAPPING
+    ANALYSIS TASK: SEMANTIC RESONANCE MAPPING (V2.0)
     
-    INPUT: User Character Description: "${userDescription}"
-    CONTEXT: The current nightmare logic is "${activeCluster}".
+    [INPUT DATA]
+    User Character Description: "${userDescription}"
+    Active Simulation Cluster: "${activeCluster}"
     
-    OBJECTIVE: 
-    1. Analyze the input for thematic proximity to these Clusters: 
-       - FLESH (Biology, Body Horror, Wet)
-       - SYSTEM (Tech, Glitch, Cold, Industrial)
-       - HAUNTING (Ghosts, Memory, Dust)
-       - SURVIVAL (Cold, Hunger, Nature)
-       - BLASPHEMY (Religion, Dirt, Profanity)
-       - SELF (Identity, Mirrors, Psychology)
-       - DESIRE (Lust, Consumption, Heat)
-       
-    2. Construct a 'VoiceSignature' and 'PsychologicalProfile' that blends the User's description with the aesthetics of the detected Cluster.
+    [LORE REFERENCE]
+    The Nightmare Machine operates on these thematic frequencies:
+    ${loreContext}
     
-    EXAMPLE:
-    Input: "A frantic mother looking for her son."
-    Cluster Match: HAUNTING (Primary), FLESH (Secondary - familial bond).
-    Voice: Breathless, Broken syntax.
-    Psychology: Martyr complex.
+    [STYLE ENFORCEMENT]
+    Adhere to these narrative rules when designing the Voice/Psychology:
+    ${styleContext}
+    
+    [OBJECTIVE]
+    1. THEMATIC ALIGNMENT: Analyze the User Description. Determine its primary and secondary resonance with the LORE clusters.
+    2. VOICE SYNTHESIS: Construct a 'VoiceSignature' that reflects the character's origin BUT is corrupted by the 'Active Simulation Cluster'.
+       - If the cluster is SYSTEM, the voice should differ (detached, glitchy) vs FLESH (breathless, wet).
+    3. PSYCHOLOGICAL PROFILE: Define the 'Core Trauma' and 'Shadow Self' based on the intersection of the User's description and the Active Cluster's philosophy.
     
     Output must be valid JSON matching the schema.
   `;

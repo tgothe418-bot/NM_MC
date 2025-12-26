@@ -1,5 +1,3 @@
-
-
 import { 
   NpcState, 
   VoiceSignature, 
@@ -9,213 +7,142 @@ import { getDefaultDialogueState } from './dialogueEngine';
 import { hydrateUserCharacter } from './geminiService';
 
 /**
- * NPC GENERATOR ENGINE (V4.0 - MOSAIC CHARACTERIZATION)
+ * NPC GENERATOR ENGINE (V5.0 - REALISM & RESONANCE)
+ * Moves beyond "Cluster-Centrism" by generating a human first, 
+ * then applying the nightmare logic as a corrupting filter.
  */
 
-// --- DATA POOLS ---
+// --- REALISTIC DATA POOLS ---
 
-const ORIGIN_POOLS = {
-  "Americas": {
-    names_masc: ["Mateo", "Elijah", "Santiago", "Caleb", "Diego", "Wyatt", "Malik", "Dante", "Leo", "Julian"],
-    names_fem: ["Sofia", "Chloe", "Valentina", "Zoe", "Luna", "Maya", "Naomi", "Elena", "Ava", "Isabella"],
-    surnames: ["Reyes", "Washington", "Castillo", "Moreau", "Blackwood", "Vega", "Price", "Hayes", "Rivera", "Brooks"],
-    regions: ["New Orleans, USA", "Mexico City", "Vancouver, BC", "Sao Paulo, Brazil", "Chicago, USA", "Bogota, Colombia"]
-  },
-  "Euro_Slavic": {
-    names_masc: ["Dmitri", "Luka", "Nikolai", "Viktor", "Marek", "Adrian", "Elias", "Sebastian", "Felix", "Jasper"],
-    names_fem: ["Katya", "Elena", "Nadia", "Petra", "Ivana", "Sylvie", "Oksana", "Clara", "Freya", "Beatrix"],
-    surnames: ["Volkov", "Kovac", "Novak", "Dimitrov", "Petrov", "Sokolov", "Morozov", "Wagner", "Hoffman", "Weber"],
-    regions: ["Kyiv", "Prague", "Berlin", "St. Petersburg", "Warsaw", "Budapest", "Vienna"]
-  },
-  "Asia_Pacific": {
-    names_masc: ["Kenji", "Wei", "Arjun", "Hiro", "Min-ho", "Ravi", "Jin", "Ren", "Kai", "Akira"],
-    names_fem: ["Yuki", "Mei", "Priya", "Hana", "Ji-woo", "Leila", "Sora", "Aiko", "Yuna", "Emi"],
-    surnames: ["Tanaka", "Chen", "Patel", "Kim", "Yamamoto", "Singh", "Nguyen", "Lee", "Wu", "Gupta"],
-    regions: ["Tokyo", "Seoul", "Mumbai", "Shanghai", "Singapore", "Bangkok", "Manila"]
-  },
-  "West_Africa": {
-    names_masc: ["Kwame", "Amara", "Tunde", "Chidi", "Kofi", "Emeka", "Idris", "Zayn", "Malik", "Omar"],
-    names_fem: ["Zainab", "Nneka", "Amina", "Chioma", "Fatima", "Yara", "Imani", "Nia", "Asha", "Zola"],
-    surnames: ["Okonkwo", "Mensah", "Diallo", "Sow", "Adeybayo", "Conteh", "Traore", "Kamara"],
-    regions: ["Lagos", "Accra", "Dakar", "Nairobi", "Cairo", "Casablanca"]
-  }
-};
-
-const PSYCH_ARCHETYPES: Record<string, Partial<PsychologicalProfile>> = {
-  // --- THE RATIONALISTS ---
-  "The Skeptic": {
-    breaking_point_trigger: "Undeniable supernatural proof",
-    shadow_self: "The Catatonic",
-    moral_compass: 'Utilitarian'
-  },
-  "The Academic": {
-    breaking_point_trigger: "Illogic / Non-Euclidean geometry",
-    shadow_self: "The Cultist", // They worship what they cannot explain
-    moral_compass: 'Utilitarian'
-  },
-  "The Strategist": {
-    breaking_point_trigger: "Total loss of control / Chaos",
-    shadow_self: "The Tyrant", // Imposes order through cruelty
-    moral_compass: 'Utilitarian'
-  },
-  "The Medic": {
-    breaking_point_trigger: "Inability to heal a loved one",
-    shadow_self: "The Angel of Mercy", // Euthanizes to prevent suffering
-    moral_compass: 'Altruistic'
-  },
-
-  // --- THE EMOTIONALISTS ---
-  "The Martyr": {
-    breaking_point_trigger: "Failure to save a dependent",
-    shadow_self: "The Avenger",
-    moral_compass: 'Altruistic'
-  },
-  "The Nurturer": {
-    breaking_point_trigger: "Corruption of the innocent",
-    shadow_self: "The Devourer", // Consumes to keep them "safe" inside
-    moral_compass: 'Altruistic'
-  },
-  "The Lover": {
-    breaking_point_trigger: "Betrayal or loss of the beloved",
-    shadow_self: "The Stalker",
-    moral_compass: 'Self-Preserving' // Preserving the "Us"
-  },
-  "The Artist": {
-    breaking_point_trigger: "Destruction of their life's work",
-    shadow_self: "The Vandal", // Destroys all beauty
-    moral_compass: 'Nihilistic'
-  },
-
-  // --- THE SURVIVORS ---
-  "The Rat": {
-    breaking_point_trigger: "Imminent physical pain",
-    shadow_self: "The Collaborator",
-    moral_compass: 'Self-Preserving'
-  },
-  "The Soldier": {
-    breaking_point_trigger: "Betrayal by command / Futility",
-    shadow_self: "The Butcher",
-    moral_compass: 'Utilitarian'
-  },
-  "The Loner": {
-    breaking_point_trigger: "Forced intimacy / Crowds",
-    shadow_self: "The Solipsist", // Believes others aren't real
-    moral_compass: 'Self-Preserving'
-  },
-  "The Scavenger": {
-    breaking_point_trigger: "Starvation / Total lack of resources",
-    shadow_self: "The Hoarder",
-    moral_compass: 'Self-Preserving'
-  },
-
-  // --- THE BROKEN ---
-  "The Addict": {
-    breaking_point_trigger: "Withdrawal / Sobriety",
-    shadow_self: "The Fiend",
-    moral_compass: 'Nihilistic'
-  },
-  "The Guilt-Ridden": {
-    breaking_point_trigger: "Forgiveness (They cannot accept it)",
-    shadow_self: "The Flagellant", // Seeks pain as penance
-    moral_compass: 'Altruistic'
-  },
-  "The Nihilist": {
-    breaking_point_trigger: "Proof of a benevolent God/Meaning",
-    shadow_self: "The Zealot", // Clings to the new meaning violently
-    moral_compass: 'Nihilistic'
-  },
-  "The Innocent": {
-    breaking_point_trigger: "Direct participation in violence",
-    shadow_self: "The Conduit", // Empty vessel for the horror
-    moral_compass: 'Altruistic'
-  },
-
-  // --- THE SOCIAL ---
-  "The Leader": {
-    breaking_point_trigger: "Mutiny / Loss of respect",
-    shadow_self: "The Pariah",
-    moral_compass: 'Utilitarian'
-  },
-  "The Follower": {
-    breaking_point_trigger: "Death of the Leader",
-    shadow_self: "The Fanatic", // Will follow *anything* else
-    moral_compass: 'Altruistic'
-  },
-  "The Hedonist": {
-    breaking_point_trigger: "Sensory deprivation",
-    shadow_self: "The Masochist", // Pain is the only sensation left
-    moral_compass: 'Self-Preserving'
-  },
-  "The Gossip": {
-    breaking_point_trigger: "Silence / Being ignored",
-    shadow_self: "The Screamer",
-    moral_compass: 'Self-Preserving'
-  }
-};
-
-const TRAUMAS = [
-  // Physical / Survival
-  "Sole survivor of a house fire that killed their twin.",
-  "Spent 3 days trapped in a collapsed mine listening to others die.",
-  "Was a child soldier in a conflict no one remembers.",
-  "Survived a plane crash by eating the other passengers.",
-  "Lost an arm in industrial machinery; sometimes feels it grasping.",
-  "Buried alive for six hours due to a prank gone wrong.",
-  "Drifted at sea for weeks, drinking turtle blood.",
-
-  // Medical / Biological
-  "Accidentally administered a fatal dose to a pediatric patient.",
-  "Woke up during surgery but couldn't move or scream.",
-  "Born with a parasitic twin that was surgically removed.",
-  "Participated in a drug trial that erased their childhood memories.",
-  "Their body rejected a heart transplant from a murderer.",
-  "Carries a dormant, unknown virus from a deep-jungle expedition.",
-
-  // Psychological / Social
-  "Witnessed a parent's suicide on their 10th birthday.",
-  "Sold out their sibling to clear a gambling debt.",
-  "Gaslit their spouse into an asylum to steal an inheritance.",
-  "Lost a child in a crowd and never found them.",
-  "Was the favorite child of a serial killer.",
-  "Catfished someone who then committed suicide on livestream.",
-  "Stalked by a stranger who looked exactly like them for a year.",
-
-  // Cosmic / Weird
-  "Saw something in a telescope that looked back.",
-  "Read a book that didn't exist, and now quotes it in sleep.",
-  "Discovered a hidden room in their house where someone had been living.",
-  "Received phone calls from their own number for a month.",
-  "Found their own obituary in a newspaper from 1950.",
-  "Cannot recognize faces (Prosopagnosia) after a lightning strike.",
-  "Has a recurring dream of drowning in a city of black geometry."
+const JOBS = [
+  "Structural Engineer", "Pediatric Nurse", "Sous Chef", "Data Archivist", 
+  "Long-haul Trucker", "Botanist", "High School History Teacher", "Paramedic", 
+  "Corporate Lawyer", "Janitor", "Software Developer", "Art Restorer", 
+  "Yoga Instructor", "Crime Scene Cleaner", "Librarian", "Electrician"
 ];
 
-const HOBBIES = ["Mycology", "Radio Repair", "Taxidermy", "Lockpicking", "Urban Exploration", "Botany", "Violin", "Chess", "Sketching", "Astronomy", "Genealogy", "Origami", "Photography", "Poetry", "Knitting", "Insect Collection", "Watchmaking", "Cryptography", "Anatomy", "Natural Philosophy", "Cartography", "Fire Building", "Scavenging", "Journaling", "Gourmet Cooking", "Hacking", "Serial Killer History"];
+const CORE_DRIVES = [
+  "To atone for a past mistake",
+  "To get back to their children",
+  "To finish their life's work",
+  "To prove they aren't crazy",
+  "To find the person they lost",
+  "To document the truth",
+  "To purely survive, no matter the cost"
+];
+
+// Mapped to specific clusters to create thematic resonance
+const CLUSTER_SPECIFIC_TRAUMAS: Record<string, string[]> = {
+  "Flesh": [
+    "Woke up during surgery and couldn't scream.",
+    "Lost a limb that they can still feel itching.",
+    "Witnessed a birth that went horribly wrong.",
+    "Has a rare skin condition that makes them sensitive to touch."
+  ],
+  "System": [
+    "Erased from all government databases overnight.",
+    "Hearing a specific frequency that predicts bad events.",
+    "Worked in content moderation and saw 'The Video'.",
+    "Has a pacemaker that sometimes hums a tune."
+  ],
+  "Haunting": [
+    "Inherited a house where the doors locked themselves.",
+    "Can't remember the face of their dead spouse.",
+    "Found their own obituary in a library archive.",
+    "Smells their grandmother's perfume before accidents happen."
+  ],
+  "Survival": [
+    "Survived a plane crash by eating the dead.",
+    "Trapped in a cave for three days with a broken leg.",
+    "Lost a child to hypothermia on a camping trip.",
+    "Was buried alive as a prank that went too long."
+  ],
+  "Self": [
+    "Suffers from Capgras Delusion (thinks loved ones are imposters).",
+    "Has no memory of their life before age 10.",
+    "Constantly sees their own doppelganger in crowds.",
+    "Believes they are a character in a story."
+  ],
+  "Blasphemy": [
+    "Raised in a cult that worshipped decay.",
+    "Accidentally desecrated a grave and feels cursed.",
+    "Witnessed a miracle that was actually horrific.",
+    "Has intrusive thoughts about defiling sacred objects."
+  ],
+  "Desire": [
+    "Stalked an ex-lover until they disappeared.",
+    "Addicted to the feeling of fear.",
+    "Has a history of falling in love with dangerous people.",
+    "Ruined their family for a moment of pleasure."
+  ]
+};
+
+const GENERIC_TRAUMAS = [
+  "Witnessed a violent crime.",
+  "Lost everything in a house fire.",
+  "Betrayed by a sibling for money.",
+  "Survived a terminal illness against odds."
+];
+
+// Personality Traits (The Big 5 Model - Simplified)
+const PERSONALITY_TRAITS = [
+  { label: "The Stoic", high: ["Resilient", "Calm"], low: ["Detached", "Cold"] },
+  { label: "The Neurotic", high: ["Alert", "Sensitive"], low: ["Anxious", "Volatile"] },
+  { label: "The Empath", high: ["Caring", "Insightful"], low: ["Overwhelmed", "Fragile"] },
+  { label: "The Analyst", high: ["Logical", "Prepared"], low: ["Cynical", "Rigid"] },
+  { label: "The Charmer", high: ["Persuasive", "Social"], low: ["Manipulative", "Fake"] }
+];
+
+const ORIGIN_POOLS = {
+  "Global_North": {
+    names: ["James", "Sarah", "Michael", "Emily", "David", "Jessica", "Robert", "Jennifer"],
+    surnames: ["Smith", "Johnson", "Williams", "Brown", "Jones", "Miller", "Davis"],
+    regions: ["Chicago", "London", "Toronto", "Berlin", "Seattle"]
+  },
+  "Global_South": {
+    names: ["Mateo", "Sofia", "Alejandro", "Valentina", "Gabriel", "Camila"],
+    surnames: ["Garcia", "Rodriguez", "Martinez", "Hernandez", "Lopez"],
+    regions: ["Mexico City", "Buenos Aires", "Sao Paulo", "Bogota"]
+  },
+   "East_Asia": {
+    names: ["Kenji", "Yuki", "Wei", "Mei", "Jin", "Hana"],
+    surnames: ["Tanaka", "Chen", "Kim", "Lee", "Wong"],
+    regions: ["Tokyo", "Seoul", "Shanghai", "Singapore"]
+  }
+};
 
 const pickRandom = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 const pickRandomKey = (obj: any) => Object.keys(obj)[Math.floor(Math.random() * Object.keys(obj).length)];
 
 export const generateProceduralNpc = (clusterName: string = "Flesh", intensity: string = "Level 3", startingPoint: string = "Prologue"): NpcState => {
   
-  // Calculate numeric intensity for scaling
   const intensityLevel = parseInt(intensity.replace(/\D/g, '')) || 3;
   const isHighIntensity = intensityLevel >= 4;
 
-  // 1. Select Cultural Origin
+  // 1. Generate Base Human (Cluster Agnostic)
   const originKey = pickRandomKey(ORIGIN_POOLS);
   const pool = ORIGIN_POOLS[originKey as keyof typeof ORIGIN_POOLS];
-  const gender = Math.random() > 0.5 ? 'masc' : 'fem';
-  const firstName = gender === 'masc' ? pickRandom(pool.names_masc) : pickRandom(pool.names_fem);
-  const lastName = pickRandom(pool.surnames);
+  const name = `${pickRandom(pool.names)} ${pickRandom(pool.surnames)}`;
   const region = pickRandom(pool.regions);
+  const job = pickRandom(JOBS);
+  const drive = pickRandom(CORE_DRIVES);
+  const personality = pickRandom(PERSONALITY_TRAITS);
 
-  // 2. Select Psychology
-  const archKey = pickRandomKey(PSYCH_ARCHETYPES);
-  const basePsych = PSYCH_ARCHETYPES[archKey];
-  const trauma = pickRandom(TRAUMAS);
-  const hobby = pickRandom(HOBBIES);
+  // 2. Select Trauma (Cluster Informed)
+  // 50% chance to have a trauma specifically related to the active cluster (Thematic Resonance)
+  // 50% chance to have a generic trauma (Realistic randomness)
+  const useClusterTrauma = Math.random() > 0.5;
+  // Normalize cluster key to match dictionary
+  const normalizedCluster = Object.keys(CLUSTER_SPECIFIC_TRAUMAS).find(k => clusterName.includes(k)) || "Flesh";
+  
+  const trauma = useClusterTrauma 
+    ? pickRandom(CLUSTER_SPECIFIC_TRAUMAS[normalizedCluster] || GENERIC_TRAUMAS)
+    : pickRandom(GENERIC_TRAUMAS);
 
-  // 3. Construct Voice Signature
+  // 3. Construct "Corruption" (How the cluster affects them)
+  const richOrigin = `A ${personality.label.toLowerCase()} ${job} from ${region}. Driven to ${drive.toLowerCase()}. Trauma: ${trauma}`;
+
+  // 4. Voice Signature
   const voiceSig: VoiceSignature = {
     rhythm: pickRandom(['Staccato', 'Lyrical', 'Breathless', 'Monotone', 'Erratic']),
     syntax_complexity: pickRandom(['Simple', 'Academic', 'Broken', 'Flowery']),
@@ -225,21 +152,14 @@ export const generateProceduralNpc = (clusterName: string = "Flesh", intensity: 
       ["Chews lip", "Checks watch"],
       ["Hums unconsciously", "Clenches jaw"],
       ["Touches holy symbol", "Whispers prayers"],
-      ["Scratches phantom itch", "Cracks knuckles"],
-      ["Stares at light sources", "Picks at skin"]
+      ["Scratches phantom itch", "Cracks knuckles"]
     ]),
     cultural_markers: [region]
   };
 
-  const richOrigin = `From ${region}. ${archKey}. ${trauma} They speak with a ${voiceSig.rhythm} rhythm. Their hobby of ${hobby.toLowerCase()} masks a deep anxiety.`;
-
-  // 4. Determine Flaws & Personality
-  const flaw = pickRandom(["Cowardice", "Greed", "Wrath", "Envy", "Pride", "Sloth", "Lust", "Addiction", "Fanaticism"]);
-  const trait = pickRandom(["Resourceful", "Paranoid", "Charming", "Aggressive", "Stoic", "Manic"]);
-
   return {
-    name: `${firstName} ${lastName}`,
-    archetype: archKey,
+    name: name,
+    archetype: `${personality.label} (${job})`, // E.g., "The Stoic (Nurse)"
     origin: {
       region: region,
       ethnicity: originKey,
@@ -247,29 +167,28 @@ export const generateProceduralNpc = (clusterName: string = "Flesh", intensity: 
     },
     background_origin: richOrigin,
     hidden_agenda: {
-      goal: "Survive at any cost",
-      constraint: "Must not reveal the trauma",
+      goal: drive, // Their realistic drive becomes their agenda
+      constraint: "Must keep their trauma secret",
       progress_level: 0
     },
     psychology: {
       stress_level: intensityLevel * 10,
-      current_thought: "Keep moving.",
+      current_thought: "Just keep moving.",
       dominant_instinct: pickRandom(['Fight', 'Flight', 'Freeze', 'Fawn']),
       sanity_percentage: 100,
       resilience_level: isHighIntensity ? 'Fragile' : 'Moderate',
       emotional_state: "Anxious",
       profile: {
-        archetype: archKey,
+        archetype: personality.label,
         core_trauma: trauma,
-        breaking_point_trigger: basePsych.breaking_point_trigger!,
-        shadow_self: basePsych.shadow_self!,
-        moral_compass: (basePsych.moral_compass as any) || 'Self-Preserving'
+        breaking_point_trigger: "Confrontation with the specific trauma",
+        shadow_self: `The Corrupted ${job}`, // E.g., "The Corrupted Nurse"
+        moral_compass: pickRandom(['Altruistic', 'Utilitarian', 'Self-Preserving'])
       }
     },
     dialogue_state: {
       ...getDefaultDialogueState(richOrigin),
       voice_signature: voiceSig,
-      // Map legacy profile for UI compatibility
       voice_profile: { 
         tone: voiceSig.rhythm, 
         vocabulary: [], 
@@ -281,80 +200,33 @@ export const generateProceduralNpc = (clusterName: string = "Flesh", intensity: 
     fracture_state: 0,
     consciousness: "Alert",
     personality: {
-        dominant_trait: trait,
-        fatal_flaw: flaw,
-        coping_mechanism: pickRandom(["Prayer", "Dissociation", "Violence", "Self-Harm"]),
-        moral_alignment: basePsych.moral_compass || "Neutral"
-    },
-    physical: {
-        height: pickRandom(["Tall", "Short", "Average"]),
-        build: pickRandom(["Wiry", "Heavy", "Athletic", "Frail"]),
-        distinguishing_feature: pickRandom(["Scarred hands", "Piercing eyes", "Twitchy posture", "Immaculate clothing", "Smell of tobacco"]),
-        clothing_style: "Worn utilitarian"
+        dominant_trait: pickRandom(personality.high),
+        fatal_flaw: pickRandom(personality.low),
+        coping_mechanism: pickRandom(["Rationalization", "Prayer", "Humor", "Dissociation"]),
+        moral_alignment: "Neutral"
     },
     relationship_state: { trust: 25, fear: intensityLevel * 10, secretKnowledge: isHighIntensity },
-    relationships_to_other_npcs: {},
-    memory_stream: [],
     current_intent: { goal: 'Survive', target: 'Self', urgency: 5 },
+    // Defaults for compatibility
     knowledge_state: [],
-    physical_state: "Tense",
-    willpower: isHighIntensity ? 30 : 60,
-    devotion: isHighIntensity ? 20 : 40,
-    resources_held: [hobby], // They often carry items related to their hobby
-    trust_level: 1,
-    agency_level: "Low",
-    narrative_role: "Survivor",
-    pain_level: 0,
-    shock_level: 0,
-    mobility_score: 100,
-    manipulation_score: 100,
-    perception_score: 100,
-    fracture_vectors: { fear: intensityLevel * 10, isolation: 10, guilt: 20, paranoia: 10 },
-    current_state: "Active",
-    disassociation_index: 0,
-    secondary_goal: "Redemption"
+    fracture_vectors: { fear: 10, isolation: 10, guilt: 10, paranoia: 10 }
   };
 };
 
-/**
- * ASYNC FACTORY: Creates an NPC either procedurally OR via Semantic Resonance 
- * if a user description is provided.
- */
 export const createNpcFactory = async (
   cluster: string, 
   intensity: string, 
   userDescription?: string
 ): Promise<NpcState> => {
-  
-  // PATH A: High-Fidelity User Character (Semantic Resonance)
   if (userDescription && userDescription.trim().length > 5) {
     try {
       const hydratedPartial = await hydrateUserCharacter(userDescription, cluster);
-      
-      // Merge with required runtime fields that might be missing from the LLM response
-      const base = generateProceduralNpc(cluster, intensity); // Get a "skeleton" for safe defaults
-      
-      return {
-        ...base, // Use base for stats like health/fracture vectors
-        ...hydratedPartial, // Overwrite identity/voice/psychology with LLM data
-        // Ensure deeply nested objects are merged correctly if needed
-        psychology: {
-          ...base.psychology,
-          ...hydratedPartial.psychology,
-          // Ensure profile is correctly set if partial has it
-          profile: hydratedPartial.psychology?.profile || base.psychology.profile
-        },
-        dialogue_state: {
-             ...base.dialogue_state,
-             ...(hydratedPartial.dialogue_state || {}),
-        }
-      };
+      const base = generateProceduralNpc(cluster, intensity);
+      return { ...base, ...hydratedPartial };
     } catch (e) {
       console.warn("Semantic Resonance Failed, falling back to procedural:", e);
       return generateProceduralNpc(cluster, intensity);
     }
   }
-
-  // PATH B: Pure Procedural (Mosaic)
   return generateProceduralNpc(cluster, intensity);
 };

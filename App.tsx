@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { StatusPanel } from './components/StatusPanel';
 import { StoryLog } from './components/StoryLog';
@@ -62,7 +61,7 @@ const App: React.FC = () => {
 
   // --- AUTO-PILOT LOGIC ---
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: ReturnType<typeof setTimeout>;
 
     const runAutoTurn = async () => {
       if (autoMode.active && autoMode.remainingCycles > 0 && !isLoading && isInitialized) {
