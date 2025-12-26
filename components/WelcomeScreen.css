@@ -1,4 +1,5 @@
-/* Container: Deep, dark gradient for depth instead of flat black */
+
+/* Container: Deeper, oppressive darkness */
 .welcome-container {
     position: fixed;
     inset: 0;
@@ -7,76 +8,189 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    /* A very deep charcoal-to-blood gradient */
-    background: linear-gradient(135deg, #050505 0%, #1a0505 100%);
+    background: radial-gradient(circle at center, #1a0000 0%, #000000 100%);
     overflow: hidden;
     font-family: 'Courier New', Courier, monospace;
     user-select: none;
 }
 
-/* Texture: CRT Scanlines */
-.scanlines {
+/* Claustrophobic Vignette */
+.vignette {
     position: absolute;
     inset: 0;
+    background: radial-gradient(circle, transparent 30%, black 100%);
+    z-index: 215;
     pointer-events: none;
-    /* Creates a subtle horizontal line pattern */
-    background: linear-gradient(to bottom, rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%);
-    background-size: 100% 4px;
-    z-index: 210;
 }
 
-/* Animation: Smooth Entrance (Fade In + Slide Up) */
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(30px) scale(0.95);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
+/* Static Noise Overlay */
+.static-noise {
+    position: absolute;
+    inset: 0;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 211;
 }
 
-.content-entrance {
-    /* Plays the entrance animation once on load */
-    animation: fadeInUp 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+/* Watcher Effects */
+.watcher-overlay {
+    position: absolute;
+    inset: 0;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 4rem; /* Generous spacing for a premium feel */
-    z-index: 220;
-    width: 100%;
-    max-width: 90vw;
+    opacity: 0;
+    transition: opacity 0.1s ease;
+    z-index: 205;
+}
+
+.watcher-overlay.visible {
+    opacity: 0.15;
+    animation: eye-flicker 1s infinite;
+}
+
+.watcher-eyes {
+    display: flex;
+    gap: 100px;
+    color: #ff0000;
+}
+
+.eye-icon {
+    width: 40px;
+    height: 40px;
+    filter: drop-shadow(0 0 10px red);
+}
+
+/* Spectral Whispers */
+.whisper-text {
+    position: absolute;
+    top: 15%;
+    color: rgba(255, 255, 255, 0.2);
+    font-size: 0.8rem;
+    letter-spacing: 0.8em;
+    opacity: 0;
+    transition: all 1s ease;
+    text-transform: uppercase;
+}
+
+.whisper-text.active {
+    opacity: 1;
+    transform: translateY(-20px);
+    filter: blur(1px);
+}
+
+/* Heartbeat Button Animation */
+@keyframes heartbeat {
+    0% { transform: scale(1); box-shadow: 0 0 0px rgba(255, 0, 0, 0); }
+    10% { transform: scale(1.05); box-shadow: 0 0 20px rgba(255, 0, 0, 0.3); }
+    20% { transform: scale(1); }
+    30% { transform: scale(1.02); }
+    40% { transform: scale(1); }
+}
+
+.spooky-pulse {
+    animation: heartbeat 2s infinite ease-in-out;
+}
+
+.enter-button {
+    background: rgba(40, 0, 0, 0.4);
+    border: 1px solid #660000;
+    color: #ff3333;
+    padding: 2rem 6rem;
+    font-size: 1.5rem;
+    letter-spacing: 0.5em;
+    cursor: pointer;
+    overflow: hidden;
+    position: relative;
+    margin-top: 5vh; /* Reduced slightly to account for larger text below */
+    transition: all 0.3s ease;
+}
+
+.enter-button:hover {
+    background: rgba(60, 0, 0, 0.6);
+    box-shadow: 0 0 30px rgba(255, 0, 0, 0.2);
+}
+
+.blood-shine {
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 0, 0, 0.4), transparent);
+    transform: skewX(-25deg);
+    animation: blood-slide 5s infinite;
+}
+
+@keyframes blood-slide {
+    0% { left: -150%; }
+    20% { left: 150%; }
+    100% { left: 150%; }
+}
+
+/* Screen Shake during Glitch */
+.screen-shake {
+    animation: shake 0.1s infinite;
+}
+
+@keyframes shake {
+    0% { transform: translate(1px, 1px) rotate(0deg); }
+    25% { transform: translate(-1px, -2px) rotate(-1deg); }
+    50% { transform: translate(-3px, 0px) rotate(1deg); }
+    75% { transform: translate(3px, 2px) rotate(0deg); }
+    100% { transform: translate(1px, -1px) rotate(-1deg); }
+}
+
+.warning-text {
+    color: #ff3333;
+    font-size: 0.85rem;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    text-align: center;
+    text-shadow: 0 0 15px rgba(255, 0, 0, 0.6);
+    line-height: 1.6;
+    text-transform: uppercase;
+}
+
+@keyframes eye-flicker {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
 }
 
 /* Typography: The Main "THE" */
 .title-primary {
-    font-size: clamp(4rem, 10vw, 8rem); /* Responsive sizing */
+    font-size: clamp(8rem, 25vw, 18rem);
     font-weight: 900;
-    letter-spacing: 0.2em; /* Wide spacing */
+    letter-spacing: 0.1em;
     color: #e0e0e0;
     text-transform: uppercase;
     position: relative;
-    line-height: 1;
-    /* Subtle throb animation */
+    line-height: 0.9;
     animation: text-throb 4s ease-in-out infinite;
+    text-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
 }
 
 /* Typography: "NIGHTMARE MACHINE" */
 .title-secondary {
-    font-size: clamp(1.5rem, 4vw, 3rem);
+    font-size: clamp(2.5rem, 7vw, 6rem);
     font-weight: 700;
-    letter-spacing: 0.4em; /* Extremely wide spacing */
+    letter-spacing: 0.4em;
     color: #a0a0a0;
     text-transform: uppercase;
     position: relative;
     text-align: center;
-    margin-top: 1rem;
+    margin-top: 2rem;
     animation: text-throb 5s ease-in-out infinite reverse;
+    text-shadow: 0 0 15px rgba(0, 0, 0, 0.8);
 }
 
-/* Effects: Chromatic Aberration (The red/blue split) */
+/* Keyframes */
+@keyframes text-throb {
+    0%, 100% { filter: drop-shadow(0 0 10px rgba(255,255,255,0.1)); opacity: 1; }
+    50% { filter: drop-shadow(0 0 25px rgba(255,255,255,0.3)); opacity: 0.9; }
+}
+
 .aberration-layer {
     position: absolute;
     inset: 0;
@@ -97,7 +211,6 @@
     animation: glitch-anim-2 3s infinite linear alternate-reverse;
 }
 
-/* Effects: Background Fog/Lights */
 .fog-layer {
     position: absolute;
     inset: 0;
@@ -113,33 +226,37 @@
     animation: beam-slide 10s ease-in-out infinite;
 }
 
-/* Button Styling */
-.enter-button {
-    position: relative;
-    background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #ff3333;
-    padding: 1.5rem 4rem;
-    font-size: 1.25rem;
-    letter-spacing: 0.5em;
-    font-weight: 700;
-    text-transform: uppercase;
-    cursor: pointer;
-    overflow: hidden;
-    transition: all 0.3s ease;
+.scanlines {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(to bottom, rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%);
+    background-size: 100% 4px;
+    z-index: 210;
 }
 
-.enter-button:hover {
-    background: rgba(255, 0, 0, 0.05);
-    border-color: #ff3333;
-    box-shadow: 0 0 30px rgba(255, 0, 0, 0.2);
-    letter-spacing: 0.6em; /* Expands slightly on hover */
+.content-entrance {
+    animation: fadeInUp 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6vh;
+    z-index: 220;
+    width: 100%;
+    max-width: 95vw;
+    padding-bottom: 5vh;
 }
 
-/* Keyframes */
-@keyframes text-throb {
-    0%, 100% { filter: drop-shadow(0 0 10px rgba(255,255,255,0.1)); opacity: 1; }
-    50% { filter: drop-shadow(0 0 25px rgba(255,255,255,0.3)); opacity: 0.9; }
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
 @keyframes glitch-anim-1 {
