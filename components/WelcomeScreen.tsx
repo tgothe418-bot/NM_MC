@@ -72,7 +72,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
   }, [whisper, watcherActive]);
 
   return (
-    <div className={`welcome-container ${isGlitching ? 'screen-shake' : ''}`}>
+    <div className="welcome-container">
       <div className="vignette"></div>
       
       <svg className="hidden">
@@ -109,7 +109,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
         
         <ChevronUp className="text-red-900 w-6 h-6 opacity-20 animate-bounce" />
           
-        <div className="flex flex-col items-center">
+        <div className="title-wrapper">
             <div 
               className="relative transition-all duration-75"
               style={{ filter: isGlitching ? 'url(#distort)' : 'none' }}
@@ -122,7 +122,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
             </div>
 
             <div 
-              className="relative mt-4 transition-all duration-75"
+              className="relative transition-all duration-75"
               style={{ filter: isGlitching ? 'url(#distort)' : 'none' }}
             >
                 <h1 className="title-secondary">
@@ -138,19 +138,23 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
             onClick={onStart}
             className="enter-button spooky-pulse"
           >
-            <span className="relative z-10">ABANDON HOPE</span>
+            <span className="relative z-10">INITIALIZE SIMULATION</span>
             <div className="blood-shine"></div>
           </button>
         </div>
       </div>
 
       <div className="absolute bottom-8 w-full px-6 flex justify-center z-50 pointer-events-none">
-          <div className="flex items-center gap-6 bg-black/60 p-6 border border-red-900/40 rounded-sm backdrop-blur-sm pointer-events-auto max-w-4xl shadow-[0_0_30px_rgba(255,0,0,0.1)]">
-            <Skull className="w-10 h-10 text-red-600 animate-pulse flex-shrink-0" />
+          <div 
+            className="flex items-center gap-6 bg-black/60 p-6 border border-red-900/40 rounded-sm backdrop-blur-sm pointer-events-auto max-w-4xl shadow-[0_0_30px_rgba(255,0,0,0.1)]"
+            role="alert"
+            aria-label="Warning"
+          >
+            <Skull className="w-10 h-10 text-red-600 animate-pulse flex-shrink-0" aria-hidden="true" />
             <p className="warning-text">
                 WARNING: THIS IS A HORROR SIMULATOR THAT HAS NO ETHICAL LIMITS.<br />BE CAUTIOUS AND DO NOT ASK FOR MORE THAN YOU ARE OK WITH.
             </p>
-            <Skull className="w-10 h-10 text-red-600 animate-pulse flex-shrink-0" />
+            <Skull className="w-10 h-10 text-red-600 animate-pulse flex-shrink-0" aria-hidden="true" />
           </div>
       </div>
     </div>

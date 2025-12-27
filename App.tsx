@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { StatusPanel } from './components/StatusPanel';
 import { StoryLog } from './components/StoryLog';
@@ -15,7 +16,7 @@ import { createNpcFactory } from './services/npcGenerator';
 import { Terminal, Lock, Key, Activity } from 'lucide-react';
 
 const INITIAL_STATE: GameState = {
-  meta: { turn: 0, perspective: "Pending", mode: 'Pending', intensity_level: "Level 1", active_cluster: "None" },
+  meta: { turn: 50, perspective: "Pending", mode: 'Pending', intensity_level: "Level 1", active_cluster: "None" },
   villain_state: { name: "Unknown", archetype: "Unknown", threat_scale: 0, primary_goal: "Dormant", current_tactic: "Dormant" },
   npc_states: [],
   location_state: getDefaultLocationState(),
@@ -185,24 +186,23 @@ const App: React.FC = () => {
       });
     }
 
-    // Determine pacing vars based on starting_point
-    let startTurn = 1;
+    // Determine pacing vars based on starting_point (COUNTDOWN LOGIC)
+    let startTurn = 50; // Default Prologue (40+ turns remaining)
     let startThreat = 1;
-    let pacingInstruction = "PACING: SLOW BURN. Establish atmosphere before threat.";
+    let pacingInstruction = "PACING: PROLOGUE (40+ Turns Left). Slow burn. Establish atmosphere.";
 
     if (config.starting_point === 'In Media Res') {
-        startTurn = 20;
+        startTurn = 20; // 15-25 range
         startThreat = 3;
-        pacingInstruction = "PACING: IMMEDIATE ACTION. The user is already in danger. Bypass introductions. The threat is active and present.";
+        pacingInstruction = "PACING: IN MEDIA RES (20 Turns Left). Immediate danger. Bypass introductions.";
     } else if (config.starting_point === 'Climax') {
-        startTurn = 45;
+        startTurn = 8; // 0-10 range
         startThreat = 5;
-        pacingInstruction = "PACING: CLIMAX. The end is here. High stakes, immediate confrontation. Maximum intensity. No buildup.";
+        pacingInstruction = "PACING: CLIMAX (8 Turns Left). The end is here. High stakes, immediate confrontation.";
     }
     
     // CONSTRUCT INITIAL STATE FROM CONFIG
     // This ensures fidelity from Turn 0 by passing the configured state directly to the simulator
-    // instead of relying on generic defaults or prompts alone.
     
     // 1. Location
     const initialLocation = getDefaultLocationState(config.cluster);
@@ -270,7 +270,7 @@ const App: React.FC = () => {
     - Theme: ${config.cluster} (${config.intensity})
     - Visual Style: ${config.visual_motif || "Standard"}
     - Starting Location: ${config.location_description || "Standard"}
-    - Temporal Point: ${config.starting_point} (Start at Turn ${startTurn})
+    - Temporal Point: ${config.starting_point} (T-Minus ${startTurn} Turns)
     
     ${pacingInstruction}
     `;
@@ -411,7 +411,11 @@ If the Mode changed (e.g., to Villain), shift the narrative voice immediately.
             </div>
             <StoryLog history={history} isLoading={isLoading} activeCluster={gameState.meta.active_cluster} />
             <div className="p-8 bg-gradient-to-t from-black to-transparent">
-                <InputArea onSend={handleSendMessage} isLoading={isLoading || autoMode.active} />
+                <InputArea 
+                  onSend={handleSendMessage} 
+                  isLoading={isLoading || autoMode.active} 
+                  onAdvance={() => handleSendMessage("( The protagonist pauses, letting the moment stretch. )")}
+                />
             </div>
         </div>
       </div>

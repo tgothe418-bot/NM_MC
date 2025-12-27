@@ -9,9 +9,9 @@ interface SetupOverlayProps {
 }
 
 const STARTING_POINT_OPTIONS = [
-  { id: 'Prologue', label: 'Prologue', desc: 'The Slow Burn (Turns 0-10)' },
-  { id: 'In Media Res', label: 'In Media Res', desc: 'Active Threat (Turns 15-25)' },
-  { id: 'Climax', label: 'The Climax', desc: 'Immediate Finale (Turns 40+)' },
+  { id: 'Prologue', label: 'Prologue', desc: 'The Slow Burn (50 Turns Remaining)' },
+  { id: 'In Media Res', label: 'In Media Res', desc: 'Active Threat (25 Turns Remaining)' },
+  { id: 'Climax', label: 'The Climax', desc: 'Immediate Finale (10 Turns Remaining)' },
 ];
 
 const CLUSTER_OPTIONS = [

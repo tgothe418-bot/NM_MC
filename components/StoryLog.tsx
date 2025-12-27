@@ -50,9 +50,23 @@ const getAccentColor = (cluster?: string) => {
 };
 
 const applyTypographicAnomalies = (text: string): React.ReactNode[] => {
-  const regex = /(\b(?:house|home|dwelling|hallway|hallways|corridor|room|rooms|walls|structure|place)\b|\b(?:minotaur|beast|monster|threat|horror)\b|\b(?:russet|crimson lake|crimson|cerulean sky|cerulean|cobalt|vermilion|ochre|umber|sienna|viridian)\b)/gi;
-  const parts = text.split(regex);
+  // Matches ANSI codes for Blue (34) and Red (31), plus existing keywords
+  const regex = /(\x1b\[34m[\s\S]*?\x1b\[0m)|(\x1b\[31m[\s\S]*?\x1b\[0m)|(\b(?:house|home|dwelling|hallway|hallways|corridor|room|rooms|walls|structure|place)\b|\b(?:minotaur|beast|monster|threat|horror)\b|\b(?:russet|crimson lake|crimson|cerulean sky|cerulean|cobalt|vermilion|ochre|umber|sienna|viridian)\b)/gi;
+  
+  const parts = text.split(regex).filter(p => p);
+  
   return parts.map((part, index) => {
+    // ANSI Blue - System/Cold/Structure
+    if (part.startsWith('\x1b[34m')) {
+        const content = part.replace(/\x1b\[34m|\x1b\[0m/g, '');
+        return <span key={index} className="text-blue-400 font-bold drop-shadow-[0_0_8px_rgba(96,165,250,0.5)] animate-pulse">{content}</span>;
+    }
+    // ANSI Red - Flesh/Danger/Violence
+    if (part.startsWith('\x1b[31m')) {
+        const content = part.replace(/\x1b\[31m|\x1b\[0m/g, '');
+        return <span key={index} className="text-red-500 font-bold drop-shadow-[0_0_8px_rgba(220,38,38,0.5)] animate-pulse">{content}</span>;
+    }
+
     const lower = part.toLowerCase();
     if (['house', 'home', 'dwelling', 'hallway', 'hallways', 'corridor', 'room', 'rooms', 'walls', 'structure', 'place'].includes(lower)) return <span key={index} className="text-[#4dabff] font-bold drop-shadow-[0_0_5px_rgba(77,171,255,0.3)]">{part}</span>;
     if (['minotaur', 'beast', 'monster', 'threat', 'horror'].includes(lower)) return <span key={index} className="text-[#ff3b3b] font-bold relative inline-block"><span className="relative z-10">{part}</span>{lower === 'minotaur' && <span className="absolute left-0 top-1/2 w-full h-[2px] bg-red-600/50 transform -translate-y-1/2"></span>}</span>;
