@@ -160,11 +160,69 @@ export const generateNpcPortrait = async (npc: NpcState): Promise<string | null>
     return null;
 }
 
-export const processGameTurn = async (gameState: GameState, action: string): Promise<{ gameState: GameState, storyText: string, imageUrl?: string }> => {
+export const processGameTurn = async (
+    gameState: GameState, 
+    action: string, 
+    files: File[] = [],
+    onStreamUpdate?: (text: string, phase: 'logic' | 'narrative') => void
+): Promise<{ gameState: GameState, storyText: string, imageUrl?: string }> => {
     const ai = getAI();
 
-    // 1. Simulation Step (Logic)
-    const simResponse = await ai.models.generateContent({
+    // 0. IMAGE EDITING / GENERATION PATH
+    // If the user provides an image, we assume they might want to edit it.
+    const imageFile = files.find(f => f.type.startsWith('image/'));
+    if (imageFile) {
+        try {
+            const base64Data = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(imageFile);
+            });
+            const base64Content = base64Data.split(',')[1];
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash-image',
+                contents: {
+                    parts: [
+                        { inlineData: { mimeType: imageFile.type, data: base64Content } },
+                        { text: action || "Enhance this image with a horror aesthetic." }
+                    ]
+                }
+            });
+
+            let generatedImage = undefined;
+            let generatedText = "The machine reconfigures the visual data...";
+
+            // Iterate through parts to find image
+            if (response.candidates?.[0]?.content?.parts) {
+                for (const part of response.candidates[0].content.parts) {
+                    if (part.inlineData) {
+                        generatedImage = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                    } else if (part.text) {
+                        generatedText = part.text;
+                    }
+                }
+            }
+            
+            // If we got an image, return early. We don't advance the game simulation logic (JSON state) for image edits.
+            if (generatedImage) {
+                return {
+                    gameState,
+                    storyText: generatedText || "Visual reconfiguration complete.",
+                    imageUrl: generatedImage
+                };
+            }
+        } catch (e) {
+            console.error("Image Processing Failed", e);
+            // Fallthrough to normal simulation if image gen fails
+        }
+    }
+
+    // 1. Simulation Step (Logic) - STREAMED
+    if (onStreamUpdate) onStreamUpdate("\n>>> INITIALIZING LOGIC SIMULATION...\n", 'logic');
+    
+    const simStream = await ai.models.generateContentStream({
         model: 'gemini-3-pro-preview',
         contents: `CURRENT STATE: ${JSON.stringify(gameState)}\nUSER ACTION: ${action}`,
         config: { 
@@ -173,9 +231,18 @@ export const processGameTurn = async (gameState: GameState, action: string): Pro
         }
     });
 
+    let simText = "";
+    for await (const chunk of simStream) {
+        const t = chunk.text;
+        if (t) {
+            simText += t;
+            if (onStreamUpdate) onStreamUpdate(t, 'logic');
+        }
+    }
+
     let simulatedState = gameState;
     try {
-        const parsed = JSON.parse(simResponse.text || "{}");
+        const parsed = JSON.parse(simText || "{}");
         
         // CRITICAL: Deep Merge / Preservation Strategy
         // The Simulator sometimes returns partial states or resets fields. 
@@ -219,12 +286,13 @@ export const processGameTurn = async (gameState: GameState, action: string): Pro
 
     } catch (e) {
         console.error("Simulator Parse Error", e);
-        // If parse fails, we continue with the original state to at least get a narrative response,
-        // rather than crashing the loop.
+        if (onStreamUpdate) onStreamUpdate(`\n[ERROR] JSON PARSE FAILED: ${e}\n`, 'logic');
     }
 
-    // 2. Narration Step (Prose)
-    const narrResponse = await ai.models.generateContent({
+    // 2. Narration Step (Prose) - STREAMED
+    if (onStreamUpdate) onStreamUpdate("\n>>> SYNTHESIZING NARRATIVE...\n", 'narrative');
+
+    const narrStream = await ai.models.generateContentStream({
         model: 'gemini-3-pro-preview',
         contents: `SIMULATED STATE: ${JSON.stringify(simulatedState)}`,
         config: { 
@@ -233,7 +301,16 @@ export const processGameTurn = async (gameState: GameState, action: string): Pro
         }
     });
 
-    const parsed = parseResponse(narrResponse.text || "");
+    let narrText = "";
+    for await (const chunk of narrStream) {
+        const t = chunk.text;
+        if (t) {
+            narrText += t;
+            if (onStreamUpdate) onStreamUpdate(t, 'narrative');
+        }
+    }
+
+    const parsed = parseResponse(narrText || "");
     
     // 3. Final State Resolution
     const finalState = parsed.gameState || simulatedState;

@@ -35,6 +35,11 @@ export default function App() {
   const [autoMode, setAutoMode] = useState({ active: false, remainingCycles: 0 });
   const [showSimModal, setShowSimModal] = useState(false);
 
+  // Logic Viewing State
+  const [showLogic, setShowLogic] = useState(false);
+  const [streamedLogic, setStreamedLogic] = useState("");
+  const [streamPhase, setStreamPhase] = useState<'logic' | 'narrative'>('logic');
+
   // Helper to ensure global API key access if set via modal
   useEffect(() => {
     if (apiKey && !process.env.API_KEY) {
@@ -85,6 +90,33 @@ export default function App() {
     handleSendMessage("BEGIN SIMULATION. ESTABLISH CONTEXT AND ATMOSPHERE BASED ON PARAMETERS.", [], newState);
   };
 
+  const handleResetGame = () => {
+    if (window.confirm("TERMINATE SESSION?\n\nThis will wipe all narrative progress and return to the void.")) {
+      // 1. Stop Auto Pilot
+      setAutoMode({ active: false, remainingCycles: 0 });
+      
+      // 2. Clear History
+      setHistory([{ 
+        role: 'model', 
+        text: INITIAL_GREETING, 
+        timestamp: Date.now() 
+      }]);
+
+      // 3. Reset State to Default
+      setGameState({
+        meta: { turn: 50, perspective: 'First Person', mode: 'Survivor', intensity_level: 'Level 3', active_cluster: 'None' },
+        villain_state: { name: 'Unknown', archetype: 'Unknown', threat_scale: 0, primary_goal: 'Unknown', current_tactic: 'None' },
+        npc_states: [],
+        location_state: getDefaultLocationState(),
+        narrative: { visual_motif: '', illustration_request: null }
+      });
+
+      // 4. Return to Welcome Screen
+      setIsInitialized(false);
+      setShowSetup(false);
+    }
+  };
+
   const handleSendMessage = async (text: string, files: File[] = [], overrideState?: GameState) => {
     if (isLoading) return;
 
@@ -94,12 +126,17 @@ export default function App() {
     }
     
     setIsLoading(true);
+    setStreamedLogic("");
+    setStreamPhase('logic');
 
     // CRITICAL: Use overrideState if provided (initial setup), otherwise use current state
     const currentState = overrideState || gameState;
 
     try {
-        const result = await processGameTurn(currentState, text);
+        const result = await processGameTurn(currentState, text, files, (chunk, phase) => {
+            setStreamPhase(phase);
+            setStreamedLogic(prev => prev + chunk);
+        });
         
         setGameState(result.gameState);
         setHistory(prev => [...prev, { 
@@ -195,6 +232,7 @@ export default function App() {
             isTesting={autoMode.active}
             onAbortTest={() => setAutoMode({ active: false, remainingCycles: 0 })}
             onUpdateNpc={handleUpdateNpc}
+            onReset={handleResetGame}
         />
 
         {/* Center: Main Narrative Log */}
@@ -203,6 +241,9 @@ export default function App() {
                 history={history} 
                 isLoading={isLoading} 
                 activeCluster={gameState.meta.active_cluster}
+                showLogic={showLogic}
+                streamedLogic={streamedLogic}
+                streamPhase={streamPhase}
             />
             
             <div className="p-6 bg-gradient-to-t from-black via-black to-transparent z-20">
@@ -210,6 +251,8 @@ export default function App() {
                     onSend={(text, files) => handleSendMessage(text, files)} 
                     isLoading={isLoading} 
                     onAdvance={() => handleSendMessage("Wait. Observe.")}
+                    showLogic={showLogic}
+                    onToggleLogic={() => setShowLogic(!showLogic)}
                 />
             </div>
             

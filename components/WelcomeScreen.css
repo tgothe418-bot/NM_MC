@@ -1,44 +1,125 @@
 
-/* Container styles moved mostly to Tailwind for safety, keeping complex animations here */
+/* 16mm Film Grain Texture - High Intensity */
+.film-grain {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.5'/%3E%3C/svg%3E");
+    background-size: 150px 150px;
+    animation: grain-dance 0.5s steps(3) infinite;
+    opacity: 0.15;
+    mix-blend-mode: overlay;
+}
+
+/* Projector Flicker - Brightness pulsing */
+.projector-flicker {
+    background: white;
+    opacity: 0;
+    animation: flicker-anim 4s infinite steps(12);
+    mix-blend-mode: overlay;
+}
+
+/* Gate Weave - The physical shaking of the film strip */
+.gate-weave {
+    animation: weave-anim 2s ease-in-out infinite alternate;
+}
 
 .vignette {
-    background: radial-gradient(circle, transparent 40%, #000000 100%);
+    background: radial-gradient(circle, transparent 40%, #000000 95%);
     pointer-events: none;
 }
 
-.static-noise {
-    opacity: 0.04;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-    pointer-events: none;
+/* Title Typography - BLOOM & HALATION */
+.title-primary {
+    font-size: clamp(3rem, 12vw, 10rem);
+    text-shadow: 0 0 20px rgba(200, 200, 200, 0.2);
+    opacity: 0.6;
 }
 
-/* Watcher Effects */
-.watcher-eyes {
-    opacity: 0.8;
+.title-secondary {
+    font-size: clamp(4rem, 18vw, 16rem); 
+    width: 100%;
 }
 
-/* Spectral Whispers */
-.whisper-text.active {
-    opacity: 1;
-    transform: translateY(-20px);
-    filter: blur(1px);
+/* NIGHTMARE PULSE ANIMATION (Heartbeat) */
+@keyframes nightmare-pulse-anim {
+    0%, 100% {
+        color: #600000; /* Dark Dried Blood */
+        text-shadow: 0 0 20px rgba(80, 0, 0, 0.5);
+        transform: scaleY(1.1);
+    }
+    12% { /* Systole - Big Beat */
+        color: #ff1a1a; /* Bright Arterial Red */
+        text-shadow: 0 0 60px rgba(255, 26, 26, 0.8), 0 0 100px rgba(255, 0, 0, 0.6);
+        transform: scaleY(1.15) scaleX(1.02);
+    }
+    24% { /* Diastole - Echo Beat */
+        color: #a30000; /* Mid Red */
+        text-shadow: 0 0 30px rgba(163, 0, 0, 0.6);
+        transform: scaleY(1.12) scaleX(1.01);
+    }
+    36% { /* Rest */
+        color: #600000;
+        text-shadow: 0 0 20px rgba(80, 0, 0, 0.5);
+        transform: scaleY(1.1);
+    }
+}
+
+@keyframes glow-pulse-anim {
+    0%, 36%, 100% { opacity: 0.4; color: #600000; }
+    12% { opacity: 0.9; color: #ff0000; }
+    24% { opacity: 0.6; color: #cc0000; }
+}
+
+.nightmare-text-anim {
+    background: none;
+    -webkit-text-fill-color: initial;
+    display: block;
+    animation: nightmare-pulse-anim 1.5s infinite cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.nightmare-glow-anim {
+    animation: glow-pulse-anim 1.5s infinite cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 /* Animations */
+@keyframes grain-dance {
+    0% { background-position: 0 0; }
+    33% { background-position: 50px -50px; }
+    66% { background-position: -50px 50px; }
+    100% { background-position: 25px -25px; }
+}
+
+@keyframes flicker-anim {
+    0% { opacity: 0.02; }
+    5% { opacity: 0.05; }
+    10% { opacity: 0.02; }
+    15% { opacity: 0.06; }
+    30% { opacity: 0.02; }
+    50% { opacity: 0.02; }
+    55% { opacity: 0.05; }
+    60% { opacity: 0.02; }
+    90% { opacity: 0.08; } /* Flash */
+    100% { opacity: 0.02; }
+}
+
+@keyframes weave-anim {
+    0% { transform: translateY(0px) translateX(0px); }
+    25% { transform: translateY(1px) translateX(0.5px); }
+    50% { transform: translateY(-0.5px) translateX(-0.5px); }
+    75% { transform: translateY(0.5px) translateX(0px); }
+    100% { transform: translateY(-1px) translateX(0.5px); }
+}
+
 @keyframes heartbeat {
-    0% { transform: scale(1); box-shadow: 0 0 0px rgba(0, 255, 255, 0); }
-    10% { transform: scale(1.02); box-shadow: 0 0 20px rgba(0, 255, 255, 0.1); }
-    20% { transform: scale(1); }
-    30% { transform: scale(1.01); }
-    40% { transform: scale(1); }
+    0% { transform: scale(1); box-shadow: 0 0 20px rgba(220, 20, 60, 0.1); border-color: rgba(139,0,0,0.5); }
+    50% { transform: scale(1.02); box-shadow: 0 0 40px rgba(220, 20, 60, 0.3); border-color: rgba(220,20,60,0.8); }
+    100% { transform: scale(1); box-shadow: 0 0 20px rgba(220, 20, 60, 0.1); border-color: rgba(139,0,0,0.5); }
 }
 
 .spooky-pulse {
-    animation: heartbeat 4s infinite ease-in-out;
+    animation: heartbeat 2s infinite ease-in-out;
 }
 
 .blood-shine {
-    animation: blood-slide 4s infinite;
+    animation: blood-slide 3s infinite;
 }
 
 @keyframes blood-slide {
@@ -47,74 +128,41 @@
     100% { left: 150%; }
 }
 
-@keyframes text-throb {
-    0%, 100% { filter: drop-shadow(0 0 10px rgba(0, 255, 255, 0.1)); opacity: 1; }
-    50% { filter: drop-shadow(0 0 25px rgba(0, 255, 255, 0.3)); opacity: 0.9; }
-}
-
 .aberration-layer {
     mix-blend-mode: screen;
 }
 
 .animate-glitch-1 {
-    animation: glitch-anim-1 2.5s infinite linear alternate-reverse;
+    animation: glitch-anim-1 0.2s infinite linear alternate-reverse;
 }
 
 .animate-glitch-2 {
-    animation: glitch-anim-2 3s infinite linear alternate-reverse;
-}
-
-.fog-beam {
-    position: absolute;
-    width: 100%;
-    height: 100px;
-    background: linear-gradient(90deg, transparent, rgba(255, 0, 0, 0.05), transparent);
-    filter: blur(40px);
-    animation: beam-slide 10s ease-in-out infinite;
-    pointer-events: none;
-}
-
-.scanlines {
-    background: linear-gradient(to bottom, rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%);
-    background-size: 100% 4px;
-    pointer-events: none;
+    animation: glitch-anim-2 0.3s infinite linear alternate-reverse;
 }
 
 .content-entrance {
-    animation: fadeInUp 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    animation: fadeInUp 3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 @keyframes fadeInUp {
     from {
         opacity: 0;
-        transform: translateY(30px) scale(0.95);
+        transform: translateY(30px) scale(0.98);
+        filter: blur(5px);
     }
     to {
         opacity: 1;
         transform: translateY(0) scale(1);
+        filter: blur(0);
     }
 }
 
 @keyframes glitch-anim-1 {
-    0% { clip-path: inset(20% 0 80% 0); transform: translate(-2px, 1px); }
-    20% { clip-path: inset(60% 0 1% 0); transform: translate(1px, -1px); }
-    40% { clip-path: inset(40% 0 20% 0); transform: translate(2px, 2px); }
-    60% { clip-path: inset(80% 0 5% 0); transform: translate(-1px, -2px); }
-    80% { clip-path: inset(10% 0 60% 0); transform: translate(1px, 1px); }
-    100% { clip-path: inset(30% 0 50% 0); transform: translate(-2px, -1px); }
+    0% { clip-path: inset(20% 0 80% 0); transform: translate(-2px, 1px); opacity: 0.3; }
+    100% { clip-path: inset(10% 0 50% 0); transform: translate(1px, -1px); opacity: 0.5; }
 }
 
 @keyframes glitch-anim-2 {
-    0% { clip-path: inset(10% 0 60% 0); transform: translate(2px, -1px); }
-    20% { clip-path: inset(80% 0 5% 0); transform: translate(-1px, 2px); }
-    40% { clip-path: inset(30% 0 20% 0); transform: translate(-2px, -2px); }
-    60% { clip-path: inset(10% 0 80% 0); transform: translate(1px, 1px); }
-    80% { clip-path: inset(50% 0 30% 0); transform: translate(-1px, -1px); }
-    100% { clip-path: inset(20% 0 40% 0); transform: translate(2px, 2px); }
-}
-
-@keyframes beam-slide {
-    0%, 100% { transform: translateY(20vh) translateX(-50%); opacity: 0; }
-    50% { opacity: 1; }
-    100% { transform: translateY(80vh) translateX(50%); opacity: 0; }
+    0% { clip-path: inset(80% 0 10% 0); transform: translate(2px, -1px); opacity: 0.3; }
+    100% { clip-path: inset(10% 0 80% 0); transform: translate(-1px, 2px); opacity: 0.5; }
 }

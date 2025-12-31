@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Activity, Camera, Mic, Film, FastForward, Paperclip, X, FileText, Image as ImageIcon } from 'lucide-react';
+import { Send, Activity, Camera, Mic, Film, FastForward, Paperclip, X, FileText, Image as ImageIcon, Terminal } from 'lucide-react';
 
 interface InputAreaProps {
   onSend: (text: string, files: File[]) => void;
@@ -9,10 +9,12 @@ interface InputAreaProps {
   onAdvance?: () => void;
   isLoading: boolean;
   inputType?: 'text' | 'choice_yes_no';
-  externalValue?: string; 
+  externalValue?: string;
+  showLogic?: boolean;
+  onToggleLogic?: () => void;
 }
 
-export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVideoCutscene, onAdvance, isLoading, inputType = 'text', externalValue }) => {
+export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVideoCutscene, onAdvance, isLoading, inputType = 'text', externalValue, showLogic, onToggleLogic }) => {
   const [text, setText] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -166,6 +168,20 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
                    <Film className="w-6 h-6" />
                    <span className="absolute left-full ml-4 top-1/2 -translate-y-1/2 text-xs bg-black border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg opacity-0 group-hover/vid:opacity-100 transition-opacity pointer-events-none whitespace-nowrap uppercase tracking-widest font-mono shadow-2xl z-20">
                      Neural Video Projection
+                   </span>
+                </button>
+              )}
+
+              {onToggleLogic && (
+                <button
+                  type="button"
+                  onClick={onToggleLogic}
+                  className={`p-3 rounded-xl transition-all relative group/logic ${showLogic ? 'text-green-500 bg-green-900/20' : 'text-gray-500 hover:text-green-400 hover:bg-gray-800'}`}
+                  title="Toggle Logic Visualization"
+                >
+                   <Terminal className="w-6 h-6" />
+                   <span className="absolute left-full ml-4 top-1/2 -translate-y-1/2 text-xs bg-black border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg opacity-0 group-hover/logic:opacity-100 transition-opacity pointer-events-none whitespace-nowrap uppercase tracking-widest font-mono shadow-2xl z-20">
+                     {showLogic ? 'Hide Machine Logic' : 'View Untranslated Logic'}
                    </span>
                 </button>
               )}

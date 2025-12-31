@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { GameState, NpcState } from '../types';
-import { Skull, Radio, Users, Eye, Brain, ChevronDown, ChevronRight, GripVertical, Activity, ZapOff, Stethoscope, Cpu, FileText, Square, Target, BookOpen, AlertCircle } from 'lucide-react';
+import { Skull, Radio, Users, Eye, Brain, ChevronDown, ChevronRight, GripVertical, Activity, ZapOff, Stethoscope, Cpu, FileText, Square, Target, BookOpen, AlertCircle, Power } from 'lucide-react';
 import { CharacterPortrait } from './CharacterPortrait';
 
 interface StatusPanelProps {
@@ -11,6 +11,7 @@ interface StatusPanelProps {
   isTesting: boolean;
   onAbortTest: () => void;
   onUpdateNpc?: (index: number, updates: Partial<NpcState>) => void;
+  onReset?: () => void;
 }
 
 export const StatusPanel: React.FC<StatusPanelProps> = ({ 
@@ -19,7 +20,8 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
     onOpenSimulation, 
     isTesting, 
     onAbortTest,
-    onUpdateNpc
+    onUpdateNpc,
+    onReset
 }) => {
   const { meta, villain_state, npc_states } = gameState;
   const threatLevel = villain_state?.threat_scale || 0;
@@ -122,6 +124,17 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
                 </div>
                 
                 <div className="flex items-center gap-2">
+                    {/* Reset Button */}
+                    {onReset && (
+                        <button 
+                            onClick={onReset}
+                            className="p-2 rounded-sm border border-gray-800 bg-black text-gray-600 hover:text-red-500 hover:border-red-900 transition-all group/reset"
+                            title="Terminate Session"
+                        >
+                            <Power className="w-4 h-4 group-hover/reset:animate-pulse" />
+                        </button>
+                    )}
+
                     {isTesting ? (
                         <button 
                             onClick={onAbortTest} 
