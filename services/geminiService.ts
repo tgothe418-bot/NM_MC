@@ -1,679 +1,328 @@
+import { GoogleGenAI } from "@google/genai";
+import { GameState, SimulationConfig, NpcState } from "../types";
+import { PLAYER_SYSTEM_INSTRUCTION, SIMULATOR_INSTRUCTION, NARRATOR_INSTRUCTION } from "../constants";
+import { parseResponse } from "../utils";
 
-import { GoogleGenAI, Chat, Type } from "@google/genai";
-import { SIMULATOR_INSTRUCTION, NARRATOR_INSTRUCTION, PLAYER_SYSTEM_INSTRUCTION, ANALYST_SYSTEM_INSTRUCTION } from "../constants";
-import { SimulationConfig, GameState, RoomNode, NpcState } from "../types";
-import { constructRoomGenerationRules } from "./locationEngine";
-import { LORE_LIBRARY } from '../loreLibrary';
-import { STYLE_GUIDE } from './styleGuide';
-
-let chatSession: Chat | null = null;
-
-/**
- * SHARED SCHEMA COMPONENTS
- */
-
-const NPC_STATE_SCHEMA = {
-  type: Type.OBJECT,
-  properties: {
-    name: { type: Type.STRING },
-    archetype: { type: Type.STRING },
-    hidden_agenda: {
-      type: Type.OBJECT,
-      properties: {
-        goal: { type: Type.STRING },
-        progress_level: { type: Type.INTEGER }
-      },
-      required: ["goal", "progress_level"]
-    },
-    psychology: {
-      type: Type.OBJECT,
-      properties: {
-        stress_level: { type: Type.INTEGER },
-        current_thought: { type: Type.STRING },
-        dominant_instinct: { type: Type.STRING }
-      },
-      required: ["stress_level", "current_thought", "dominant_instinct"]
-    },
-    active_injuries: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          location: { type: Type.STRING },
-          type: { type: Type.STRING },
-          description: { type: Type.STRING }
-        },
-        required: ["location", "type", "description"]
-      }
-    },
-    fracture_state: { type: Type.INTEGER },
-    consciousness: { type: Type.STRING }
-  },
-  required: ["name", "archetype", "hidden_agenda", "psychology", "active_injuries", "fracture_state", "consciousness"]
-};
-
-// Replaced map with array to avoid empty properties error
-const ROOM_SCHEMA = {
-  type: Type.OBJECT,
-  properties: {
-    id: { type: Type.STRING },
-    name: { type: Type.STRING },
-    archetype: { type: Type.STRING },
-    description_cache: { type: Type.STRING },
-    exits: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          direction: { type: Type.STRING },
-          target_node_id: { type: Type.STRING, nullable: true }
-        },
-        required: ["direction"]
-      }
-    },
-    hazards: { type: Type.ARRAY, items: { type: Type.STRING } },
-    items: { type: Type.ARRAY, items: { type: Type.STRING } }
-  },
-  required: ["id", "name", "description_cache", "exits"]
-};
-
-const GAME_STATE_SCHEMA = {
-  type: Type.OBJECT,
-  properties: {
-    meta: {
-      type: Type.OBJECT,
-      properties: {
-        turn: { type: Type.INTEGER },
-        perspective: { type: Type.STRING },
-        mode: { type: Type.STRING },
-        intensity_level: { type: Type.STRING },
-        active_cluster: { type: Type.STRING }
-      },
-      required: ["turn", "perspective", "mode", "intensity_level", "active_cluster"]
-    },
-    villain_state: {
-      type: Type.OBJECT,
-      properties: {
-        name: { type: Type.STRING },
-        archetype: { type: Type.STRING },
-        threat_scale: { type: Type.INTEGER },
-        primary_goal: { type: Type.STRING },
-        current_tactic: { type: Type.STRING }
-      },
-      required: ["name", "archetype", "threat_scale", "primary_goal", "current_tactic"]
-    },
-    npc_states: {
-      type: Type.ARRAY,
-      items: NPC_STATE_SCHEMA
-    },
-    location_state: {
-      type: Type.OBJECT,
-      properties: {
-        current_room_id: { type: Type.STRING },
-        rooms: { type: Type.ARRAY, items: ROOM_SCHEMA }, // Changed from room_map dict to rooms array
-        fidelity_status: { type: Type.STRING },
-        current_state: { type: Type.INTEGER },
-        weather_state: { type: Type.STRING },
-        time_of_day: { type: Type.STRING },
-        architectural_notes: { type: Type.ARRAY, items: { type: Type.STRING } }
-      },
-      required: ["current_room_id", "rooms", "fidelity_status", "current_state"]
-    },
-    narrative: {
-      type: Type.OBJECT,
-      properties: {
-        visual_motif: { type: Type.STRING },
-        illustration_request: { type: Type.STRING, nullable: true }
-      },
-      required: ["visual_motif"]
-    }
-  },
-  required: ["meta", "villain_state", "npc_states", "location_state", "narrative"]
-};
-
-const NARRATOR_RESPONSE_SCHEMA = {
-  type: Type.OBJECT,
-  properties: {
-    story_text: { type: Type.STRING },
-    game_state: GAME_STATE_SCHEMA
-  },
-  required: ["story_text", "game_state"]
-};
-
-const NPC_ACTIONS_RESPONSE_SCHEMA = {
-  type: Type.OBJECT,
-  properties: {
-    actions: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          npc_name: { type: Type.STRING },
-          action: { type: Type.STRING }
-        },
-        required: ["npc_name", "action"]
-      }
-    }
-  },
-  required: ["actions"]
-};
-
-const CHARACTER_ANALYSIS_SCHEMA = {
-  type: Type.OBJECT,
-  properties: {
-    name: { type: Type.STRING },
-    archetype: { type: Type.STRING },
-    resonance_signature: {
-      type: Type.OBJECT,
-      properties: {
-        primary_cluster: { type: Type.STRING },
-        secondary_cluster: { type: Type.STRING },
-        resonance_score: { type: Type.NUMBER }
-      },
-      required: ["primary_cluster", "secondary_cluster", "resonance_score"]
-    },
-    voice_signature: {
-      type: Type.OBJECT,
-      properties: {
-        rhythm: { type: Type.STRING },
-        syntax_complexity: { type: Type.STRING },
-        catchphrases: { type: Type.ARRAY, items: { type: Type.STRING } },
-        ticks: { type: Type.ARRAY, items: { type: Type.STRING } },
-        cultural_markers: { type: Type.ARRAY, items: { type: Type.STRING } }
-      },
-      required: ["rhythm", "syntax_complexity", "ticks"]
-    },
-    psychology_profile: {
-      type: Type.OBJECT,
-      properties: {
-        core_trauma: { type: Type.STRING },
-        breaking_point_trigger: { type: Type.STRING },
-        shadow_self: { type: Type.STRING },
-        moral_compass: { type: Type.STRING }
-      },
-      required: ["core_trauma", "breaking_point_trigger", "shadow_self", "moral_compass"]
-    }
-  },
-  required: ["name", "archetype", "resonance_signature", "voice_signature", "psychology_profile"]
-};
-
-export const initializeGemini = () => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  chatSession = ai.chats.create({
-    model: 'gemini-3-pro-preview',
-    config: {
-      systemInstruction: NARRATOR_INSTRUCTION,
-      responseMimeType: 'application/json',
-      responseSchema: NARRATOR_RESPONSE_SCHEMA,
-      temperature: 0.8,
-    },
-  });
-};
-
-const withRetry = async <T>(op: () => Promise<T>): Promise<T> => {
-  let attempt = 0;
-  const maxAttempts = 3;
-  while (attempt < maxAttempts) {
-    try {
-      return await op();
-    } catch (e) {
-      attempt++;
-      if (attempt === maxAttempts) throw e;
-      await new Promise(r => setTimeout(r, 2000 * attempt));
-    }
-  }
-  throw new Error("Retry failed after max attempts");
-};
-
-// Helper to convert internal Record<string, RoomNode> to Array for Gemini
-const prepareGameStateForPrompt = (gameState: GameState): any => {
-  const rooms = gameState.location_state?.room_map ? Object.values(gameState.location_state.room_map) : [];
-  return {
-    ...gameState,
-    location_state: {
-      ...gameState.location_state,
-      rooms: rooms, // Pass array
-      room_map: undefined // Remove map
-    }
-  };
-};
-
-// Helper to convert Gemini Array back to Record<string, RoomNode>
-const restoreGameStateFromResponse = (parsed: any): any => {
-  if (parsed.location_state && Array.isArray(parsed.location_state.rooms)) {
-    const roomMap: Record<string, any> = {};
-    parsed.location_state.rooms.forEach((r: any) => {
-      if (r && r.id) roomMap[r.id] = r;
-    });
-    parsed.location_state.room_map = roomMap;
-    // Keep rooms array or delete it? Let's keep it for compatibility or just rely on room_map
-    // delete parsed.location_state.rooms;
-  }
-  return parsed;
-};
-
-
-/**
- * PASS 0: NPC AGENT ACTIONS (FLASH)
- */
-export const generateNpcActions = async (gameState: GameState, userAction: string): Promise<string[]> => {
-  if (!gameState.npc_states?.length) return [];
-
-  // OOC / META GUARD
-  // If the user input is OOC, we do not generate NPC actions to prevent the simulation from advancing inadvertently.
-  if (/^(OOC:|META:)/i.test(userAction.trim())) {
-    return [];
-  }
-  
-  return withRetry(async () => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // Filter out null/undefined NPCs to prevent 'Cannot read properties of undefined (reading 'name')'
-    const validNpcs = gameState.npc_states.filter(n => n && n.name);
-
-    if (validNpcs.length === 0) return [];
-
-    const prompt = `
-      You are the Agent Engine. For each active NPC, decide ONE discrete action they take to advance their hidden goal.
-      USER ACTION: ${userAction}
-      NPCS: ${JSON.stringify(validNpcs.map(n => ({ 
-        name: n.name, 
-        role: n.archetype, 
-        goal: n.hidden_agenda?.goal, 
-        psychology: {
-            instinct: n.psychology?.dominant_instinct,
-            thought: n.psychology?.current_thought,
-            stress: n.psychology?.stress_level
-        },
-        status: {
-            injuries: n.active_injuries?.map(i => `${i.location} (${i.type})`) || [],
-            consciousness: n.consciousness,
-            fracture_state: n.fracture_state
-        },
-        personality: n.personality
-      })))}
-      
-      Respond in JSON format as specified.
-    `;
-
-    const res = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: NPC_ACTIONS_RESPONSE_SCHEMA
-      }
-    });
-
-    const parsed = JSON.parse(res.text || '{"actions":[]}');
-    return parsed.actions.map((a: any) => `${a.npc_name}: ${a.action}`);
-  });
-};
-
-/**
- * PASS 1: THE SIMULATOR (FLASH)
- */
-export const simulateTurn = async (gameState: GameState, userAction: string, npcActions: string[]): Promise<GameState> => {
-  return withRetry(async () => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const promptState = prepareGameStateForPrompt(gameState);
-    const generationRules = constructRoomGenerationRules(gameState);
-    
-    const prompt = `
-      [SYSTEM INSTRUCTION]: You are the SIMULATOR. Process the mechanical consequences of the user and NPC actions.
-      [CURRENT STATE]: ${JSON.stringify(promptState)}
-      [USER ACTION]: ${userAction}
-      [NPC INTENTIONS]: ${npcActions.join('\n')}
-      ${generationRules}
-      
-      CORE DIRECTIVE: MAINTAIN FIDELITY.
-      1. Do NOT overwrite the user-defined 'visual_motif', 'villain_state.name', 'villain_state.archetype' or 'villain_state.primary_goal' unless the narrative explicitly changes them.
-      2. Keep the 'meta.mode' and 'meta.perspective' consistent with the provided state.
-      3. Update all numeric metrics, injuries, and the spatial map.
-      4. If the user enters a new area (UNEXPLORED), create a NEW RoomNode in 'rooms' array with a unique ID and description_cache.
-      
-      Update all numeric metrics, injuries, and the spatial map.
-      If the user enters a new area (UNEXPLORED), create a NEW RoomNode in 'rooms' array with a unique ID and description_cache.
-    `;
-
-    const res = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-      config: {
-        systemInstruction: SIMULATOR_INSTRUCTION,
-        responseMimeType: 'application/json',
-        responseSchema: GAME_STATE_SCHEMA,
-        temperature: 0.2, // Low temperature for consistent logic
-      }
-    });
-
-    const parsed = JSON.parse(res.text || "{}");
-    let nextState = restoreGameStateFromResponse(parsed);
-
-    // --- DYNAMIC INTENSITY SCALING ---
-    // Automatically escalates intensity based on psychological fracture and stress levels.
-    if (nextState.npc_states && Array.isArray(nextState.npc_states)) {
-        let maxStress = 0;
-        let maxFracture = 0;
-
-        nextState.npc_states.forEach((npc: any) => {
-            const s = npc.psychology?.stress_level || 0;
-            const f = npc.fracture_state || 0;
-            if (s > maxStress) maxStress = s;
-            if (f > maxFracture) maxFracture = f;
-        });
-
-        let newLevel = "Level 1: The Uncanny";
-        
-        // Thresholds:
-        // Level 5: Absolute psychological break (Stress 90+ or Fracture 3+)
-        // Level 4: Extreme distress (Stress 75+)
-        // Level 3: High panic (Stress 50+)
-        // Level 2: Unease/Dread (Stress 25+)
-        
-        if (maxFracture >= 3 || maxStress >= 90) {
-            newLevel = "Level 5: The Transgressive";
-        } else if (maxStress >= 75) {
-            newLevel = "Level 4: The Grotesque";
-        } else if (maxStress >= 50) {
-            newLevel = "Level 3: The Visceral";
-        } else if (maxStress >= 25) {
-            newLevel = "Level 2: The Dread";
-        }
-
-        // Apply dynamic adjustment if valid metadata exists
-        if (nextState.meta) {
-            // We use the calculated level, overriding the previous state if the situation escalates
-            // This ensures the narrative "heats up" with the drama.
-            nextState.meta.intensity_level = newLevel;
-        }
-    }
-
-    return nextState;
-  });
-};
-
-/**
- * PASS 2: THE NARRATOR (PRO)
- */
-export const sendMessageToGemini = async (userAction: string, simulatedState: GameState, manifestos: string, customSession?: Chat): Promise<string> => {
-  const session = customSession || chatSession;
-  if (!session) throw new Error("Narrator Chat Session not initialized");
-  
-  const promptState = prepareGameStateForPrompt(simulatedState);
-  
-  const prompt = `
-    [SIMULATED STATE - GROUND TRUTH]: ${JSON.stringify(promptState)}
-    [USER ACTION]: ${userAction}
-    ${manifestos}
-    
-    Narrate the results of this simulation. Adhere to the cluster aesthetic and sensory manifesto.
-  `;
-  
-  const res = await session.sendMessage({ message: prompt });
-  
-  // Intercept the response to fix the room map structure in the JSON string
-  let text = res.text || "";
-  try {
-     const parsed = JSON.parse(text);
-     if (parsed.game_state) {
-         // Fix the nested game_state
-         parsed.game_state = restoreGameStateFromResponse(parsed.game_state);
-         text = JSON.stringify(parsed);
-     }
-  } catch(e) {
-      // If parsing fails, return raw text (likely empty or broken)
-  }
-  
-  return text;
-};
-
-export const generateCalibrationField = async (field: string, cluster: string, intensity: string, count?: number, existingValue?: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const countContext = count ? ` Generate for ${count} subjects.` : "";
-  const baseContext = existingValue ? ` Refine this content: ${existingValue}.` : "";
-  
-  const res = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: `
-      GENERATION TASK: Create content for field '${field}'. 
-      THEME: ${cluster}. 
-      INTENSITY: ${intensity}. 
-      CONTEXT: ${countContext}${baseContext} 
-      CONSTRAINT: Be concise, evocative, and punchy. Avoid flowery prose. Max 2-3 sentences or bullet points.
-    `,
-  });
-  return res.text || "";
-};
+const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const generateAutoPlayerAction = async (gameState: GameState): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAI();
   const res = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `Based on the following game state, suggest a realistic horror movie protagonist action: ${JSON.stringify(gameState)}`,
+    contents: `CURRENT SITUATION: ${JSON.stringify(gameState)}\n\nYOUR IMMEDIATE ACTION:`,
     config: { systemInstruction: PLAYER_SYSTEM_INSTRUCTION }
   });
   return res.text || "";
 };
 
-export const generateSimulationAnalysis = async (gameState: GameState): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const res = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
-    contents: `Analyze the psychological collapse in this simulation: ${JSON.stringify(gameState)}`,
-    config: { systemInstruction: ANALYST_SYSTEM_INSTRUCTION }
-  });
-  return res.text || "";
-};
-
-export const generateHorrorImage = async (prompt: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image',
-    contents: { parts: [{ text: prompt }] },
-    config: { imageConfig: { aspectRatio: "16:9" } }
-  });
-  for (const part of response.candidates[0].content.parts) {
-    if (part.inlineData) {
-      return `data:image/png;base64,${part.inlineData.data}`;
-    }
-  }
-  throw new Error("No image generated");
-};
-
-export const generateCinematicVideo = async (prompt: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  let operation = await ai.models.generateVideos({
-    model: 'veo-3.1-fast-generate-preview',
-    prompt: prompt,
-    config: {
-      numberOfVideos: 1,
-      resolution: '720p',
-      aspectRatio: '16:9'
-    }
-  });
-  while (!operation.done) {
-    await new Promise(resolve => setTimeout(resolve, 10000));
-    operation = await ai.operations.getVideosOperation({ operation: operation });
-  }
-  const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-  const res = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
-  const blob = await res.blob();
-  return URL.createObjectURL(blob);
-};
-
-export const hydrateUserCharacter = async (userDescription: string, activeCluster: string): Promise<Partial<NpcState>> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+export const hydrateUserCharacter = async (description: string, cluster: string): Promise<Partial<NpcState>> => {
+  const ai = getAI();
+  const prompt = `Based on the description: "${description}" and the horror theme "${cluster}", generate a JSON object for a partial NpcState.
+  Include: name, archetype, background_origin, psychology (stress_level, dominant_instinct), appearance.
+  Return ONLY JSON.`;
   
-  // Dynamic construction of Lore Context
-  const loreKeys = Object.keys(LORE_LIBRARY);
-  const loreContext = loreKeys.map(k => {
-      const lore = LORE_LIBRARY[k];
-      return `- ${k.toUpperCase()}: ${lore.displayName} (${lore.mood})`;
-  }).join('\n');
-
-  // Dynamic construction of Style Context
-  const styleContext = STYLE_GUIDE.narrative_rules.join('\n');
-
-  const prompt = `
-    ANALYSIS TASK: SEMANTIC RESONANCE MAPPING (V2.0)
-    
-    [INPUT DATA]
-    User Character Description: "${userDescription}"
-    Active Simulation Cluster: "${activeCluster}"
-    
-    [LORE REFERENCE]
-    The Nightmare Machine operates on these thematic frequencies:
-    ${loreContext}
-    
-    [STYLE ENFORCEMENT]
-    Adhere to these narrative rules when designing the Voice/Psychology:
-    ${styleContext}
-    
-    [OBJECTIVE]
-    1. THEMATIC ALIGNMENT: Analyze the User Description. Determine its primary and secondary resonance with the LORE clusters.
-    2. VOICE SYNTHESIS: Construct a 'VoiceSignature' that reflects the character's origin BUT is corrupted by the 'Active Simulation Cluster'.
-       - If the cluster is SYSTEM, the voice should differ (detached, glitchy) vs FLESH (breathless, wet).
-    3. PSYCHOLOGICAL PROFILE: Define the 'Core Trauma' and 'Shadow Self' based on the intersection of the User's description and the Active Cluster's philosophy.
-    
-    Output must be valid JSON matching the schema.
-  `;
-
   const res = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: prompt,
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema: CHARACTER_ANALYSIS_SCHEMA,
-      temperature: 0.7
-    }
+    config: { responseMimeType: 'application/json' }
   });
-
-  const parsed = JSON.parse(res.text || "{}");
   
-  return {
-    name: parsed.name,
-    archetype: parsed.archetype,
-    resonance_signature: parsed.resonance_signature,
-    dialogue_state: {
-      voice_signature: parsed.voice_signature,
-      // Default legacy fields
-      voice_profile: { tone: parsed.voice_signature?.rhythm || "Neutral", vocabulary: [], quirks: [], forbidden_topics: [] },
-      memory: { short_term_buffer: [], long_term_summary: `Origin: ${userDescription}` },
-      mood_state: "Anxious",
-      last_social_maneuver: "OBSERVE",
-      current_social_intent: "OBSERVE",
-      conversation_history: []
-    },
-    psychology: {
-      profile: parsed.psychology_profile,
-      stress_level: 20,
-      current_thought: "Where am I?",
-      dominant_instinct: "Flight",
-      resilience_level: "Moderate",
-      sanity_percentage: 100,
-      emotional_state: "Anxious"
-    },
-    fracture_state: 0,
-    consciousness: "Alert",
-    active_injuries: [],
-    hidden_agenda: { goal: "Survive", constraint: "Unknown", progress_level: 0 },
-    background_origin: userDescription
-  };
+  try {
+      return JSON.parse(res.text || "{}");
+  } catch (e) {
+      return {};
+  }
 };
 
-// --- STRESS TEST ENGINE ---
+export const generateCalibrationField = async (field: string, cluster: string, intensity: string, count?: number, existingValue?: string): Promise<string> => {
+    const ai = getAI();
+    let prompt = `Generate a creative, horror-themed value for the field: "${field}".
+    Context: Horror Theme: ${cluster}, Intensity: ${intensity}.`;
+    
+    if (field === 'Visual Motif') {
+        prompt += `\nSTRICT CONSTRAINT: Use short, simple phrases and general cinematic motifs (e.g. "Grainy 16mm film", "Cold fluorescent lighting", "Rust and decay"). Do NOT write full sentences. Keep it under 10 words.`;
+    }
 
-export const runStressTest = async (
-  config: SimulationConfig, 
-  initialState: GameState,
-  onProgress: (log: string, currentTurn: number) => void
-): Promise<string> => {
-  
-  let markdownLog = `# NIGHTMARE MACHINE STRESS TEST REPORT
-**Date:** ${new Date().toISOString()}
-**Parameters:** Cluster: ${config.cluster}, Intensity: ${config.intensity}, Cycles: ${config.cycles}
+    if (field === 'Specimen Targets') {
+        prompt += `\nSTRICT CONSTRAINT: Use brief, simple descriptions (e.g. "A group of lost hikers", "A solitary night watchman"). Avoid flowery prose. Keep it factual and concise.`;
+    }
 
----
+    if (count) prompt += `\nTarget Population Count: ${count}.`;
+    if (existingValue) prompt += `\nRefine this existing idea: "${existingValue}".`;
+    
+    prompt += `\nOutput ONLY the content text, no conversational filler.`;
 
-`;
+    const res = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt
+    });
+    return res.text?.trim() || "";
+};
 
-  let currentState = { ...initialState };
-  
-  // ISOLATION: Create specific session for this test run to prevent polluting the main game context
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const testSession = ai.chats.create({
-    model: 'gemini-3-pro-preview',
-    config: {
-      systemInstruction: NARRATOR_INSTRUCTION,
-      responseMimeType: 'application/json',
-      responseSchema: NARRATOR_RESPONSE_SCHEMA,
-      temperature: 0.8,
-    },
-  });
+export const generateCharacterProfile = async (cluster: string, intensity: string, role: string): Promise<{name: string, background: string, traits: string}> => {
+    const ai = getAI();
+    const prompt = `Generate a cohesive character profile for a "${role}" in a horror story.
+    Theme: ${cluster}
+    Intensity: ${intensity}
+    
+    Output JSON with fields:
+    - name: Full name
+    - background: A short backstory (1-2 sentences) establishing why they are here.
+    - traits: Key personality traits, flaws, or physical features.
+    
+    Return ONLY JSON.`;
 
-  for (let i = 0; i < config.cycles; i++) {
-    const turnHeader = `\n## CYCLE ${i + 1}\n`;
-    markdownLog += turnHeader;
-    onProgress(markdownLog, i + 1);
+    const res = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+        config: { responseMimeType: 'application/json' }
+    });
 
     try {
-      // 1. Auto-generate User Action
-      const userAction = await generateAutoPlayerAction(currentState);
-      markdownLog += `**User Action:** ${userAction}\n\n`;
-
-      // 2. Generate NPC Actions
-      const npcActions = await generateNpcActions(currentState, userAction);
-      markdownLog += `**NPC Actions:**\n${npcActions.map(a => `- ${a}`).join('\n')}\n\n`;
-
-      // 3. Simulate Turn
-      const simulatedState = await simulateTurn(currentState, userAction, npcActions);
-      
-      // Validation: Check critical state integrity
-      if (!simulatedState.location_state || !simulatedState.location_state.current_room_id) {
-        throw new Error("CRITICAL: Simulation returned invalid Location State");
-      }
-      markdownLog += `**Simulation Status:** OK (Threat: ${simulatedState.villain_state.threat_scale})\n`;
-
-      // 4. Narrate (using isolated testSession)
-      const responseText = await sendMessageToGemini(userAction, simulatedState, "", testSession); 
-      
-      // 5. Parse Response
-      let parsed;
-      try {
-        parsed = JSON.parse(responseText);
-        if(!parsed.game_state || !parsed.story_text) throw new Error("Missing schema fields");
-      } catch (jsonErr) {
-        throw new Error(`JSON PARSE FAILURE: ${jsonErr}`);
-      }
-
-      // Update State for next loop
-      currentState = {
-        ...parsed.game_state,
-        location_state: {
-          ...parsed.game_state.location_state,
-          room_map: { 
-              ...simulatedState.location_state.room_map, 
-              ...(parsed.game_state.location_state.room_map || {}) 
-          }
-        }
-      };
-
-      markdownLog += `**Narrator Output:** Valid JSON (${parsed.story_text.length} chars)\n`;
-      markdownLog += `**State Snapshot:** Room: ${currentState.location_state.current_room_id}, Fidelity: ${currentState.location_state.fidelity_status}\n`;
-      
-    } catch (error: any) {
-      markdownLog += `\n# CRITICAL FAILURE DETECTED\n`;
-      markdownLog += `**Error Type:** ${error.name || "Unknown"}\n`;
-      markdownLog += `**Message:** ${error.message}\n`;
-      markdownLog += `**Stack Trace:**\n\`\`\`\n${error.stack || "No stack trace"}\n\`\`\`\n`;
-      markdownLog += `\n**HALTING SEQUENCE.**`;
-      
-      onProgress(markdownLog, i + 1);
-      return markdownLog; // Exit early on critical failure
+        const data = JSON.parse(res.text || "{}");
+        return {
+            name: data.name || "Unknown",
+            background: data.background || "No history available.",
+            traits: data.traits || "Survival Instinct"
+        };
+    } catch (e) {
+        return { name: "Unknown", background: "Unknown", traits: "Unknown" };
     }
+};
+
+export const analyzeImageContext = async (file: File, context: string): Promise<string> => {
+  const ai = getAI();
+  
+  const base64Data = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+  
+  const base64Content = base64Data.split(',')[1];
+  
+  let promptText = "Analyze this image.";
+  if (context === 'Visual Motif') {
+      promptText = "Analyze the aesthetic style of this image. Provide a Visual Motif description using ONLY short, simple phrases (e.g. 'Grainy 16mm film', 'High contrast noir', 'VHS static'). Do not use full sentences. Output ONLY the description.";
+  } else if (context === 'Specimen Targets') {
+      promptText = "Analyze the characters or figures in this image. Describe them briefly as 'Specimen Targets' for a horror story. Focus on archetype, appearance, and vibe. Use brief, simple descriptions suitable for a character profile. Do not narrate.";
   }
 
-  markdownLog += `\n# TEST COMPLETE\nAll cycles executed without critical termination.\n`;
-  onProgress(markdownLog, config.cycles);
-  return markdownLog;
+  const res = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: {
+      parts: [
+        { inlineData: { mimeType: file.type, data: base64Content } },
+        { text: promptText }
+      ]
+    }
+  });
+
+  return res.text?.trim() || "";
+};
+
+// Backwards compatibility alias
+export const analyzeVisualMotifImage = (file: File) => analyzeImageContext(file, 'Visual Motif');
+
+export const generateNpcPortrait = async (npc: NpcState): Promise<string | null> => {
+    const ai = getAI();
+    // Construct a vivid prompt based on state
+    const prompt = `A high-quality, moody horror portrait of ${npc.name}, a ${npc.archetype}. 
+    Appearance: ${npc.physical?.build || 'Average'}, ${npc.physical?.height || ''}. 
+    ${npc.physical?.hair_style ? `Hair: ${npc.physical.hair_style}` : ''}.
+    ${npc.physical?.eye_color ? `Eyes: ${npc.physical.eye_color}` : ''}.
+    Clothing: ${npc.physical?.clothing_style || 'Worn clothes'}.
+    Distinguishing feature: ${npc.physical?.distinguishing_feature || 'None'}.
+    Current State: ${npc.psychology?.emotional_state || 'Neutral'}. Stress level: ${npc.psychology?.stress_level || 0}%.
+    ${npc.active_injuries.length > 0 ? `Injuries: ${npc.active_injuries.map(i => i.location + ' ' + i.type).join(', ')}.` : ''}
+    Art Style: Dark, cinematic, high contrast, psychological horror aesthetic. 
+    Close up character portrait, facing forward. High detail, 4k.`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: { parts: [{ text: prompt }] },
+            config: {
+                imageConfig: { aspectRatio: "1:1" }
+            }
+        });
+        
+        // Extract image
+        for (const part of response.candidates?.[0]?.content?.parts || []) {
+            if (part.inlineData) {
+                return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+            }
+        }
+    } catch (e) {
+        console.error("Portrait Generation Failed", e);
+    }
+    return null;
+}
+
+export const processGameTurn = async (gameState: GameState, action: string): Promise<{ gameState: GameState, storyText: string, imageUrl?: string }> => {
+    const ai = getAI();
+
+    // 1. Simulation Step (Logic)
+    const simResponse = await ai.models.generateContent({
+        model: 'gemini-3-pro-preview',
+        contents: `CURRENT STATE: ${JSON.stringify(gameState)}\nUSER ACTION: ${action}`,
+        config: { 
+            systemInstruction: SIMULATOR_INSTRUCTION,
+            responseMimeType: 'application/json' 
+        }
+    });
+
+    let simulatedState = gameState;
+    try {
+        const parsed = JSON.parse(simResponse.text || "{}");
+        
+        // CRITICAL: Deep Merge / Preservation Strategy
+        // The Simulator sometimes returns partial states or resets fields. 
+        // We must ensure the user's initial configuration (meta, villain, motif) persists.
+        simulatedState = {
+            ...gameState, // Fallback to current state
+            ...parsed,    // Apply updates
+            
+            // Explicitly merge nested objects to prevent overwriting with undefined/partial
+            meta: { 
+                ...gameState.meta, 
+                ...(parsed.meta || {}) 
+            },
+            villain_state: { 
+                ...gameState.villain_state, 
+                ...(parsed.villain_state || {}) 
+            },
+            narrative: {
+                ...gameState.narrative,
+                ...(parsed.narrative || {})
+            },
+            // Logic for arrays (replace, do not merge items, to allow removal)
+            npc_states: parsed.npc_states || gameState.npc_states || [],
+            location_state: parsed.location_state ? {
+                ...gameState.location_state,
+                ...parsed.location_state,
+                room_map: { ...gameState.location_state.room_map, ...(parsed.location_state.room_map || {}) }
+            } : gameState.location_state
+        };
+
+        // Safety enforcement for critical fields
+        if (!simulatedState.narrative.visual_motif && gameState.narrative.visual_motif) {
+            simulatedState.narrative.visual_motif = gameState.narrative.visual_motif;
+        }
+        if (!simulatedState.meta.player_profile && gameState.meta.player_profile) {
+            simulatedState.meta.player_profile = gameState.meta.player_profile;
+        }
+        if (gameState.villain_state.victim_profile && !simulatedState.villain_state.victim_profile) {
+            simulatedState.villain_state.victim_profile = gameState.villain_state.victim_profile;
+        }
+
+    } catch (e) {
+        console.error("Simulator Parse Error", e);
+        // If parse fails, we continue with the original state to at least get a narrative response,
+        // rather than crashing the loop.
+    }
+
+    // 2. Narration Step (Prose)
+    const narrResponse = await ai.models.generateContent({
+        model: 'gemini-3-pro-preview',
+        contents: `SIMULATED STATE: ${JSON.stringify(simulatedState)}`,
+        config: { 
+            systemInstruction: NARRATOR_INSTRUCTION,
+            responseMimeType: 'application/json'
+        }
+    });
+
+    const parsed = parseResponse(narrResponse.text || "");
+    
+    // 3. Final State Resolution
+    const finalState = parsed.gameState || simulatedState;
+    let finalStoryText = parsed.storyText;
+    let generatedImageUrl: string | undefined;
+
+    // [IMAGE GENERATION TRIGGER]
+    if (finalStoryText.includes('[SELF_PORTRAIT]')) {
+        const villain = finalState.villain_state;
+        const motif = finalState.narrative.visual_motif || "Cinematic Horror";
+        
+        const prompt = `A terrifying, cinematic self-portrait of the horror antagonist "${villain.name}". 
+        Form/Appearance: ${villain.archetype}. 
+        Visual Style: ${motif}. 
+        High contrast, nightmare fuel, photorealistic 8k, Unreal Engine 5 render style. The image should be striking and evoke dread.`;
+
+        try {
+            const imageRes = await ai.models.generateContent({
+                model: 'gemini-2.5-flash-image',
+                contents: { parts: [{ text: prompt }] },
+                config: { imageConfig: { aspectRatio: '16:9' } }
+            });
+            
+            for (const part of imageRes.candidates?.[0]?.content?.parts || []) {
+                if (part.inlineData) {
+                    generatedImageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                    // Remove the placeholder tag
+                    finalStoryText = finalStoryText.replace(/\[SELF_PORTRAIT\]/g, ''); 
+                }
+            }
+        } catch (e) {
+            console.error("Portrait Generation Failed", e);
+        }
+    }
+
+    return {
+        gameState: finalState,
+        storyText: finalStoryText,
+        imageUrl: generatedImageUrl
+    };
+};
+
+export const runStressTest = async (config: SimulationConfig, initialState: GameState, onLog: (log: string, cycle: number) => void): Promise<void> => {
+    const ai = getAI();
+    let currentState = JSON.parse(JSON.stringify(initialState));
+    let logBuffer = "";
+    
+    const log = (msg: string) => {
+        logBuffer += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+        onLog(logBuffer, 0); // Cycle updated in loop
+    };
+
+    log("Starting Stress Test...");
+
+    for (let i = 1; i <= config.cycles; i++) {
+        log(`\n--- CYCLE ${i}/${config.cycles} ---`);
+        onLog(logBuffer, i);
+        
+        // 1. Generate Action
+        log("Generating Auto-Player Action...");
+        try {
+            const actionRes = await ai.models.generateContent({
+                model: 'gemini-3-flash-preview',
+                contents: `STATE: ${JSON.stringify(currentState)}\nACTION:`,
+                config: { systemInstruction: PLAYER_SYSTEM_INSTRUCTION }
+            });
+            const action = actionRes.text || "Wait.";
+            log(`Action: "${action}"`);
+
+            // 2. Simulate
+            log("Simulating Outcome...");
+            const simRes = await ai.models.generateContent({
+                model: 'gemini-3-flash-preview',
+                contents: `STATE: ${JSON.stringify(currentState)}\nACTION: ${action}`,
+                config: { 
+                    systemInstruction: SIMULATOR_INSTRUCTION,
+                    responseMimeType: 'application/json'
+                }
+            });
+
+            const nextState = JSON.parse(simRes.text || "{}");
+            // Simulator instruction says "Output ONLY updated JSON state"
+            currentState = nextState;
+            log(`State Updated. Turn: ${currentState.meta?.turn}`);
+            
+        } catch (e) {
+            log(`FATAL ERROR: ${e}`);
+            break;
+        }
+    }
+    log("\nStress Test Complete.");
 };

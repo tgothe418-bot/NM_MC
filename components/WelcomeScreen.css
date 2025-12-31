@@ -1,128 +1,44 @@
 
-/* Container: Deeper, oppressive darkness */
-.welcome-container {
-    position: fixed;
-    inset: 0;
-    z-index: 200;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background: radial-gradient(circle at center, #1a0000 0%, #000000 100%);
-    overflow: hidden;
-    font-family: 'Courier New', Courier, monospace;
-    user-select: none;
-}
+/* Container styles moved mostly to Tailwind for safety, keeping complex animations here */
 
-/* Claustrophobic Vignette */
 .vignette {
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle, transparent 30%, black 100%);
-    z-index: 215;
+    background: radial-gradient(circle, transparent 40%, #000000 100%);
     pointer-events: none;
 }
 
-/* Static Noise Overlay */
 .static-noise {
-    position: absolute;
-    inset: 0;
-    opacity: 0.03;
+    opacity: 0.04;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
     pointer-events: none;
-    z-index: 211;
 }
 
 /* Watcher Effects */
-.watcher-overlay {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    transition: opacity 0.1s ease;
-    z-index: 205;
-}
-
-.watcher-overlay.visible {
-    opacity: 0.15;
-    animation: eye-flicker 1s infinite;
-}
-
 .watcher-eyes {
-    display: flex;
-    gap: 100px;
-    color: #ff0000;
-}
-
-.eye-icon {
-    width: 40px;
-    height: 40px;
-    filter: drop-shadow(0 0 10px red);
+    opacity: 0.8;
 }
 
 /* Spectral Whispers */
-.whisper-text {
-    position: absolute;
-    top: 15%;
-    color: rgba(255, 255, 255, 0.2);
-    font-size: 0.8rem;
-    letter-spacing: 0.8em;
-    opacity: 0;
-    transition: all 1s ease;
-    text-transform: uppercase;
-}
-
 .whisper-text.active {
     opacity: 1;
     transform: translateY(-20px);
     filter: blur(1px);
 }
 
-/* Heartbeat Button Animation */
+/* Animations */
 @keyframes heartbeat {
     0% { transform: scale(1); box-shadow: 0 0 0px rgba(0, 255, 255, 0); }
-    10% { transform: scale(1.05); box-shadow: 0 0 20px rgba(0, 255, 255, 0.1); }
+    10% { transform: scale(1.02); box-shadow: 0 0 20px rgba(0, 255, 255, 0.1); }
     20% { transform: scale(1); }
-    30% { transform: scale(1.02); }
+    30% { transform: scale(1.01); }
     40% { transform: scale(1); }
 }
 
 .spooky-pulse {
-    animation: heartbeat 3s infinite ease-in-out;
-}
-
-.enter-button {
-    background: rgba(0, 0, 0, 0.6);
-    border: 1px solid #a0a0a0;
-    color: #ffffff;
-    padding: 2rem 6rem;
-    font-size: 1.5rem;
-    letter-spacing: 0.3em;
-    cursor: pointer;
-    overflow: hidden;
-    position: relative;
-    /* Margin removed here to prevent pushing; handled by spacing in parent */
-    margin-top: 2rem; 
-    transition: all 0.3s ease;
-}
-
-.enter-button:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: #ffffff;
-    box-shadow: 0 0 30px rgba(255, 255, 255, 0.1);
+    animation: heartbeat 4s infinite ease-in-out;
 }
 
 .blood-shine {
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 50%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-    transform: skewX(-25deg);
-    animation: blood-slide 5s infinite;
+    animation: blood-slide 4s infinite;
 }
 
 @keyframes blood-slide {
@@ -131,138 +47,41 @@
     100% { left: 150%; }
 }
 
-.warning-text {
-    color: #ff3333;
-    font-size: 0.85rem;
-    font-weight: 900;
-    letter-spacing: 0.1em;
-    text-align: center;
-    text-shadow: 0 0 15px rgba(255, 0, 0, 0.6);
-    line-height: 1.6;
-    text-transform: uppercase;
-}
-
-@keyframes eye-flicker {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
-}
-
-/* TITLE STABILITY CONTROLS */
-
-.title-wrapper {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3rem;
-    /* Fixed height reserves space so jittery text doesn't push elements around */
-    height: 40vh; 
-    min-height: 300px;
-    position: relative;
-}
-
-.title-primary {
-    font-size: clamp(8rem, 25vw, 18rem);
-    font-weight: 900;
-    letter-spacing: 0.1em;
-    color: #00ffff;
-    text-transform: uppercase;
-    position: relative;
-    
-    /* Strict dimensions to ignore Zalgo expansion */
-    line-height: 0.75; 
-    height: 0.75em;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    white-space: nowrap;
-    
-    animation: text-throb 4s ease-in-out infinite;
-    text-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
-}
-
-.title-secondary {
-    font-size: clamp(2.5rem, 7vw, 6rem);
-    font-weight: 700;
-    letter-spacing: 0.4em;
-    color: #ffffff;
-    text-transform: uppercase;
-    position: relative;
-    text-align: center;
-    
-    /* Strict dimensions to ignore Zalgo expansion */
-    line-height: 1;
-    height: 1em;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    white-space: nowrap;
-
-    animation: text-throb 5s ease-in-out infinite reverse;
-    text-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
-}
-
-/* Keyframes */
 @keyframes text-throb {
     0%, 100% { filter: drop-shadow(0 0 10px rgba(0, 255, 255, 0.1)); opacity: 1; }
     50% { filter: drop-shadow(0 0 25px rgba(0, 255, 255, 0.3)); opacity: 0.9; }
 }
 
 .aberration-layer {
-    position: absolute;
-    inset: 0;
     mix-blend-mode: screen;
-    pointer-events: none;
-    user-select: none;
 }
 
-.aberration-red {
-    color: #ff0000;
-    opacity: 0.6;
+.animate-glitch-1 {
     animation: glitch-anim-1 2.5s infinite linear alternate-reverse;
 }
 
-.aberration-cyan {
-    color: #00ffff;
-    opacity: 0.6;
+.animate-glitch-2 {
     animation: glitch-anim-2 3s infinite linear alternate-reverse;
 }
 
-.fog-layer {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    opacity: 0.3;
-}
 .fog-beam {
     position: absolute;
     width: 100%;
     height: 100px;
-    background: linear-gradient(90deg, transparent, rgba(255, 0, 0, 0.1), transparent);
+    background: linear-gradient(90deg, transparent, rgba(255, 0, 0, 0.05), transparent);
     filter: blur(40px);
     animation: beam-slide 10s ease-in-out infinite;
+    pointer-events: none;
 }
 
 .scanlines {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
     background: linear-gradient(to bottom, rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%);
     background-size: 100% 4px;
-    z-index: 210;
+    pointer-events: none;
 }
 
 .content-entrance {
     animation: fadeInUp 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2vh;
-    z-index: 220;
-    width: 100%;
-    max-width: 95vw;
-    padding-bottom: 5vh;
 }
 
 @keyframes fadeInUp {

@@ -50,12 +50,28 @@ const getAccentColor = (cluster?: string) => {
 };
 
 const applyTypographicAnomalies = (text: string): React.ReactNode[] => {
-  // Matches ANSI codes for Blue (34) and Red (31), plus existing keywords
-  const regex = /(\x1b\[34m[\s\S]*?\x1b\[0m)|(\x1b\[31m[\s\S]*?\x1b\[0m)|(\b(?:house|home|dwelling|hallway|hallways|corridor|room|rooms|walls|structure|place)\b|\b(?:minotaur|beast|monster|threat|horror)\b|\b(?:russet|crimson lake|crimson|cerulean sky|cerulean|cobalt|vermilion|ochre|umber|sienna|viridian)\b)/gi;
+  // Matches HTML span tags for color, ANSI codes, and specific keywords
+  const regex = /(<span style="color:[^"]+">[\s\S]*?<\/span>)|(\x1b\[34m[\s\S]*?\x1b\[0m)|(\x1b\[31m[\s\S]*?\x1b\[0m)|(\b(?:house|home|dwelling|hallway|hallways|corridor|room|rooms|walls|structure|place)\b|\b(?:minotaur|beast|monster|threat|horror)\b|\b(?:russet|crimson lake|crimson|cerulean sky|cerulean|cobalt|vermilion|ochre|umber|sienna|viridian)\b)/gi;
   
   const parts = text.split(regex).filter(p => p);
   
   return parts.map((part, index) => {
+    // HTML Span Tags (Fix for leaked code)
+    if (part.startsWith('<span')) {
+        const contentMatch = part.match(/>([\s\S]*?)<\/span>/i);
+        const content = contentMatch ? contentMatch[1] : part;
+        const isBlue = part.match(/color:\s*(blue|#0000ff)/i);
+        const isRed = part.match(/color:\s*(red|#ff0000)/i);
+
+        if (isBlue) {
+             return <span key={index} className="text-blue-400 font-bold drop-shadow-[0_0_8px_rgba(96,165,250,0.5)] animate-pulse">{content}</span>;
+        }
+        if (isRed) {
+             return <span key={index} className="text-red-500 font-bold drop-shadow-[0_0_8px_rgba(220,38,38,0.5)] animate-pulse">{content}</span>;
+        }
+        return <span key={index} className="text-gray-200 font-bold">{content}</span>;
+    }
+
     // ANSI Blue - System/Cold/Structure
     if (part.startsWith('\x1b[34m')) {
         const content = part.replace(/\x1b\[34m|\x1b\[0m/g, '');

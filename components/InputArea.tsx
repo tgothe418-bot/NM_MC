@@ -1,9 +1,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Activity, Camera, Mic, Film, FastForward } from 'lucide-react';
+import { Send, Activity, Camera, Mic, Film, FastForward, Paperclip, X, FileText, Image as ImageIcon } from 'lucide-react';
 
 interface InputAreaProps {
-  onSend: (text: string) => void;
+  onSend: (text: string, files: File[]) => void;
   onSnapshot?: () => void;
   onVideoCutscene?: () => void;
   onAdvance?: () => void;
@@ -14,7 +14,9 @@ interface InputAreaProps {
 
 export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVideoCutscene, onAdvance, isLoading, inputType = 'text', externalValue }) => {
   const [text, setText] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
 
   useEffect(() => {
@@ -26,9 +28,10 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (text.trim() && !isLoading) {
-      onSend(text);
+    if ((text.trim() || files.length > 0) && !isLoading) {
+      onSend(text, files);
       setText('');
+      setFiles([]);
       setIsVoiceActive(false);
     }
   };
@@ -38,6 +41,19 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
       e.preventDefault();
       handleSubmit();
     }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files);
+      setFiles(prev => [...prev, ...newFiles]);
+    }
+    // Reset input so same file can be selected again if needed
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeFile = (index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   useEffect(() => {
@@ -51,80 +67,136 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
     <div className="relative w-full max-w-5xl mx-auto">
       <form onSubmit={handleSubmit} className="relative group">
         <div className={`absolute -inset-1 bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 rounded-2xl blur-md opacity-30 group-hover:opacity-70 transition duration-1000 ${isLoading ? 'animate-pulse' : ''} ${isVoiceActive ? 'opacity-90 from-red-900 via-red-600 to-red-900' : ''}`}></div>
-        <div className={`relative flex items-center bg-black/90 border-2 rounded-2xl p-4 shadow-3xl transition-all duration-700 backdrop-blur-xl ${isVoiceActive ? 'border-red-900 shadow-[0_0_40px_rgba(220,20,60,0.2)]' : 'border-gray-800 group-hover:border-gray-700'}`}>
+        <div className={`relative flex flex-col bg-black/90 border-2 rounded-2xl p-4 shadow-3xl transition-all duration-700 backdrop-blur-xl ${isVoiceActive ? 'border-red-900 shadow-[0_0_40px_rgba(220,20,60,0.2)]' : 'border-gray-800 group-hover:border-gray-700'}`}>
           
-          <div className="flex flex-col gap-2">
-            {onAdvance && (
-              <button
-                type="button"
-                onClick={onAdvance}
-                disabled={isLoading}
-                className="p-4 rounded-xl text-gray-500 hover:text-amber-500 hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed group/adv relative"
-                title="Advance Narrative"
-              >
-                 <FastForward className="w-8 h-8" />
-                 <span className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 text-xs bg-black border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg opacity-0 group-hover/adv:opacity-100 transition-opacity pointer-events-none whitespace-nowrap uppercase tracking-widest font-mono shadow-2xl">
-                   Yield Turn
-                 </span>
-              </button>
-            )}
+          {/* File Previews */}
+          {files.length > 0 && (
+            <div className="flex gap-3 px-2 mb-4 overflow-x-auto pb-2 custom-scrollbar">
+              {files.map((file, idx) => (
+                <div key={idx} className="relative flex items-center gap-3 bg-gray-900 border border-gray-700 rounded-lg p-2 pr-8 shrink-0 animate-fadeIn">
+                  {file.type.startsWith('image/') ? (
+                    <div className="w-8 h-8 rounded bg-gray-800 overflow-hidden relative">
+                        <img 
+                          src={URL.createObjectURL(file)} 
+                          alt="preview" 
+                          className="w-full h-full object-cover opacity-80"
+                        />
+                    </div>
+                  ) : (
+                    <FileText className="w-8 h-8 text-gray-500" />
+                  )}
+                  <div className="flex flex-col max-w-[120px]">
+                    <span className="text-xs text-gray-300 truncate font-mono">{file.name}</span>
+                    <span className="text-[9px] text-gray-600 uppercase tracking-wider">{(file.size / 1024).toFixed(1)} KB</span>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => removeFile(idx)}
+                    className="absolute top-1 right-1 text-gray-500 hover:text-red-500 transition-colors p-1"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
-            {onSnapshot && (
+          <div className="flex items-end gap-2">
+            <div className="flex flex-col gap-2 pb-1">
+              <input 
+                type="file" 
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                className="hidden"
+                multiple
+                accept="image/*,.txt,.md,.json,.csv"
+              />
+              
               <button
                 type="button"
-                onClick={onSnapshot}
+                onClick={() => fileInputRef.current?.click()}
                 disabled={isLoading}
-                className="p-4 rounded-xl text-gray-500 hover:text-system-cyan hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed group/cam relative"
-                title="Visualize Neural Landscape"
+                className="p-3 rounded-xl text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed relative group/attach"
+                title="Attach Data"
               >
-                 <Camera className="w-8 h-8" />
-                 <span className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 text-xs bg-black border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg opacity-0 group-hover/cam:opacity-100 transition-opacity pointer-events-none whitespace-nowrap uppercase tracking-widest font-mono shadow-2xl">
-                   Project Neural Image
-                 </span>
+                <Paperclip className="w-6 h-6" />
+                <span className="absolute left-full ml-4 top-1/2 -translate-y-1/2 text-xs bg-black border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg opacity-0 group-hover/attach:opacity-100 transition-opacity pointer-events-none whitespace-nowrap uppercase tracking-widest font-mono shadow-2xl z-20">
+                   Attach Data
+                </span>
               </button>
-            )}
 
-            {onVideoCutscene && (
-              <button
-                type="button"
-                onClick={onVideoCutscene}
-                disabled={isLoading}
-                className="p-4 rounded-xl text-gray-500 hover:text-red-500 hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed group/vid relative"
-                title="Cinematic Cutscene"
-              >
-                 <Film className="w-8 h-8" />
-                 <span className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 text-xs bg-black border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg opacity-0 group-hover/vid:opacity-100 transition-opacity pointer-events-none whitespace-nowrap uppercase tracking-widest font-mono shadow-2xl">
-                   Neural Video Projection
-                 </span>
-              </button>
-            )}
+              {onAdvance && (
+                <button
+                  type="button"
+                  onClick={onAdvance}
+                  disabled={isLoading}
+                  className="p-3 rounded-xl text-gray-500 hover:text-amber-500 hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed group/adv relative"
+                  title="Advance Narrative"
+                >
+                   <FastForward className="w-6 h-6" />
+                   <span className="absolute left-full ml-4 top-1/2 -translate-y-1/2 text-xs bg-black border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg opacity-0 group-hover/adv:opacity-100 transition-opacity pointer-events-none whitespace-nowrap uppercase tracking-widest font-mono shadow-2xl z-20">
+                     Yield Turn
+                   </span>
+                </button>
+              )}
+
+              {onSnapshot && (
+                <button
+                  type="button"
+                  onClick={onSnapshot}
+                  disabled={isLoading}
+                  className="p-3 rounded-xl text-gray-500 hover:text-system-cyan hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed group/cam relative"
+                  title="Visualize Neural Landscape"
+                >
+                   <Camera className="w-6 h-6" />
+                   <span className="absolute left-full ml-4 top-1/2 -translate-y-1/2 text-xs bg-black border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg opacity-0 group-hover/cam:opacity-100 transition-opacity pointer-events-none whitespace-nowrap uppercase tracking-widest font-mono shadow-2xl z-20">
+                     Project Neural Image
+                   </span>
+                </button>
+              )}
+
+              {onVideoCutscene && (
+                <button
+                  type="button"
+                  onClick={onVideoCutscene}
+                  disabled={isLoading}
+                  className="p-3 rounded-xl text-gray-500 hover:text-red-500 hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed group/vid relative"
+                  title="Cinematic Cutscene"
+                >
+                   <Film className="w-6 h-6" />
+                   <span className="absolute left-full ml-4 top-1/2 -translate-y-1/2 text-xs bg-black border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg opacity-0 group-hover/vid:opacity-100 transition-opacity pointer-events-none whitespace-nowrap uppercase tracking-widest font-mono shadow-2xl z-20">
+                     Neural Video Projection
+                   </span>
+                </button>
+              )}
+            </div>
+
+            <div className="relative w-full px-4 self-center">
+              {isVoiceActive && (
+                   <div className="absolute -top-10 left-4 flex items-center gap-3 text-xs text-red-500 font-mono uppercase tracking-[0.4em] animate-pulse font-bold">
+                       <Mic className="w-4 h-4" /> System Listening...
+                   </div>
+              )}
+              <textarea
+                  ref={textareaRef}
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={isLoading ? "Architect is reweaving the simulation..." : (isVoiceActive ? "Speak to the Void..." : "Define your volition...")}
+                  disabled={isLoading}
+                  rows={1}
+                  className={`w-full bg-transparent text-gray-100 placeholder-gray-700 px-2 py-4 focus:outline-none resize-none font-serif text-2xl max-h-64 disabled:opacity-50 transition-all ${isVoiceActive ? 'text-red-100 placeholder-red-900/40' : ''}`}
+              />
+            </div>
+            
+            <button
+              type="submit"
+              disabled={(!text.trim() && files.length === 0) || isLoading}
+              className={`p-4 rounded-xl text-gray-600 hover:text-white hover:bg-gray-800 transition-all disabled:opacity-10 disabled:cursor-not-allowed self-end ${isVoiceActive ? 'text-red-500 hover:bg-red-900/30 animate-pulse' : ''}`}
+            >
+              {isLoading ? <Activity className="w-8 h-8 animate-spin" /> : <Send className="w-8 h-8" />}
+            </button>
           </div>
-
-          <div className="relative w-full px-4">
-            {isVoiceActive && (
-                 <div className="absolute -top-10 left-4 flex items-center gap-3 text-xs text-red-500 font-mono uppercase tracking-[0.4em] animate-pulse font-bold">
-                     <Mic className="w-4 h-4" /> System Listening...
-                 </div>
-            )}
-            <textarea
-                ref={textareaRef}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={isLoading ? "Architect is reweaving the simulation..." : (isVoiceActive ? "Speak to the Void..." : "Define your volition...")}
-                disabled={isLoading}
-                rows={1}
-                className={`w-full bg-transparent text-gray-100 placeholder-gray-700 px-2 py-4 focus:outline-none resize-none font-serif text-2xl max-h-64 disabled:opacity-50 transition-all ${isVoiceActive ? 'text-red-100 placeholder-red-900/40' : ''}`}
-            />
-          </div>
-          
-          <button
-            type="submit"
-            disabled={!text.trim() || isLoading}
-            className={`p-4 rounded-xl text-gray-600 hover:text-white hover:bg-gray-800 transition-all disabled:opacity-10 disabled:cursor-not-allowed ${isVoiceActive ? 'text-red-500 hover:bg-red-900/30 animate-pulse' : ''}`}
-          >
-            {isLoading ? <Activity className="w-8 h-8 animate-spin" /> : <Send className="w-8 h-8" />}
-          </button>
         </div>
       </form>
     </div>

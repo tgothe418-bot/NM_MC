@@ -4,7 +4,7 @@ import { LORE_LIBRARY } from '../loreLibrary';
 import { STYLE_GUIDE } from './styleGuide';
 
 /**
- * THE SENSORY ENGINE (Sensorium V4.0 - Style Aware)
+ * THE SENSORY ENGINE (Sensorium V4.1 - Style Aware)
  */
 
 const getRandomElements = (arr: string[], count: number): string[] => {
@@ -42,11 +42,13 @@ export const constructSensoryManifesto = (gameState: GameState): string => {
     const smells = getRandomElements(lore.sensoryInjectors.smell, quantity);
     const sounds = getRandomElements(lore.sensoryInjectors.sound, quantity);
     const touches = getRandomElements(lore.sensoryInjectors.touch, quantity);
-    
+    const verbs = getRandomElements(style.preferred_verbs, 5); // Inject preferred verbs
+    const concepts = getRandomElements(style.key_concepts, 3);
+
     // 4. Construct the Manifesto
     let manifesto = `\n\n*** SENSORY & STYLE MANIFESTO (CLUSTER: ${lore.displayName.toUpperCase()}) ***\n`;
     manifesto += `AESTHETIC PROTOCOL: ${style.prose_style}\n`;
-    manifesto += `CORE CONCEPTS: ${style.key_concepts.join(", ")}\n`;
+    manifesto += `CORE CONCEPTS: ${concepts.join(" | ")}\n`;
     
     manifesto += `\nCRITICAL INTEGRATION RULES (STRICT):\n`;
     STYLE_GUIDE.narrative_rules.forEach(rule => {
@@ -54,10 +56,15 @@ export const constructSensoryManifesto = (gameState: GameState): string => {
     });
 
     manifesto += `\nVOCABULARY BLACKLIST (NEVER USE THESE VERBATIM):\n`;
+    const randomBlacklist = getRandomElements(STYLE_GUIDE.vocabulary_blacklist, 5); // Just show a few random ones to save tokens, or all? 
+    // Actually, listing all is safer for the model to know what NOT to use.
     STYLE_GUIDE.vocabulary_blacklist.forEach(word => {
       manifesto += ` - "${word}"\n`;
     });
     
+    manifesto += `\nPREFERRED VERBS (USE THESE TO DRIVE ACTION):\n`;
+    manifesto += ` - ${verbs.join(", ")}\n`;
+
     manifesto += `\nSENSORY ANCHORS (USE AS CONCEPTUAL SEEDS ONLY):\n`;
     manifesto += ` - SMELL: ${smells.join(", ")}\n`;
     manifesto += ` - SOUND: ${sounds.join(", ")}\n`;

@@ -1,5 +1,4 @@
 
-
 // Types for the Nightmare Machine simulation engine
 
 export interface ClusterWeights {
@@ -21,6 +20,10 @@ export interface SimulationConfig {
   villain_methods?: string;
   primary_goal?: string;
   victim_description?: string;
+  // Survivor Fields
+  survivor_name?: string;
+  survivor_background?: string;
+  survivor_traits?: string;
 }
 
 export interface VillainState {
@@ -29,6 +32,7 @@ export interface VillainState {
   threat_scale: number; 
   primary_goal: string;
   current_tactic: string; 
+  victim_profile?: string;
 }
 
 export interface HiddenAgenda {
@@ -48,16 +52,29 @@ export interface DialogueEntry {
   sentiment: string;
   turn: number;
   timestamp: number;
+  type?: 'dialogue' | 'action' | 'observation' | 'internal';
+  importance?: number; // 0-100 scale of significance
+  tags?: string[];
+}
+
+export interface MemoryEpisode {
+  id: string;
+  turn: number;
+  description: string;
+  emotional_impact: number; // -10 (Traumatic) to 10 (Redemptive)
+  involved_actors: string[];
 }
 
 export interface DialogueMemory {
   short_term_buffer: DialogueEntry[]; 
   long_term_summary: string; 
+  episodic_logs: MemoryEpisode[];
+  known_facts: string[];
 }
 
 export interface VoiceSignature {
-  rhythm: 'Staccato' | 'Lyrical' | 'Breathless' | 'Monotone' | 'Erratic';
-  syntax_complexity: 'Simple' | 'Academic' | 'Broken' | 'Flowery';
+  rhythm: 'Staccato' | 'Lyrical' | 'Breathless' | 'Monotone' | 'Erratic' | 'Measured' | 'Rapid' | 'Whispering' | 'Halting' | 'Booming';
+  syntax_complexity: 'Simple' | 'Academic' | 'Broken' | 'Flowery' | 'Technical' | 'Vague' | 'Precise' | 'Street' | 'Formal';
   catchphrases: string[];
   ticks: string[]; 
   cultural_markers: string[]; 
@@ -93,7 +110,7 @@ export interface PsychologicalProfile {
   core_trauma: string;
   breaking_point_trigger: string;
   shadow_self: string; 
-  moral_compass: 'Altruistic' | 'Utilitarian' | 'Self-Preserving' | 'Nihilistic';
+  moral_compass: 'Altruistic' | 'Utilitarian' | 'Self-Preserving' | 'Nihilistic' | 'Loyalist';
 }
 
 export interface ClusterResonance {
@@ -106,6 +123,7 @@ export interface NpcState {
   name: string;
   archetype: string; 
   background_origin: string;
+  portrait_url?: string;
   origin?: {
     region: string;
     ethnicity: string;
@@ -137,6 +155,9 @@ export interface NpcState {
     build: string;
     distinguishing_feature: string;
     clothing_style: string;
+    hair_style?: string;
+    eye_color?: string;
+    skin_tone?: string;
   };
   relationship_state?: {
     trust: number;
@@ -206,6 +227,11 @@ export interface GameState {
     mode: 'Survivor' | 'Villain' | 'Pending';
     intensity_level: string;
     active_cluster: string;
+    player_profile?: {
+        name: string;
+        background: string;
+        traits: string;
+    };
   };
   villain_state: VillainState;
   npc_states: NpcState[];

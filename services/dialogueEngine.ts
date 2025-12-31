@@ -1,5 +1,6 @@
 
 
+
 import { NpcState, DialogueEntry, KnowledgeNode, SocialManeuver, DialogueMemory, DialogueState } from '../types';
 
 /**
@@ -15,7 +16,9 @@ export const getDefaultDialogueState = (background: string = ""): DialogueState 
     },
     memory: {
         short_term_buffer: [],
-        long_term_summary: background || "No prior history recorded."
+        long_term_summary: background || "No prior history recorded.",
+        episodic_logs: [],
+        known_facts: []
     },
     last_social_maneuver: 'OBSERVE',
     mood_state: "Neutral",
@@ -84,15 +87,32 @@ const getShareableKnowledge = (npc: NpcState, intent: SocialManeuver): string[] 
 
 const synthesizeMemory = (memory: DialogueMemory): string => {
     if (!memory) return "CONTEXT: Lost to the void.\n";
-    let summary = `LONG TERM CONTEXT: ${memory.long_term_summary || "Unknown"}\n`;
+    let summary = `\nMEMORY MATRIX:\n`;
+    
+    if (memory.known_facts && memory.known_facts.length > 0) {
+        summary += `[ESTABLISHED FACTS]:\n - ${memory.known_facts.slice(-5).join("\n - ")}\n`;
+    }
+
+    summary += `[CORE NARRATIVE]: ${memory.long_term_summary || "Unknown"}\n`;
+    
+    // Add Episodic Context (Significant Events)
+    if (memory.episodic_logs && memory.episodic_logs.length > 0) {
+        const recent = memory.episodic_logs.slice(-3);
+        summary += `[KEY MEMORIES (TRAUMA)]: \n`;
+        recent.forEach(ep => {
+            summary += ` - (Turn ${ep.turn}) ${ep.description} [Impact: ${ep.emotional_impact}]\n`;
+        });
+    }
+
     if (memory.short_term_buffer && memory.short_term_buffer.length > 0) {
         summary += `IMMEDIATE CONTEXT:\n`;
-        memory.short_term_buffer.forEach(entry => {
+        memory.short_term_buffer.slice(-5).forEach(entry => {
             if (entry) {
                 // Maximum defense for text properties
                 const textContent = (typeof entry.text === 'string' ? entry.text : String(entry.text || ""));
                 const speakerName = entry.speaker || "Unknown";
-                summary += `   - ${speakerName}: "${textContent.substring(0, 60)}..."\n`;
+                const typeTag = entry.type ? `[${entry.type.toUpperCase()}]` : '';
+                summary += `   - ${typeTag} ${speakerName}: "${textContent.substring(0, 100)}..."\n`;
             }
         });
     }
@@ -100,7 +120,7 @@ const synthesizeMemory = (memory: DialogueMemory): string => {
 };
 
 export const updateNpcMemory = (currentMemory: DialogueMemory, newEntry: DialogueEntry): DialogueMemory => {
-    const MAX_BUFFER_SIZE = 5;
+    const MAX_BUFFER_SIZE = 8;
     const buffer = [...(currentMemory.short_term_buffer || []), newEntry];
     if (buffer.length > MAX_BUFFER_SIZE) buffer.shift();
 
@@ -155,6 +175,8 @@ export const constructVoiceManifesto = (npcs: NpcState[]): string => {
 
         manifesto += `CURRENT STATE: Stress ${npc.psychology?.stress_level || 0}/100. Intent: [${intent}].\n`;
         manifesto += `THOUGHT: "${npc.psychology?.current_thought || "..."}"\n`;
+        
+        // Use synthesized memory with episodic logs
         manifesto += synthesizeMemory(ds.memory);
         
         manifesto += `>>> DIRECTIVE: ${intent}.\n`;

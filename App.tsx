@@ -1,63 +1,143 @@
-
 import React, { useState, useEffect, useRef } from 'react';
+import { GameState, SimulationConfig, ChatMessage, NpcState } from './types';
+import { WelcomeScreen } from './components/WelcomeScreen';
+import { SetupOverlay } from './components/SetupOverlay';
 import { StatusPanel } from './components/StatusPanel';
 import { StoryLog } from './components/StoryLog';
 import { InputArea } from './components/InputArea';
-import { ClusterAmbience } from './components/ClusterAmbience';
 import { SimulationModal } from './components/SimulationModal';
-import { SetupOverlay } from './components/SetupOverlay';
-import { WelcomeScreen } from './components/WelcomeScreen';
-import { sendMessageToGemini, initializeGemini, generateAutoPlayerAction, generateSimulationAnalysis, generateHorrorImage, generateCinematicVideo, generateNpcActions, simulateTurn, generateCalibrationField } from './services/geminiService';
-import { GameState, ChatMessage, SimulationConfig, NpcState } from './types';
-import { constructVoiceManifesto } from './services/dialogueEngine';
-import { constructSensoryManifesto } from './services/sensoryEngine';
-import { constructLocationManifesto, getDefaultLocationState, constructRoomGenerationRules } from './services/locationEngine';
-import { createNpcFactory } from './services/npcGenerator';
-import { Terminal, Lock, Key, Activity } from 'lucide-react';
+import { ApiKeyModal } from './components/ApiKeyModal';
+import { VoiceControl } from './components/VoiceControl';
+import { INITIAL_GREETING } from './constants';
+import { generateAutoPlayerAction, processGameTurn } from './services/geminiService';
+import { getDefaultLocationState } from './services/locationEngine';
 
-const INITIAL_STATE: GameState = {
-  meta: { turn: 50, perspective: "Pending", mode: 'Pending', intensity_level: "Level 1", active_cluster: "None" },
-  villain_state: { name: "Unknown", archetype: "Unknown", threat_scale: 0, primary_goal: "Dormant", current_tactic: "Dormant" },
-  npc_states: [],
-  location_state: getDefaultLocationState(),
-  narrative: { visual_motif: "", illustration_request: null }
-};
-
-const App: React.FC = () => {
-  const [history, setHistory] = useState<ChatMessage[]>([]);
-  const [gameState, setGameState] = useState<GameState>(INITIAL_STATE);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSplashComplete, setIsSplashComplete] = useState(false);
+export default function App() {
+  const [apiKey, setApiKey] = useState(process.env.API_KEY || "");
   const [isInitialized, setIsInitialized] = useState(false);
-  const [showKeySelection, setShowKeySelection] = useState(true);
-
-  // Auto-Pilot State
-  const [autoMode, setAutoMode] = useState<{ active: boolean; remainingCycles: number }>({
-    active: false,
-    remainingCycles: 0
+  const [showSetup, setShowSetup] = useState(false);
+  
+  const [gameState, setGameState] = useState<GameState>({
+    meta: { turn: 50, perspective: 'First Person', mode: 'Survivor', intensity_level: 'Level 3', active_cluster: 'None' },
+    villain_state: { name: 'Unknown', archetype: 'Unknown', threat_scale: 0, primary_goal: 'Unknown', current_tactic: 'None' },
+    npc_states: [],
+    location_state: getDefaultLocationState(),
+    narrative: { visual_motif: '', illustration_request: null }
   });
 
-  // Simulation Modal State
-  const [isSimulationModalOpen, setIsSimulationModalOpen] = useState(false);
-  const [isTesting, setIsTesting] = useState(false);
-  const [simulationReport, setSimulationReport] = useState<string | null>(null);
+  const [history, setHistory] = useState<ChatMessage[]>([{ 
+    role: 'model', 
+    text: INITIAL_GREETING, 
+    timestamp: Date.now() 
+  }]);
 
+  const [isLoading, setIsLoading] = useState(false);
+  const [autoMode, setAutoMode] = useState({ active: false, remainingCycles: 0 });
+  const [showSimModal, setShowSimModal] = useState(false);
+
+  // Helper to ensure global API key access if set via modal
   useEffect(() => {
-    const check = async () => {
-      const has = await (window as any).aistudio.hasSelectedApiKey();
-      if (has) { setShowKeySelection(false); initializeGemini(); }
-    };
-    check();
-  }, []);
+    if (apiKey && !process.env.API_KEY) {
+      Object.assign(process.env, { API_KEY: apiKey });
+    }
+  }, [apiKey]);
 
-  const handleSelectKey = async () => {
-    await (window as any).aistudio.openSelectKey();
-    setShowKeySelection(false);
-    initializeGemini();
+  const handleSetupComplete = (config: SimulationConfig) => {
+    // Initialize Game State based on config
+    const newState: GameState = {
+        meta: {
+            turn: config.starting_point === 'Prologue' ? 50 : config.starting_point === 'In Media Res' ? 25 : 10,
+            perspective: config.perspective,
+            mode: config.mode as 'Survivor' | 'Villain',
+            intensity_level: config.intensity,
+            active_cluster: config.cluster,
+            // If survivor fields are present, store them in meta so Gemini knows who the user is
+            player_profile: config.survivor_name || config.survivor_background ? {
+                name: config.survivor_name || "Survivor",
+                background: config.survivor_background || "No history provided.",
+                traits: config.survivor_traits || "Unknown"
+            } : undefined
+        },
+        villain_state: {
+            name: config.villain_name || "The Entity",
+            archetype: config.villain_appearance || "Unknown Horror",
+            threat_scale: 1,
+            primary_goal: config.primary_goal || "Consumption",
+            current_tactic: "Stalking",
+            victim_profile: config.victim_description || "Unknown Victims"
+        },
+        npc_states: [], // Will be populated by Simulator
+        location_state: {
+            ...getDefaultLocationState(),
+            architectural_notes: config.location_description ? [config.location_description] : []
+        },
+        narrative: {
+            visual_motif: config.visual_motif || "Standard Cinematic",
+            illustration_request: null
+        }
+    };
+    
+    setGameState(newState);
+    setShowSetup(false);
+    setIsInitialized(true);
+    
+    // Initial Narration Trigger - MUST PASS newState to avoid stale closure state
+    handleSendMessage("BEGIN SIMULATION. ESTABLISH CONTEXT AND ATMOSPHERE BASED ON PARAMETERS.", [], newState);
   };
 
-  const handleWelcomeComplete = () => {
-    setIsSplashComplete(true);
+  const handleSendMessage = async (text: string, files: File[] = [], overrideState?: GameState) => {
+    if (isLoading) return;
+
+    // Add user message to history (unless it's the system start command)
+    if (!text.includes("BEGIN SIMULATION")) {
+        setHistory(prev => [...prev, { role: 'user', text, timestamp: Date.now() }]);
+    }
+    
+    setIsLoading(true);
+
+    // CRITICAL: Use overrideState if provided (initial setup), otherwise use current state
+    const currentState = overrideState || gameState;
+
+    try {
+        const result = await processGameTurn(currentState, text);
+        
+        setGameState(result.gameState);
+        setHistory(prev => [...prev, { 
+            role: 'model', 
+            text: result.storyText, 
+            gameState: result.gameState, 
+            imageUrl: result.imageUrl,
+            timestamp: Date.now() 
+        }]);
+
+    } catch (e) {
+        console.error("Game Loop Error:", e);
+        setHistory(prev => [...prev, { 
+            role: 'model', 
+            text: "CRITICAL FAILURE: The simulation has desynchronized. Please reset parameters.", 
+            timestamp: Date.now() 
+        }]);
+    } finally {
+        setIsLoading(false);
+    }
+  };
+
+  // Wrapper for Voice/Status Panel
+  const processAction = async (action: string): Promise<string> => {
+     await handleSendMessage(action);
+     // Return the last model message text
+     return history[history.length - 1].text; 
+  };
+
+  // State Updater for specific NPC (passed to StatusPanel -> CharacterPortrait)
+  const handleUpdateNpc = (npcIndex: number, updates: Partial<NpcState>) => {
+    setGameState(prev => {
+      const newNpcs = [...prev.npc_states];
+      if (newNpcs[npcIndex]) {
+          newNpcs[npcIndex] = { ...newNpcs[npcIndex], ...updates };
+      }
+      return { ...prev, npc_states: newNpcs };
+    });
   };
 
   // --- AUTO-PILOT LOGIC ---
@@ -73,7 +153,7 @@ const App: React.FC = () => {
             const action = await generateAutoPlayerAction(gameState);
             if (action) {
               // Feed action into the main loop
-              await handleSendMessage(`[AUTO-ACTION]: ${action}`);
+              await handleSendMessage(action);
               // Decrement counter
               setAutoMode(prev => ({ ...prev, remainingCycles: prev.remainingCycles - 1 }));
             }
@@ -90,352 +170,71 @@ const App: React.FC = () => {
     runAutoTurn();
 
     return () => clearTimeout(timeoutId);
-  }, [autoMode, isLoading, isInitialized, gameState]); // Re-run when state settles
+  }, [autoMode, isLoading, isInitialized, gameState]); 
 
-  const handleSendMessage = async (text: string, isInitial = false, stateOverride?: GameState): Promise<string> => {
-    setIsLoading(true);
-    if (!isInitial) setHistory(prev => [...prev, { role: 'user', text, timestamp: Date.now() }]);
+  // --- RENDER ---
 
-    // Use override if provided, otherwise current state
-    const currentState = stateOverride || gameState;
-
-    try {
-      // Pass 0: NPC Agency (with fallback)
-      let npcActions: string[] = [];
-      try {
-        // We must use currentState here to ensure initial conditions are respected
-        npcActions = await generateNpcActions(currentState, text);
-      } catch (err) {
-        console.warn("NPC Agency skipped due to error:", err);
-      }
-
-      // Pass 1: Simulation
-      let simulated = await simulateTurn(currentState, text, npcActions);
-      
-      // Pass 1.5: Room Enrichment
-      // If the user moved to a new room, we ensure the description is rich and cluster-specific.
-      const prevRoomId = currentState.location_state.current_room_id;
-      const currRoomId = simulated.location_state.current_room_id;
-      
-      if (currRoomId !== prevRoomId) {
-          const room = simulated.location_state.room_map[currRoomId];
-          // We check if it needs enrichment (always enrich new rooms for high fidelity)
-          if (room) {
-              const generationRules = constructRoomGenerationRules(simulated);
-              try {
-                const enrichedDesc = await generateCalibrationField(
-                    "Atmospheric Description",
-                    simulated.meta.active_cluster,
-                    simulated.meta.intensity_level,
-                    undefined,
-                    `Describe the location "${room.name}".\nCONTEXT: ${generationRules}.\nCURRENT DRAFT: ${room.description_cache || "None"}`
-                );
-                
-                if (enrichedDesc) {
-                    simulated.location_state.room_map[currRoomId] = {
-                        ...room,
-                        description_cache: enrichedDesc
-                    };
-                }
-              } catch (e) {
-                console.warn("Room enrichment failed, using default:", e);
-              }
-          }
-      }
-
-      const voiceM = constructVoiceManifesto(simulated.npc_states);
-      const sensoryM = constructSensoryManifesto(simulated);
-      const locationM = constructLocationManifesto(simulated.location_state);
-      
-      // Pass 2: Narration
-      // Note: sendMessageToGemini internally handles the JSON schema correction for rooms array
-      const responseText = await sendMessageToGemini(text, simulated, voiceM + sensoryM + locationM);
-      const parsed = JSON.parse(responseText);
-      
-      const nextState = {
-        ...parsed.game_state,
-        location_state: {
-          ...parsed.game_state.location_state,
-          // Merge map from simulated state with updates from narrator
-          room_map: { 
-              ...simulated.location_state.room_map, 
-              ...(parsed.game_state.location_state.room_map || {}) 
-          }
-        }
-      };
-
-      setGameState(nextState);
-      setHistory(prev => [...prev, { role: 'model', text: parsed.story_text, timestamp: Date.now() }]);
-      return parsed.story_text;
-    } catch (e) {
-      console.error(e);
-      return "The connection fails.";
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSetupComplete = async (config: SimulationConfig) => {
-    setIsInitialized(true);
-
-    // If auto-pilot cycles are requested, initialize the auto mode state
-    if (config.cycles > 0) {
-      setAutoMode({
-        active: true,
-        remainingCycles: config.cycles
-      });
-    }
-
-    // Determine pacing vars based on starting_point (COUNTDOWN LOGIC)
-    let startTurn = 50; // Default Prologue (40+ turns remaining)
-    let startThreat = 1;
-    let pacingInstruction = "PACING: PROLOGUE (40+ Turns Left). Slow burn. Establish atmosphere.";
-
-    if (config.starting_point === 'In Media Res') {
-        startTurn = 20; // 15-25 range
-        startThreat = 3;
-        pacingInstruction = "PACING: IN MEDIA RES (20 Turns Left). Immediate danger. Bypass introductions.";
-    } else if (config.starting_point === 'Climax') {
-        startTurn = 8; // 0-10 range
-        startThreat = 5;
-        pacingInstruction = "PACING: CLIMAX (8 Turns Left). The end is here. High stakes, immediate confrontation.";
-    }
-    
-    // CONSTRUCT INITIAL STATE FROM CONFIG
-    // This ensures fidelity from Turn 0 by passing the configured state directly to the simulator
-    
-    // 1. Location
-    const initialLocation = getDefaultLocationState(config.cluster);
-    if (config.location_description) {
-        const startRoomId = initialLocation.current_room_id;
-        initialLocation.room_map[startRoomId].description_cache = config.location_description;
-        initialLocation.room_map[startRoomId].name = "Starting Location";
-    }
-
-    // 2. Villain
-    const initialVillainState = {
-        name: config.villain_name || "Unknown Entity",
-        archetype: config.villain_appearance || "Unknown Archetype",
-        threat_scale: startThreat,
-        primary_goal: config.primary_goal || "Unknown",
-        current_tactic: config.villain_methods || "Dormant"
-    };
-
-    // 3. Generate NPCs (Client-Side)
-    let initialNpcs: NpcState[] = [];
-    if (config.mode === 'Villain' && config.victim_count) {
-        // First one uses the description (The "Hero" / Focus)
-        if (config.victim_description) {
-            initialNpcs.push(await createNpcFactory(config.cluster, config.intensity, config.victim_description));
-        } else {
-            initialNpcs.push(await createNpcFactory(config.cluster, config.intensity));
-        }
-        
-        // The rest are procedural fillers
-        for (let i = 1; i < (config.victim_count || 1); i++) {
-            initialNpcs.push(await createNpcFactory(config.cluster, config.intensity));
-        }
-    }
-
-    // 4. Meta & Narrative
-    const initialMeta = {
-        turn: startTurn,
-        perspective: config.perspective,
-        mode: config.mode as any,
-        intensity_level: config.intensity,
-        active_cluster: config.cluster
-    };
-    
-    const initialNarrative = {
-        visual_motif: config.visual_motif || "",
-        illustration_request: null
-    };
-
-    const initialState: GameState = {
-        ...INITIAL_STATE,
-        meta: initialMeta,
-        villain_state: initialVillainState,
-        location_state: initialLocation,
-        narrative: initialNarrative,
-        npc_states: initialNpcs // Simulator will see these immediately
-    };
-
-    setGameState(initialState);
-    
-    // Construct Prompt
-    let startPrompt = `INITIALIZE SIMULATION.
-    [CONFIGURATION]
-    - Mode: ${config.mode}
-    - Perspective: ${config.perspective}
-    - Theme: ${config.cluster} (${config.intensity})
-    - Visual Style: ${config.visual_motif || "Standard"}
-    - Starting Location: ${config.location_description || "Standard"}
-    - Temporal Point: ${config.starting_point} (T-Minus ${startTurn} Turns)
-    
-    ${pacingInstruction}
-    `;
-
-    if (config.mode === 'Villain') {
-        startPrompt += `
-    [ANTAGONIST SETUP]
-    - Name: ${config.villain_name}
-    - Goal: ${config.primary_goal}
-    - Methods: ${config.villain_methods}
-    
-    [ACTIVE SUBJECTS]:
-    ${JSON.stringify(initialNpcs.map(n => ({ name: n.name, archetype: n.archetype, origin: n.background_origin })))}
-
-    DIRECTIVE: These subjects are present in the starting location. Initiate the narrative.
-        `;
-    } else {
-        startPrompt += `
-    [SURVIVAL SETUP]
-    - Threat: ${config.villain_name || "Hidden"}
-    
-    DIRECTIVE: Establish the atmosphere. The threat is present but maybe not yet visible.
-        `;
-    }
-
-    // Pass the fully constructed initial state to the engine
-    await handleSendMessage(startPrompt, true, initialState);
-  };
-
-  // --- Modal & Test Handlers ---
-
-  const handleOpenSimulation = () => {
-    setIsSimulationModalOpen(true);
-  };
-
-  const handleCloseSimulation = () => {
-    setIsSimulationModalOpen(false);
-  };
-
-  const handleRunSimulationFromModal = async (config: SimulationConfig, continueSession: boolean = false) => {
-    setIsSimulationModalOpen(false);
-
-    if (continueSession) {
-         // Update meta-state locally first to reflect changes immediately
-         setGameState(prev => ({
-             ...prev,
-             meta: {
-                 ...prev.meta,
-                 perspective: config.perspective,
-                 mode: config.mode as any,
-                 intensity_level: config.intensity,
-                 active_cluster: config.cluster
-             }
-         }));
-
-         // Inject into current session
-         const updatePrompt = `
-SYSTEM OVERRIDE: PARAMETER RE-CALIBRATION
-[NEW CONFIGURATION]:
-- Perspective: ${config.perspective}
-- Mode: ${config.mode}
-- Intensity: ${config.intensity}
-- Cluster: ${config.cluster}
-- Temporal Adjustment: ${config.starting_point}
-${config.mode === 'Villain' ? `
-- Villain Identity: ${config.villain_name || "Unchanged"}
-- Goal: ${config.primary_goal || "Unchanged"}
-- Methods: ${config.villain_methods || "Unchanged"}
-` : ''}
-
-DIRECTIVE: Acknowledge these changes and seamlessly integrate them into the ongoing narrative. 
-If the Mode changed (e.g., to Villain), shift the narrative voice immediately.
-         `;
-         await handleSendMessage(updatePrompt, false);
-    } else {
-        // Reset Standard
-        setHistory([]);
-        setIsInitialized(true);
-        setAutoMode({ active: false, remainingCycles: 0 }); // Reset auto mode
-        
-        // Slight delay to allow UI to clear
-        setTimeout(async () => {
-           // We reuse the explicit initialization logic logic for fidelity
-           await handleSetupComplete(config);
-        }, 500);
-    }
-  };
-
-  if (showKeySelection) {
-    return (
-      <div className="fixed inset-0 bg-void flex items-center justify-center p-6 z-[300]">
-        <div className="bg-terminal border border-fresh-blood p-12 max-w-xl text-center space-y-10 shadow-2xl">
-          <Lock className="w-20 h-20 text-fresh-blood mx-auto animate-pulse" />
-          <h2 className="text-3xl font-mono text-white uppercase">Neural Key Required</h2>
-          <button onClick={handleSelectKey} className="w-full bg-fresh-blood text-black font-bold py-6 font-mono flex items-center justify-center gap-4">
-            <Key /> Select Neural Key
-          </button>
-          <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noreferrer" className="text-xs text-gray-500 block uppercase">Billing Docs</a>
-        </div>
-      </div>
-    );
+  if (!apiKey) return <ApiKeyModal onSetKey={setApiKey} />;
+  
+  if (!isInitialized && !showSetup) {
+      return <WelcomeScreen onStart={() => setShowSetup(true)} />;
+  }
+  
+  if (showSetup) {
+      return <SetupOverlay onComplete={handleSetupComplete} />;
   }
 
   return (
-    <div className="flex h-screen w-full bg-void text-gray-200 overflow-hidden font-sans relative">
-      {isSplashComplete && (
-        <ClusterAmbience 
-          activeCluster={gameState.meta.active_cluster} 
-          threatLevel={gameState.villain_state.threat_scale} 
+    <div className="flex h-screen bg-[#050505] text-gray-200 overflow-hidden font-sans">
+        
+        {/* Left Panel: Status & Diagnostics */}
+        <StatusPanel 
+            gameState={gameState} 
+            onProcessAction={processAction} 
+            onOpenSimulation={() => setShowSimModal(true)}
+            isTesting={autoMode.active}
+            onAbortTest={() => setAutoMode({ active: false, remainingCycles: 0 })}
+            onUpdateNpc={handleUpdateNpc}
         />
-      )}
-      
-      {!isSplashComplete && <WelcomeScreen onStart={handleWelcomeComplete} />}
-      {isSplashComplete && !isInitialized && <SetupOverlay onComplete={handleSetupComplete} />}
-      
-      <div className={`relative z-10 flex w-full h-full bg-black/40 backdrop-blur-md transition-all duration-1000 ${isInitialized ? 'opacity-100' : 'opacity-0'}`}>
-        <div className="hidden lg:block h-full">
-           <StatusPanel 
-                gameState={gameState} 
-                onProcessAction={handleSendMessage} 
-                onOpenSimulation={handleOpenSimulation} 
-                isTesting={isTesting || autoMode.active} 
-                onAbortTest={() => {
-                  setIsTesting(false);
-                  setAutoMode({ active: false, remainingCycles: 0 });
-                }} 
+
+        {/* Center: Main Narrative Log */}
+        <div className="flex-1 flex flex-col relative">
+            <StoryLog 
+                history={history} 
+                isLoading={isLoading} 
+                activeCluster={gameState.meta.active_cluster}
             />
-        </div>
-        <div className="flex-1 flex flex-col h-full overflow-hidden">
-            <div className="h-16 border-b border-gray-800 flex items-center px-8 bg-black/80">
-                <Terminal className="w-6 h-6 mr-4 text-gray-500" />
-                <h1 className="font-serif text-2xl tracking-widest">NIGHTMARE MACHINE <span className="text-xs text-gray-600 ml-2">v3.5</span></h1>
-                {autoMode.active && (
-                  <div className="ml-auto flex items-center gap-2 px-4 py-1 bg-amber-900/30 border border-amber-600/50 rounded text-amber-500 text-xs font-mono uppercase tracking-widest animate-pulse">
-                    <Activity className="w-3 h-3" /> Auto-Pilot Active ({autoMode.remainingCycles})
-                  </div>
-                )}
-            </div>
-            <StoryLog history={history} isLoading={isLoading} activeCluster={gameState.meta.active_cluster} />
-            <div className="p-8 bg-gradient-to-t from-black to-transparent">
+            
+            <div className="p-6 bg-gradient-to-t from-black via-black to-transparent z-20">
                 <InputArea 
-                  onSend={handleSendMessage} 
-                  isLoading={isLoading || autoMode.active} 
-                  onAdvance={() => handleSendMessage("( The protagonist pauses, letting the moment stretch. )")}
+                    onSend={(text, files) => handleSendMessage(text, files)} 
+                    isLoading={isLoading} 
+                    onAdvance={() => handleSendMessage("Wait. Observe.")}
                 />
             </div>
+            
+            {/* Overlay Controls */}
+            <div className="absolute top-6 right-6 z-30">
+                <VoiceControl onProcessAction={processAction} />
+            </div>
         </div>
-      </div>
 
-      <SimulationModal
-        isOpen={isSimulationModalOpen}
-        onClose={handleCloseSimulation}
-        onRunSimulation={handleRunSimulationFromModal}
-        isTesting={isTesting}
-        simulationReport={simulationReport}
-        initialPerspective={gameState.meta.perspective}
-        initialMode={gameState.meta.mode}
-        initialStart="Prologue"
-        initialCluster={gameState.meta.active_cluster}
-        initialIntensity={gameState.meta.intensity_level}
-        isSessionActive={isInitialized}
-        currentVillainState={gameState.villain_state}
-      />
+        {/* Simulation Modal */}
+        <SimulationModal 
+            isOpen={showSimModal} 
+            onClose={() => setShowSimModal(false)}
+            onRunSimulation={(config) => {
+                setShowSimModal(false);
+                // If cycles provided, start auto-pilot
+                if (config.cycles > 0) {
+                    setAutoMode({ active: true, remainingCycles: config.cycles });
+                }
+            }}
+            isTesting={autoMode.active}
+            simulationReport={null}
+            initialCluster={gameState.meta.active_cluster}
+            currentVillainState={gameState.villain_state}
+        />
     </div>
   );
-};
-
-export default App;
+}

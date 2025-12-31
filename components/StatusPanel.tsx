@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { GameState } from '../types';
-import { Skull, Radio, Users, Eye, Brain, ChevronDown, ChevronRight, GripVertical, Activity, ZapOff, Stethoscope, Cpu, FileText, Square, Target } from 'lucide-react';
+import { GameState, NpcState } from '../types';
+import { Skull, Radio, Users, Eye, Brain, ChevronDown, ChevronRight, GripVertical, Activity, ZapOff, Stethoscope, Cpu, FileText, Square, Target, BookOpen, AlertCircle } from 'lucide-react';
+import { CharacterPortrait } from './CharacterPortrait';
 
 interface StatusPanelProps {
   gameState: GameState;
@@ -9,6 +10,7 @@ interface StatusPanelProps {
   onOpenSimulation: () => void;
   isTesting: boolean;
   onAbortTest: () => void;
+  onUpdateNpc?: (index: number, updates: Partial<NpcState>) => void;
 }
 
 export const StatusPanel: React.FC<StatusPanelProps> = ({ 
@@ -16,7 +18,8 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
     onProcessAction, 
     onOpenSimulation, 
     isTesting, 
-    onAbortTest
+    onAbortTest,
+    onUpdateNpc
 }) => {
   const { meta, villain_state, npc_states } = gameState;
   const threatLevel = villain_state?.threat_scale || 0;
@@ -228,6 +231,8 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
                     const stress = npc.psychology?.stress_level || 0;
                     const isInjured = npc.active_injuries?.length > 0;
                     const isPsychoticBreak = stress > 100;
+                    const memories = npc.dialogue_state?.memory?.episodic_logs || [];
+                    const facts = npc.dialogue_state?.memory?.known_facts || [];
                     
                     return (
                         <div 
@@ -238,23 +243,25 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
                                : 'bg-[#0c0c0c] border-gray-800 hover:border-gray-700'
                            }`}
                         >
-                            <button 
-                               onClick={() => toggleNpc(npc.name)}
-                               className="w-full text-left p-4 flex items-center justify-between group"
-                            >
-                                <div className="flex items-center gap-4">
-                                    <div className={`w-0.5 h-10 rounded-full ${isAnomaly ? 'bg-system-green' : isPsychoticBreak ? 'bg-red-500' : 'bg-gray-800'}`} />
-                                    <div>
+                            {/* Summary Row */}
+                            <div className="w-full flex items-center justify-between p-3 bg-black/20 hover:bg-black/40 transition-colors">
+                                <div className="flex items-center gap-4 flex-1">
+                                    <CharacterPortrait 
+                                        npc={npc} 
+                                        onUpdateNpc={(updates) => onUpdateNpc && onUpdateNpc(idx, updates)} 
+                                    />
+                                    
+                                    <button onClick={() => toggleNpc(npc.name)} className="flex-1 text-left">
                                         <div className={`font-bold text-sm tracking-widest uppercase ${isAnomaly ? 'text-system-green' : 'text-gray-200'}`}>
                                             {npc.name}
                                         </div>
                                         <div className="text-[9px] text-gray-600 uppercase tracking-[0.2em] font-mono mt-0.5">
                                             {npc.archetype}
                                         </div>
-                                    </div>
+                                    </button>
                                 </div>
                                 
-                                <div className="flex items-center gap-4">
+                                <button onClick={() => toggleNpc(npc.name)} className="flex items-center gap-4 px-2">
                                     <div className="flex gap-1.5 mr-2">
                                         <div 
                                           className={`w-2 h-2 rounded-full ${stress > 70 ? 'bg-red-600' : stress > 40 ? 'bg-orange-500' : 'bg-green-600'} shadow-[0_0_5px_rgba(0,0,0,0.5)]`} 
@@ -266,8 +273,8 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
                                         />
                                     </div>
                                     {isExpanded ? <ChevronDown className="w-3 h-3 text-gray-500" /> : <ChevronRight className="w-3 h-3 text-gray-500" />}
-                                </div>
-                            </button>
+                                </button>
+                            </div>
 
                             {isExpanded && (
                                 <div className="px-6 pb-6 text-[11px] animate-fadeIn space-y-5 border-t border-gray-800/50 pt-5 bg-black/40">
@@ -317,6 +324,49 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
                                             <div className="text-gray-600 italic">"{npc.physical?.distinguishing_feature}"</div>
                                         </div>
                                     </div>
+
+                                    {/* MEMORY & FACTS */}
+                                    {(memories.length > 0 || facts.length > 0) && (
+                                        <div className="bg-indigo-950/10 p-4 rounded-sm border border-indigo-900/30">
+                                            <div className="flex items-center gap-2 text-[9px] text-indigo-400 uppercase tracking-[0.2em] font-bold mb-3">
+                                                <BookOpen className="w-3.5 h-3.5" /> Memory Matrix
+                                            </div>
+                                            
+                                            {facts.length > 0 && (
+                                                <div className="mb-4">
+                                                     <div className="text-[8px] text-gray-600 uppercase tracking-widest mb-2 font-mono">Learned Truths</div>
+                                                     <ul className="space-y-1">
+                                                        {facts.slice(-3).map((f, i) => (
+                                                            <li key={i} className="text-[9px] text-gray-400 border-l-2 border-indigo-500/30 pl-2">
+                                                                {f}
+                                                            </li>
+                                                        ))}
+                                                     </ul>
+                                                </div>
+                                            )}
+
+                                            {memories.length > 0 && (
+                                                <div>
+                                                     <div className="text-[8px] text-gray-600 uppercase tracking-widest mb-2 font-mono">Traumatic Episodes</div>
+                                                     <div className="space-y-2">
+                                                        {memories.slice(-2).map((m, i) => (
+                                                            <div key={i} className="bg-black/40 p-2 rounded border border-gray-800 flex flex-col gap-1">
+                                                                <div className="flex justify-between items-center text-[8px] text-gray-500 font-mono uppercase">
+                                                                    <span>Turn {m.turn}</span>
+                                                                    <span className={m.emotional_impact < 0 ? 'text-red-500' : 'text-green-500'}>
+                                                                        Impact: {m.emotional_impact}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="text-[10px] text-gray-300 italic">
+                                                                    "{m.description}"
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                     </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
                                     {npc.active_injuries?.length > 0 && (
                                         <div className="bg-red-950/10 p-4 rounded-sm border border-red-900/20">
