@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { GameState, SimulationConfig, ChatMessage, NpcState } from './types';
 import { WelcomeScreen } from './components/WelcomeScreen';
@@ -78,7 +79,7 @@ export default function App() {
         },
         narrative: {
             visual_motif: config.visual_motif || "Standard Cinematic",
-            illustration_request: null
+            illustration_request: "Establishing Shot" // Force initial request in state
         }
     };
     
@@ -87,7 +88,7 @@ export default function App() {
     setIsInitialized(true);
     
     // Initial Narration Trigger - MUST PASS newState to avoid stale closure state
-    handleSendMessage("BEGIN SIMULATION. ESTABLISH CONTEXT AND ATMOSPHERE BASED ON PARAMETERS.", [], newState);
+    handleSendMessage("BEGIN SIMULATION. ESTABLISH CONTEXT. GENERATE VISUALS.", [], newState);
   };
 
   const handleResetGame = () => {

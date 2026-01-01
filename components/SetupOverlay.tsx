@@ -1,7 +1,9 @@
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Terminal, ShieldAlert, Cpu, Eye, Settings, Image, Zap, Play, Check, Users, Target, UserCheck, Skull, Wand2, Info, ChevronRight, MessageSquare, Monitor, Loader2, Sparkles, StickyNote, Bot, Activity, Layers, Timer, Clapperboard, MapPin, Hourglass, Fingerprint, Ghost, Flame, Radio, Upload, UserPlus } from 'lucide-react';
 import { SimulationConfig } from '../types';
-import { generateCalibrationField, analyzeImageContext, generateCharacterProfile } from '../services/geminiService';
+import { generateCalibrationField, analyzeImageContext, generateCharacterProfile, generateScenarioConcepts } from '../services/geminiService';
 import { NeuralPet } from './NeuralPet';
 
 interface SetupOverlayProps {
@@ -94,6 +96,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
   const [locationDescription, setLocationDescription] = useState('');
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [testCycles, setTestCycles] = useState(10);
+  const [isGeneratingIdeas, setIsGeneratingIdeas] = useState(false);
 
   const [generatingFields, setGeneratingFields] = useState<Record<string, boolean>>({});
   const [activeImageField, setActiveImageField] = useState<string | null>(null);
@@ -252,6 +255,30 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
       } finally {
           setGeneratingFields(prev => ({ ...prev, 'character_builder': false }));
       }
+  };
+
+  const handleAutoPopulate = async () => {
+    setIsGeneratingIdeas(true);
+    try {
+        const concepts = await generateScenarioConcepts(selectedClusters.join(', '), intensity, mode);
+        
+        if (concepts) {
+            if (concepts.villain_name) setVillainName(concepts.villain_name);
+            if (concepts.villain_appearance) setVillainAppearance(concepts.villain_appearance);
+            if (concepts.villain_methods) setVillainMethods(concepts.villain_methods);
+            if (concepts.primary_goal) setPrimaryGoal(concepts.primary_goal);
+            if (concepts.victim_description) setVictimDescription(concepts.victim_description);
+            if (concepts.survivor_name) setSurvivorName(concepts.survivor_name);
+            if (concepts.survivor_background) setSurvivorBackground(concepts.survivor_background);
+            if (concepts.survivor_traits) setSurvivorTraits(concepts.survivor_traits);
+            if (concepts.location_description) setLocationDescription(concepts.location_description);
+            if (concepts.visual_motif) setVisualMotif(concepts.visual_motif);
+        }
+    } catch (e) {
+        console.error("Auto Populate Error", e);
+    } finally {
+        setIsGeneratingIdeas(false);
+    }
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -616,12 +643,22 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
               <p className="text-sm font-mono text-gray-500 tracking-[0.4em] uppercase mt-2">Direct Hardware Interface // Neural Synchronization</p>
             </div>
           </div>
-          <button 
-            onClick={() => setSetupMode('choice')}
-            className="text-gray-600 hover:text-white transition-colors text-xs uppercase tracking-[0.5em] flex items-center gap-3 border border-gray-800 px-8 py-4 bg-black/40 hover:bg-gray-800/40"
-          >
-            Switch Mode
-          </button>
+          <div className="flex items-center gap-4">
+              <button 
+                onClick={handleAutoPopulate}
+                disabled={isGeneratingIdeas}
+                className="text-fresh-blood hover:text-white transition-colors text-xs uppercase tracking-[0.2em] flex items-center gap-3 border border-fresh-blood px-6 py-4 bg-fresh-blood/10 hover:bg-fresh-blood/30 rounded-sm disabled:opacity-50"
+              >
+                {isGeneratingIdeas ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                Give me some ideas
+              </button>
+              <button 
+                onClick={() => setSetupMode('choice')}
+                className="text-gray-600 hover:text-white transition-colors text-xs uppercase tracking-[0.5em] flex items-center gap-3 border border-gray-800 px-8 py-4 bg-black/40 hover:bg-gray-800/40"
+              >
+                Switch Mode
+              </button>
+          </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-16">
           <div className="space-y-4 group relative">
@@ -945,12 +982,22 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
   const renderSimulationMode = () => (
     <div className="flex flex-col h-full overflow-hidden bg-[#0a0a0a]">
       {/* Header */}
-      <div className="p-10 border-b border-amber-500/20 bg-amber-950/10 flex-shrink-0 flex items-center gap-6">
-         <Bot className="w-12 h-12 text-amber-500" />
-         <div>
-            <h2 className="text-4xl font-serif italic text-amber-500 tracking-wide">Telling you a story about...</h2>
-            <p className="text-sm font-mono text-amber-700/80 uppercase tracking-widest mt-1">Sit back. I'll handle the nightmare.</p>
+      <div className="p-10 border-b border-amber-500/20 bg-amber-950/10 flex-shrink-0 flex items-center justify-between gap-6">
+         <div className="flex items-center gap-6">
+            <Bot className="w-12 h-12 text-amber-500" />
+            <div>
+               <h2 className="text-4xl font-serif italic text-amber-500 tracking-wide">Telling you a story about...</h2>
+               <p className="text-sm font-mono text-amber-700/80 uppercase tracking-widest mt-1">Sit back. I'll handle the nightmare.</p>
+            </div>
          </div>
+         <button 
+            onClick={handleAutoPopulate}
+            disabled={isGeneratingIdeas}
+            className="text-amber-500 hover:text-white transition-colors text-xs uppercase tracking-[0.2em] flex items-center gap-3 border border-amber-500 px-6 py-4 bg-amber-500/10 hover:bg-amber-500/30 rounded-sm disabled:opacity-50"
+         >
+            {isGeneratingIdeas ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            Give me some ideas
+         </button>
       </div>
 
       {/* Scrollable Form */}

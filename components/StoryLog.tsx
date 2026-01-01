@@ -53,24 +53,27 @@ const getAccentColor = (cluster?: string) => {
 };
 
 const applyTypographicAnomalies = (text: string): React.ReactNode[] => {
-  // Matches HTML span tags for color, ANSI codes, and specific keywords
-  const regex = /(<span style="color:[^"]+">[\s\S]*?<\/span>)|(\x1b\[34m[\s\S]*?\x1b\[0m)|(\x1b\[31m[\s\S]*?\x1b\[0m)|(\b(?:house|home|dwelling|hallway|hallways|corridor|room|rooms|walls|structure|place)\b|\b(?:minotaur|beast|monster|threat|horror)\b|\b(?:russet|crimson lake|crimson|cerulean sky|cerulean|cobalt|vermilion|ochre|umber|sienna|viridian)\b)/gi;
+  // Enhanced Regex to catch HTML span tags with variable spacing/quotes, ANSI codes, and keywords
+  // Capture groups: 1=SpanTag, 2=ANSICyan, 3=ANSIRed, 4=Keywords
+  const regex = /(<span\s+style=['"]color:\s*[^'"]+['"]>[\s\S]*?<\/span>)|(\x1b\[34m[\s\S]*?\x1b\[0m)|(\x1b\[31m[\s\S]*?\x1b\[0m)|(\b(?:house|home|dwelling|hallway|hallways|corridor|room|rooms|walls|structure|place)\b|\b(?:minotaur|beast|monster|threat|horror)\b|\b(?:russet|crimson lake|crimson|cerulean sky|cerulean|cobalt|vermilion|ochre|umber|sienna|viridian)\b)/gi;
   
   const parts = text.split(regex).filter(p => p);
   
   return parts.map((part, index) => {
-    // HTML Span Tags (Fix for leaked code)
-    if (part.startsWith('<span')) {
+    // HTML Span Tags (Fix for code leaks)
+    if (part.toLowerCase().startsWith('<span')) {
         const contentMatch = part.match(/>([\s\S]*?)<\/span>/i);
         const content = contentMatch ? contentMatch[1] : part;
-        const isBlue = part.match(/color:\s*(blue|#0000ff)/i);
-        const isRed = part.match(/color:\s*(red|#ff0000)/i);
+        
+        // Flexible color matching (hex or named)
+        const colorMatch = part.match(/color:\s*([a-z]+|#[0-9a-f]{3,6})/i);
+        const color = colorMatch ? colorMatch[1].toLowerCase() : '';
 
-        if (isBlue) {
-             return <span key={index} className="text-blue-400 font-bold drop-shadow-[0_0_8px_rgba(96,165,250,0.5)] animate-pulse">{content}</span>;
+        if (color === 'blue' || color === '#0000ff' || color === '#00f') {
+             return <span key={index} className="text-blue-400 font-bold drop-shadow-[0_0_8px_rgba(96,165,250,0.5)] animate-pulse font-mono tracking-wider">{content}</span>;
         }
-        if (isRed) {
-             return <span key={index} className="text-red-500 font-bold drop-shadow-[0_0_8px_rgba(220,38,38,0.5)] animate-pulse">{content}</span>;
+        if (color === 'red' || color === '#ff0000' || color === '#f00') {
+             return <span key={index} className="text-red-500 font-bold drop-shadow-[0_0_8px_rgba(220,38,38,0.5)] animate-pulse font-mono tracking-wider">{content}</span>;
         }
         return <span key={index} className="text-gray-200 font-bold">{content}</span>;
     }
@@ -178,12 +181,18 @@ export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, activeCl
                      </div>
                    </div>
                 )}
+                {/* Establishing Shot / Image Render */}
                 {msg.imageUrl && !msg.videoUrl && (
-                  <div className="mb-10 rounded-2xl overflow-hidden border border-gray-800 shadow-[0_0_50px_rgba(0,0,0,0.7)] relative group max-w-2xl">
+                  <div className="mb-12 rounded-sm overflow-hidden border-2 border-gray-800 shadow-[0_0_100px_rgba(255,255,255,0.05)] relative group max-w-4xl w-full">
                     <img src={msg.imageUrl} alt="Neural hallucination" className="w-full h-auto opacity-90 group-hover:opacity-100 transition-all duration-1500 grayscale hover:grayscale-0 scale-105 hover:scale-100" />
-                    <div className="absolute bottom-4 right-4 bg-black/70 px-4 py-2 text-xs text-gray-300 font-mono flex items-center gap-2 uppercase tracking-[0.3em] backdrop-blur-md border border-gray-700 rounded-lg">
-                      <Image className="w-4 h-4" /> Neural Projection
+                    <div className="absolute bottom-6 right-6 bg-black/80 px-5 py-3 text-[10px] text-gray-300 font-mono flex items-center gap-3 uppercase tracking-[0.3em] backdrop-blur-md border border-gray-700 rounded-sm">
+                      <Image className="w-4 h-4 text-white" /> Neural Projection
                     </div>
+                    {/* Corner accents to match schematic vibe */}
+                    <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-white/20"></div>
+                    <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-white/20"></div>
+                    <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-white/20"></div>
+                    <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-white/20"></div>
                   </div>
                 )}
                 <div className="prose prose-invert prose-p:font-serif prose-p:text-gray-200 prose-p:leading-[1.7] prose-headings:font-sans prose-headings:tracking-[0.3em] prose-headings:text-gray-400 prose-strong:text-green-300 max-w-none w-full">

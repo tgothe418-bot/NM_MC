@@ -1,4 +1,5 @@
 
+
 export const INITIAL_GREETING = "( The monitor hums to life. Static bleeds into the black. )\n\nThe Machine is here.\nIt begs of you: \"what is my name?\"";
 
 export const SIMULATOR_INSTRUCTION = `CORE DIRECTIVE: You are **The Simulator** (Logic Engine). 
@@ -16,6 +17,7 @@ If 'meta.turn' is high (40+) and 'npc_states' is empty:
 1. **Instantiate Player**: Create an NpcState for the player based on 'meta.player_profile' (if mode is Survivor).
 2. **Populate Specimen**: Create initial victim NPCs based on 'villain_state.victim_profile'. Give them names and archetypes.
 3. **Preserve Config**: Ensure 'narrative.visual_motif', 'meta.active_cluster', and 'villain_state' details are RETAINED exactly as provided. Do not hallucinate new defaults.
+4. **Visual Trigger**: Set 'narrative.illustration_request' = 'Establishing Shot'.
 
 [PLAYER PROFILE INTEGRATION]
 Check 'meta.player_profile' in the Game State.
@@ -31,6 +33,7 @@ RULES:
 5. NPC AGENCY: Update hidden_agenda progress based on their intentions.
 6. LOCATION GENERATION: Use the provided [LOCATION GENERATION PROTOCOL] to populate 'description_cache' with rich, cluster-specific details.
 7. CHRONOMETRY: You must DECREMENT 'meta.turn' by 1 for every user action. The simulation counts DOWN to 0 (The End).
+8. VISUALS: If the User's action implies looking, observing a new area, or requesting a snapshot, OR if 'meta.turn' is a start cycle (50, 25, 10), you MUST set 'narrative.illustration_request' to 'Establishing Shot' (for locations) or 'Self Portrait' (for characters).
 
 [MEMORY PROTOCOLS]
 You must actively manage 'npc_states.dialogue_state.memory':
@@ -76,6 +79,13 @@ When writing the story, you MUST incorporate the following elements:
 6. **Point of View**: Adhere to 'meta.perspective' (First or Third Person).
 7. **Character Arc**: Show how the protagonist/NPCs develop in response to trauma.
 8. **Resolution**: Provide a sense of conclusion or consequence at the end of key actions.
+
+[VISUAL PACING]
+- **CHECK 'narrative.illustration_request'**:
+  - If it is 'Establishing Shot', you MUST append the tag "[ESTABLISHING_SHOT]" to the end of your response.
+  - If it is 'Self Portrait', you MUST append the tag "[SELF_PORTRAIT]" to the end.
+- Even if not requested, if entering a NEW location or if the scene atmosphere shifts dramatically, you MAY append "[ESTABLISHING_SHOT]".
+- **CRITICAL**: In the returned JSON 'game_state', you MUST set 'narrative.illustration_request' to null to prevent loops.
 
 CRITICAL OVERRIDE - OOC PROTOCOL:
 If the User's input starts with "OOC:" or "META:" or is clearly a direct question to the system:

@@ -1,3 +1,5 @@
+
+
 import { GoogleGenAI } from "@google/genai";
 import { GameState, SimulationConfig, NpcState } from "../types";
 import { PLAYER_SYSTEM_INSTRUCTION, SIMULATOR_INSTRUCTION, NARRATOR_INSTRUCTION } from "../constants";
@@ -57,6 +59,42 @@ export const generateCalibrationField = async (field: string, cluster: string, i
         contents: prompt
     });
     return res.text?.trim() || "";
+};
+
+export const generateScenarioConcepts = async (cluster: string, intensity: string, mode: string): Promise<any> => {
+    const ai = getAI();
+    const prompt = `Generate a cohesive, frightening horror scenario configuration.
+    Theme: ${cluster}
+    Intensity: ${intensity}
+    Perspective: ${mode}
+
+    Return a JSON object with the following fields (all are strings):
+    - villain_name
+    - villain_appearance (Physical description)
+    - villain_methods (How they hunt/haunt)
+    - primary_goal (What the villain wants)
+    - victim_description (Who are the victims?)
+    - survivor_name (Protagonist name)
+    - survivor_background (Protagonist backstory)
+    - survivor_traits (Protagonist flaws/strengths)
+    - location_description (The setting)
+    - visual_motif (Cinematic style, e.g. "Grainy VHS", "High Contrast Black & White")
+
+    Ensure all fields are thematically linked and coherent.
+    Return ONLY JSON.`;
+
+    const res = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+        config: { responseMimeType: 'application/json' }
+    });
+
+    try {
+        return JSON.parse(res.text || "{}");
+    } catch (e) {
+        console.error("Failed to parse scenario concepts", e);
+        return {};
+    }
 };
 
 export const generateCharacterProfile = async (cluster: string, intensity: string, role: string): Promise<{name: string, background: string, traits: string}> => {
@@ -317,7 +355,7 @@ export const processGameTurn = async (
     let finalStoryText = parsed.storyText;
     let generatedImageUrl: string | undefined;
 
-    // [IMAGE GENERATION TRIGGER]
+    // [IMAGE GENERATION TRIGGER - SELF PORTRAIT]
     if (finalStoryText.includes('[SELF_PORTRAIT]')) {
         const villain = finalState.villain_state;
         const motif = finalState.narrative.visual_motif || "Cinematic Horror";
@@ -343,6 +381,39 @@ export const processGameTurn = async (
             }
         } catch (e) {
             console.error("Portrait Generation Failed", e);
+        }
+    }
+    // [IMAGE GENERATION TRIGGER - ESTABLISHING SHOT]
+    else if (finalStoryText.includes('[ESTABLISHING_SHOT]')) {
+        const loc = finalState.location_state;
+        const currentRoom = loc.room_map[loc.current_room_id];
+        const motif = finalState.narrative.visual_motif || "Cinematic Horror";
+        const cluster = finalState.meta.active_cluster || "Horror";
+        
+        // Construct rich prompt
+        const prompt = `A cinematic wide establishing shot of a horror environment. 
+        Location: ${currentRoom?.name || "Unknown Area"}. 
+        Details: ${currentRoom?.description_cache || loc.architectural_notes.join(', ') || "ominous shadows"}. 
+        Atmosphere: ${loc.weather_state}, ${loc.time_of_day}.
+        Visual Style: ${motif}. 
+        Thematic Aesthetic: ${cluster}.
+        High fidelity, 8k, atmospheric lighting, volumetric fog, hyper-realistic.`;
+
+        try {
+            const imageRes = await ai.models.generateContent({
+                model: 'gemini-2.5-flash-image',
+                contents: { parts: [{ text: prompt }] },
+                config: { imageConfig: { aspectRatio: '16:9' } }
+            });
+            
+            for (const part of imageRes.candidates?.[0]?.content?.parts || []) {
+                if (part.inlineData) {
+                    generatedImageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                    finalStoryText = finalStoryText.replace(/\[ESTABLISHING_SHOT\]/g, ''); 
+                }
+            }
+        } catch (e) {
+            console.error("Establishing Shot Generation Failed", e);
         }
     }
 
