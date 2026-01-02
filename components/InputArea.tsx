@@ -1,6 +1,11 @@
 
+
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Activity, Camera, Mic, Film, FastForward, Paperclip, X, FileText, Image as ImageIcon, Terminal } from 'lucide-react';
+import { 
+  Send, Activity, Camera, Film, FastForward, Paperclip, X, 
+  FileText, Terminal, ChevronRight, MessageSquare, Eye, 
+  Zap, Hand, Mic
+} from 'lucide-react';
 
 interface InputAreaProps {
   onSend: (text: string, files: File[]) => void;
@@ -12,9 +17,10 @@ interface InputAreaProps {
   externalValue?: string;
   showLogic?: boolean;
   onToggleLogic?: () => void;
+  options?: string[];
 }
 
-export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVideoCutscene, onAdvance, isLoading, inputType = 'text', externalValue, showLogic, onToggleLogic }) => {
+export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVideoCutscene, onAdvance, isLoading, inputType = 'text', externalValue, showLogic, onToggleLogic, options }) => {
   const [text, setText] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -35,6 +41,12 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
       setText('');
       setFiles([]);
       setIsVoiceActive(false);
+    }
+  };
+
+  const handleOptionClick = (option: string) => {
+    if (!isLoading) {
+      onSend(option, []);
     }
   };
 
@@ -65,8 +77,71 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
     }
   }, [text]);
 
+  const getActionStyle = (action: string) => {
+    const lower = action.toLowerCase();
+    
+    // Dialogue
+    if (lower.startsWith('"') || lower.startsWith("'") || lower.startsWith('ask') || lower.startsWith('say') || lower.startsWith('shout') || lower.startsWith('whisper') || lower.startsWith('threaten') || lower.startsWith('speak')) {
+      return { 
+        icon: MessageSquare, 
+        style: "border-indigo-800/60 text-indigo-300 bg-indigo-950/20 hover:bg-indigo-900/60 hover:border-indigo-400 hover:text-white hover:shadow-[0_0_15px_rgba(99,102,241,0.3)]",
+        label: "Dialogue"
+      };
+    }
+    // Observation / Examine
+    if (lower.startsWith('examine') || lower.startsWith('look') || lower.startsWith('scan') || lower.startsWith('inspect') || lower.startsWith('read') || lower.startsWith('search') || lower.startsWith('check')) {
+       return { 
+        icon: Eye, 
+        style: "border-cyan-800/60 text-cyan-300 bg-cyan-950/20 hover:bg-cyan-900/60 hover:border-cyan-400 hover:text-white hover:shadow-[0_0_15px_rgba(6,182,212,0.3)]",
+        label: "Observe"
+      };
+    }
+    // High Stakes Action / Combat
+    if (lower.startsWith('attack') || lower.startsWith('fight') || lower.startsWith('shoot') || lower.startsWith('kill') || lower.startsWith('run') || lower.startsWith('flee') || lower.startsWith('destroy')) {
+       return { 
+        icon: Zap, 
+        style: "border-red-800/60 text-red-300 bg-red-950/20 hover:bg-red-900/60 hover:border-red-400 hover:text-white hover:shadow-[0_0_15px_rgba(220,38,38,0.3)]",
+        label: "Action"
+      };
+    }
+    // Interaction
+    if (lower.startsWith('take') || lower.startsWith('grab') || lower.startsWith('use') || lower.startsWith('open') || lower.startsWith('pick') || lower.startsWith('enter') || lower.startsWith('barricade')) {
+       return { 
+        icon: Hand, 
+        style: "border-amber-800/60 text-amber-300 bg-amber-950/20 hover:bg-amber-900/60 hover:border-amber-400 hover:text-white hover:shadow-[0_0_15px_rgba(217,119,6,0.3)]",
+        label: "Interact"
+      };
+    }
+    // Default
+    return { 
+      icon: ChevronRight, 
+      style: "border-gray-800 bg-black/60 text-gray-400 hover:text-white hover:border-gray-500 hover:bg-gray-800",
+      label: "Option"
+    };
+  };
+
   return (
-    <div className="relative w-full max-w-5xl mx-auto">
+    <div className="relative w-full max-w-5xl mx-auto flex flex-col gap-4">
+      
+      {/* Options/Suggestions Area */}
+      {options && options.length > 0 && !isLoading && (
+        <div className="flex flex-wrap justify-end gap-3 mb-4 animate-fadeIn">
+          {options.map((option, idx) => {
+            const { icon: Icon, style } = getActionStyle(option);
+            return (
+              <button
+                key={idx}
+                onClick={() => handleOptionClick(option)}
+                className={`px-5 py-3 border rounded-sm text-sm font-mono tracking-wide transition-all duration-300 flex items-center gap-3 group backdrop-blur-md shadow-lg ${style}`}
+              >
+                <Icon className="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity group-hover:scale-110 duration-200" />
+                <span className="font-semibold">{option}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="relative group">
         <div className={`absolute -inset-1 bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 rounded-2xl blur-md opacity-30 group-hover:opacity-70 transition duration-1000 ${isLoading ? 'animate-pulse' : ''} ${isVoiceActive ? 'opacity-90 from-red-900 via-red-600 to-red-900' : ''}`}></div>
         <div className={`relative flex flex-col bg-black/90 border-2 rounded-2xl p-4 shadow-3xl transition-all duration-700 backdrop-blur-xl ${isVoiceActive ? 'border-red-900 shadow-[0_0_40px_rgba(220,20,60,0.2)]' : 'border-gray-800 group-hover:border-gray-700'}`}>

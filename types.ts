@@ -240,6 +240,7 @@ export interface GameState {
     visual_motif: string;
     illustration_request: string | null;
   };
+  suggested_actions?: string[];
   co_author_state?: any; 
 }
 

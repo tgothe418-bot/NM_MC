@@ -52,32 +52,21 @@ const getAccentColor = (cluster?: string) => {
   return "text-gray-400";
 };
 
+const getColorClass = (color: string) => {
+  const c = color.toLowerCase().trim();
+  if (c === 'blue' || c === '#0000ff' || c === '#00f') return "text-blue-400 font-bold drop-shadow-[0_0_8px_rgba(96,165,250,0.5)] animate-pulse font-mono tracking-wider";
+  if (c === 'red' || c === '#ff0000' || c === '#f00') return "text-red-500 font-bold drop-shadow-[0_0_8px_rgba(220,38,38,0.5)] animate-pulse font-mono tracking-wider";
+  return "text-gray-200 font-bold";
+};
+
+// Processes Keywords and ANSI codes only (Spans are handled at the parent level)
 const applyTypographicAnomalies = (text: string): React.ReactNode[] => {
-  // Enhanced Regex to catch HTML span tags with variable spacing/quotes, ANSI codes, and keywords
-  // Capture groups: 1=SpanTag, 2=ANSICyan, 3=ANSIRed, 4=Keywords
-  const regex = /(<span\s+style=['"]color:\s*[^'"]+['"]>[\s\S]*?<\/span>)|(\x1b\[34m[\s\S]*?\x1b\[0m)|(\x1b\[31m[\s\S]*?\x1b\[0m)|(\b(?:house|home|dwelling|hallway|hallways|corridor|room|rooms|walls|structure|place)\b|\b(?:minotaur|beast|monster|threat|horror)\b|\b(?:russet|crimson lake|crimson|cerulean sky|cerulean|cobalt|vermilion|ochre|umber|sienna|viridian)\b)/gi;
+  // Capture groups: 1=ANSICyan, 2=ANSIRed, 3=Keywords
+  const regex = /(\x1b\[34m[\s\S]*?\x1b\[0m)|(\x1b\[31m[\s\S]*?\x1b\[0m)|(\b(?:house|home|dwelling|hallway|hallways|corridor|room|rooms|walls|structure|place)\b|\b(?:minotaur|beast|monster|threat|horror)\b|\b(?:russet|crimson lake|crimson|cerulean sky|cerulean|cobalt|vermilion|ochre|umber|sienna|viridian)\b)/gi;
   
   const parts = text.split(regex).filter(p => p);
   
   return parts.map((part, index) => {
-    // HTML Span Tags (Fix for code leaks)
-    if (part.toLowerCase().startsWith('<span')) {
-        const contentMatch = part.match(/>([\s\S]*?)<\/span>/i);
-        const content = contentMatch ? contentMatch[1] : part;
-        
-        // Flexible color matching (hex or named)
-        const colorMatch = part.match(/color:\s*([a-z]+|#[0-9a-f]{3,6})/i);
-        const color = colorMatch ? colorMatch[1].toLowerCase() : '';
-
-        if (color === 'blue' || color === '#0000ff' || color === '#00f') {
-             return <span key={index} className="text-blue-400 font-bold drop-shadow-[0_0_8px_rgba(96,165,250,0.5)] animate-pulse font-mono tracking-wider">{content}</span>;
-        }
-        if (color === 'red' || color === '#ff0000' || color === '#f00') {
-             return <span key={index} className="text-red-500 font-bold drop-shadow-[0_0_8px_rgba(220,38,38,0.5)] animate-pulse font-mono tracking-wider">{content}</span>;
-        }
-        return <span key={index} className="text-gray-200 font-bold">{content}</span>;
-    }
-
     // ANSI Blue - System/Cold/Structure
     if (part.startsWith('\x1b[34m')) {
         const content = part.replace(/\x1b\[34m|\x1b\[0m/g, '');
@@ -105,36 +94,70 @@ const applyTypographicAnomalies = (text: string): React.ReactNode[] => {
   });
 };
 
-const FormattedText: React.FC<{ text: string, cluster?: string }> = ({ text, cluster }) => {
-  const cleanHtml = (str: string) => str.replace(/<br\s*\/?>/gi, '\n').replace(/<b>(.*?)<\/b>/gi, '**$1**').replace(/<i>(.*?)<\/i>/gi, '*$1*').replace(/<strong>(.*?)<\/strong>/gi, '**$1**').replace(/<em>(.*?)<\/em>/gi, '*$1*');
-  const processedText = cleanHtml(text);
+// Handles Markdown, Footnotes, Zalgo, and Keyword Highlighting
+const FormattedTextContent: React.FC<{ text: string, cluster?: string }> = ({ text, cluster }) => {
   const isSystem = cluster?.includes("System");
-  const parts = processedText.split(/(\[\^\d+\])/g);
+  const parts = text.split(/(\[\^\d+\])/g);
   const highlightClass = getHighlightColor(cluster);
   const accentClass = getAccentColor(cluster);
+
   return (
-    <span>
+    <>
       {parts.map((part, k) => {
         if (part.match(/^\[\^\d+\]$/)) return <sup key={k} className="text-sm text-haunt-gold cursor-help ml-1 font-bold select-none hover:text-white transition-colors">{part}</sup>;
         let displayPart = part;
         if (isSystem && Math.random() > 0.95) displayPart = generateZalgo(part, 4);
+        
         const boldParts = displayPart.split(/(\*\*[^*]+\*\*)/g);
         return (
           <span key={k}>
             {boldParts.map((subPart, i) => {
               if (subPart.startsWith('**') && subPart.endsWith('**')) return <strong key={i} className={`font-bold tracking-wider transition-all duration-700 ${highlightClass}`}>{subPart.slice(2, -2)}</strong>;
+              
               const italicParts = subPart.split(/(\*[^*]+\*)/g);
               return (
                 <span key={i}>
                   {italicParts.map((innerPart, j) => {
                     if (innerPart.startsWith('*') && innerPart.endsWith('*')) return <em key={j} className={`italic font-serif tracking-widest ${accentClass}`}>{innerPart.slice(1, -1)}</em>;
-                    return applyTypographicAnomalies(innerPart);
+                    return <span key={j}>{applyTypographicAnomalies(innerPart)}</span>;
                   })}
                 </span>
               );
             })}
           </span>
         );
+      })}
+    </>
+  );
+};
+
+// Top-level formatter: Priorities SPANS first, then delegates content to FormattedTextContent
+const FormattedText: React.FC<{ text: string, cluster?: string }> = ({ text, cluster }) => {
+  const cleanHtmlString = (str: string) => str.replace(/<br\s*\/?>/gi, '\n').replace(/<b>(.*?)<\/b>/gi, '**$1**').replace(/<i>(.*?)<\/i>/gi, '*$1*').replace(/<strong>(.*?)<\/strong>/gi, '**$1**').replace(/<em>(.*?)<\/em>/gi, '*$1*');
+  const processedText = cleanHtmlString(text);
+  
+  // Robust Regex to catch HTML span tags with attributes, tolerating whitespace
+  const spanRegex = /(<span\s+style=['"][^'"]*color:\s*[^'"]*['"]>[\s\S]*?<\/span>)/gi;
+  const parts = processedText.split(spanRegex);
+
+  return (
+    <span>
+      {parts.map((part, index) => {
+        if (part.match(spanRegex)) {
+           // Parse the span
+           const contentMatch = part.match(/>([\s\S]*?)<\/span>/i);
+           const content = contentMatch ? contentMatch[1] : "";
+           const colorMatch = part.match(/color:\s*([a-z]+|#[0-9a-f]{3,6})/i);
+           const color = colorMatch ? colorMatch[1] : "";
+           
+           return (
+             <span key={index} className={getColorClass(color)}>
+               <FormattedTextContent text={content} cluster={cluster} />
+             </span>
+           );
+        }
+        // Normal text processing for non-span parts
+        return <FormattedTextContent key={index} text={part} cluster={cluster} />;
       })}
     </span>
   );
@@ -163,7 +186,14 @@ export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, activeCl
 
   return (
     <div className="flex-1 overflow-y-auto p-10 lg:p-20 custom-scrollbar bg-transparent relative z-10">
-      <div className="max-w-4xl mx-auto space-y-16 pb-64">
+      <div className="max-w-4xl mx-auto space-y-16 pb-64 min-h-full">
+        {/* If history is empty and loading, show a centered initialization screen */}
+        {history.length === 0 && isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <SigilLoader cluster={activeCluster} text="Constructing Reality..." />
+            </div>
+        )}
+
         <div className="h-10"></div>
         {history.map((msg, idx) => (
           <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-fadeIn`}>
@@ -220,8 +250,8 @@ export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, activeCl
             </div>
         )}
         
-        {/* Loading State & Logic Stream */}
-        {isLoading && (
+        {/* Loading State & Logic Stream - Only show here if history exists, otherwise use centered loader */}
+        {isLoading && history.length > 0 && (
             <div className="animate-fadeIn">
                 {showLogic ? (
                     <div className="border-l-2 border-green-500 pl-6 py-2 bg-black/40 rounded-r-lg max-w-4xl font-mono text-xs overflow-hidden border border-gray-800 shadow-2xl mt-10">

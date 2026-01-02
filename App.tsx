@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { GameState, SimulationConfig, ChatMessage, NpcState } from './types';
 import { WelcomeScreen } from './components/WelcomeScreen';
@@ -23,14 +24,11 @@ export default function App() {
     villain_state: { name: 'Unknown', archetype: 'Unknown', threat_scale: 0, primary_goal: 'Unknown', current_tactic: 'None' },
     npc_states: [],
     location_state: getDefaultLocationState(),
-    narrative: { visual_motif: '', illustration_request: null }
+    narrative: { visual_motif: '', illustration_request: null },
+    suggested_actions: []
   });
 
-  const [history, setHistory] = useState<ChatMessage[]>([{ 
-    role: 'model', 
-    text: INITIAL_GREETING, 
-    timestamp: Date.now() 
-  }]);
+  const [history, setHistory] = useState<ChatMessage[]>([]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [autoMode, setAutoMode] = useState({ active: false, remainingCycles: 0 });
@@ -80,10 +78,12 @@ export default function App() {
         narrative: {
             visual_motif: config.visual_motif || "Standard Cinematic",
             illustration_request: "Establishing Shot" // Force initial request in state
-        }
+        },
+        suggested_actions: []
     };
     
     setGameState(newState);
+    setHistory([]); // Clear placeholder history so the first generated image sets the scene
     setShowSetup(false);
     setIsInitialized(true);
     
@@ -97,11 +97,7 @@ export default function App() {
       setAutoMode({ active: false, remainingCycles: 0 });
       
       // 2. Clear History
-      setHistory([{ 
-        role: 'model', 
-        text: INITIAL_GREETING, 
-        timestamp: Date.now() 
-      }]);
+      setHistory([]);
 
       // 3. Reset State to Default
       setGameState({
@@ -109,7 +105,8 @@ export default function App() {
         villain_state: { name: 'Unknown', archetype: 'Unknown', threat_scale: 0, primary_goal: 'Unknown', current_tactic: 'None' },
         npc_states: [],
         location_state: getDefaultLocationState(),
-        narrative: { visual_motif: '', illustration_request: null }
+        narrative: { visual_motif: '', illustration_request: null },
+        suggested_actions: []
       });
 
       // 4. Return to Welcome Screen
@@ -164,7 +161,7 @@ export default function App() {
   const processAction = async (action: string): Promise<string> => {
      await handleSendMessage(action);
      // Return the last model message text
-     return history[history.length - 1].text; 
+     return history[history.length - 1]?.text || ""; 
   };
 
   // State Updater for specific NPC (passed to StatusPanel -> CharacterPortrait)
@@ -254,6 +251,7 @@ export default function App() {
                     onAdvance={() => handleSendMessage("Wait. Observe.")}
                     showLogic={showLogic}
                     onToggleLogic={() => setShowLogic(!showLogic)}
+                    options={gameState.suggested_actions}
                 />
             </div>
             

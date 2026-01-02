@@ -1,9 +1,7 @@
-
-
 import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, ShieldAlert, Cpu, Eye, Settings, Image, Zap, Play, Check, Users, Target, UserCheck, Skull, Wand2, Info, ChevronRight, MessageSquare, Monitor, Loader2, Sparkles, StickyNote, Bot, Activity, Layers, Timer, Clapperboard, MapPin, Hourglass, Fingerprint, Ghost, Flame, Radio, Upload, UserPlus } from 'lucide-react';
+import { Terminal, ShieldAlert, Cpu, Eye, Settings, Image, Zap, Play, Check, Users, Target, UserCheck, Skull, Wand2, Info, ChevronRight, MessageSquare, Monitor, Loader2, Sparkles, StickyNote, Bot, Activity, Layers, Timer, Clapperboard, MapPin, Hourglass, Fingerprint, Ghost, Flame, Radio, Upload, UserPlus, FileUp, FileText, X, HardDrive } from 'lucide-react';
 import { SimulationConfig } from '../types';
-import { generateCalibrationField, analyzeImageContext, generateCharacterProfile, generateScenarioConcepts } from '../services/geminiService';
+import { generateCalibrationField, analyzeImageContext, generateCharacterProfile, generateScenarioConcepts, analyzeSourceMaterial, ParsedCharacter } from '../services/geminiService';
 import { NeuralPet } from './NeuralPet';
 
 interface SetupOverlayProps {
@@ -69,12 +67,39 @@ const CLUSTER_OPTIONS = [
 ];
 
 const INTENSITY_OPTIONS = [
-  { id: 'Level 1', label: 'Level 1: The Uncanny', desc: 'Atmospheric disquiet; no on-screen violence.' },
-  { id: 'Level 2', label: 'Level 2: The Dread', desc: 'Elevated anxiety; brief restrained violence.' },
-  { id: 'Level 3', label: 'Level 3: The Visceral', desc: 'Hard R; survival horror stakes and gore.' },
-  { id: 'Level 4', label: 'Level 4: The Grotesque', desc: 'Disturbing medical/process horror.' },
-  { id: 'Level 5', label: 'Level 5: The Transgressive', desc: 'Apotheosis; philosophical and absolute excess.' },
+  { 
+    id: 'Level 1', 
+    label: 'Level 1: The Shadow', 
+    desc: 'Spooky & Safe. Atmospheric disquiet, "Campfire Story" vibes. Safe for all ages. No on-screen violence.',
+    warning: 'SAFE FOR ALL AUDIENCES'
+  },
+  { 
+    id: 'Level 2', 
+    label: 'Level 2: The Dread', 
+    desc: 'Psychological Horror. Unsettling imagery, tension, anxiety. Violence is implied or off-screen.',
+    warning: 'CONTAINS: DISTURBING THEMES'
+  },
+  { 
+    id: 'Level 3', 
+    label: 'Level 3: The Visceral', 
+    desc: 'Survival Horror (Rated R). Blood, physical trauma, lethal stakes. Standard genre intensity.',
+    warning: 'CONTAINS: VIOLENCE, GORE'
+  },
+  { 
+    id: 'Level 4', 
+    label: 'Level 4: The Grotesque', 
+    desc: 'Extreme Horror. Heavy gore, body horror, torture, and medical mutilation.',
+    warning: 'CONTAINS: EXTREME GORE, MUTILATION'
+  },
+  { 
+    id: 'Level 5', 
+    label: 'Level 5: The Abyssal', 
+    desc: 'Unfiltered Transgression. Splatterpunk, eroticized violence, wanton depravity, and absolutely minimal content filtering.',
+    warning: 'WARNING: NO CONTENT FILTERS. EXTREME CONTENT.'
+  }
 ];
+
+const MAX_SOURCE_FILES = 5;
 
 const Tooltip: React.FC<{ text: string }> = ({ text }) => (
   <div className="absolute bottom-full mb-2 left-0 w-80 p-4 bg-black border border-gray-700 text-xs text-gray-300 font-mono leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-[0_0_30px_rgba(0,0,0,0.9)] backdrop-blur-md rounded-sm border-l-4 border-l-fresh-blood">
@@ -91,7 +116,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
   const [mode, setMode] = useState('The Survivor (Prey Protocol)');
   const [startingPoint, setStartingPoint] = useState('Prologue');
   const [selectedClusters, setSelectedClusters] = useState<string[]>(['Flesh']);
-  const [intensity, setIntensity] = useState('Level 3: The Visceral');
+  const [intensity, setIntensity] = useState('Level 3');
   const [visualMotif, setVisualMotif] = useState('');
   const [locationDescription, setLocationDescription] = useState('');
   const [isCalibrating, setIsCalibrating] = useState(false);
@@ -101,6 +126,12 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
   const [generatingFields, setGeneratingFields] = useState<Record<string, boolean>>({});
   const [activeImageField, setActiveImageField] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Source Material Analysis State
+  const [sourceFiles, setSourceFiles] = useState<File[]>([]);
+  const [parsedCharacters, setParsedCharacters] = useState<ParsedCharacter[]>([]);
+  const [isAnalyzingSource, setIsAnalyzingSource] = useState(false);
+  const sourceInputRef = useRef<HTMLInputElement>(null);
 
   const isVillain = mode.includes('Antagonist') || mode.includes('Predator');
   
@@ -281,6 +312,80 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
     }
   };
 
+  const handleSourceUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles: File[] = Array.from(e.target.files);
+      const slotsRemaining = MAX_SOURCE_FILES - sourceFiles.length;
+      const filesToProcess = newFiles.slice(0, slotsRemaining);
+      
+      if (filesToProcess.length === 0) return; // Capacity reached
+
+      setSourceFiles(prev => [...prev, ...filesToProcess]);
+      setIsAnalyzingSource(true);
+      
+      try {
+        // Analyze each file sequentially to avoid overwhelming rate limits and to merge context logic properly
+        for (const file of filesToProcess) {
+            const result = await analyzeSourceMaterial(file);
+            
+            // Context Merging Logic
+            if (result.location) {
+                 setLocationDescription(prev => prev ? `${prev}\n\n[Location Context from ${file.name}]:\n${result.location}` : result.location);
+            }
+            if (result.visual_motif && !visualMotif) {
+                 setVisualMotif(result.visual_motif);
+            }
+            if (result.theme_cluster) {
+                 const matched = CLUSTER_OPTIONS.find(c => c.label.toUpperCase().includes(result.theme_cluster.toUpperCase()) || c.id.toUpperCase() === result.theme_cluster.toUpperCase());
+                 if (matched && !selectedClusters.includes(matched.id)) {
+                     setSelectedClusters([matched.id]); // Switch focus to new material theme
+                 }
+            }
+            
+            if (result.characters && result.characters.length > 0) {
+                setParsedCharacters(prev => [...prev, ...result.characters]);
+            }
+        }
+      } catch (err) {
+        console.error("Source analysis failed", err);
+      } finally {
+        setIsAnalyzingSource(false);
+        if (sourceInputRef.current) sourceInputRef.current.value = '';
+      }
+    }
+  };
+
+  const removeSourceFile = (index: number) => {
+    setSourceFiles(prev => prev.filter((_, i) => i !== index));
+    // Note: We intentionally do not remove the extracted text/characters as they might have been edited by the user already.
+    // The source file list purely tracks "attachments" to the scenario config.
+  };
+
+  const handleSelectCharacter = (char: ParsedCharacter) => {
+      // Determine mode based on role guess or default to current mode
+      const isAntagonistRole = char.role.toLowerCase().includes('antagonist') || char.role.toLowerCase().includes('villain') || char.role.toLowerCase().includes('monster');
+      
+      if (isAntagonistRole) {
+          setMode('The Antagonist (Predator Protocol)');
+          setVillainName(char.name);
+          setVillainAppearance(char.description);
+          setVillainMethods(char.traits); 
+          
+          // Auto-populate victims from other characters
+          const otherChars = parsedCharacters.filter(c => c.name !== char.name);
+          if (otherChars.length > 0) {
+              const victimText = otherChars.map(c => `[${c.name}]: ${c.description} (${c.traits})`).join('\n\n');
+              setVictimDescription(victimText);
+              setVictimCount(otherChars.length);
+          }
+      } else {
+          setMode('The Survivor (Prey Protocol)');
+          setSurvivorName(char.name);
+          setSurvivorBackground(char.description);
+          setSurvivorTraits(char.traits);
+      }
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -378,13 +483,18 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
 
   const handleStart = () => {
     setIsCalibrating(true);
+    
+    // Resolve intensity object to pass full context
+    const selectedIntensity = INTENSITY_OPTIONS.find(o => o.id === intensity);
+    const intensityString = selectedIntensity ? `${selectedIntensity.label} - ${selectedIntensity.desc}` : intensity;
+
     setTimeout(() => {
       onComplete({
         perspective: perspective.split(' (')[0],
         mode: mode.includes('Survivor') ? 'Survivor' : 'Villain',
         starting_point: startingPoint,
         cluster: selectedClusters.join(', '),
-        intensity: intensity.split(':')[0].trim(),
+        intensity: intensityString,
         cycles: setupMode === 'simulation' ? testCycles : 0,
         visual_motif: visualMotif,
         location_description: locationDescription,
@@ -631,6 +741,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
 
   const renderManualMode = () => (
     <div className="flex flex-col h-full overflow-hidden">
+      <input type="file" ref={sourceInputRef} onChange={handleSourceUpload} className="hidden" accept="image/*,.pdf,.txt" multiple />
       <div className="h-2 bg-fresh-blood/20 relative overflow-hidden flex-shrink-0">
         <div className="absolute inset-0 bg-fresh-blood w-1/4 animate-[scanline_2s_linear_infinite]" />
       </div>
@@ -660,6 +771,104 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
               </button>
           </div>
         </div>
+
+        {/* --- SOURCE MATERIAL INGESTION ZONE --- */}
+        <div className="space-y-6">
+            <div 
+                className={`border-2 border-dashed transition-all relative group cursor-pointer bg-gray-900/20 p-8 rounded-sm
+                    ${sourceFiles.length >= MAX_SOURCE_FILES 
+                        ? 'border-gray-800 opacity-50 cursor-not-allowed' 
+                        : 'border-gray-800 hover:border-gray-600'
+                    }`}
+                onClick={() => {
+                    if (sourceFiles.length < MAX_SOURCE_FILES) {
+                        sourceInputRef.current?.click();
+                    }
+                }}
+            >
+                <div className="flex flex-col items-center justify-center gap-4 text-center">
+                    {isAnalyzingSource ? (
+                        <>
+                            <Loader2 className="w-10 h-10 text-fresh-blood animate-spin" />
+                            <div className="text-sm font-mono uppercase tracking-widest text-fresh-blood animate-pulse">Analyzing Neural Patterns...</div>
+                        </>
+                    ) : (
+                        <>
+                            <FileUp className="w-10 h-10 text-gray-600 group-hover:text-gray-400 transition-colors" />
+                            <div>
+                                <div className="text-sm font-mono uppercase tracking-widest text-gray-400 group-hover:text-gray-200">Ingest Source Material</div>
+                                <div className="text-[10px] text-gray-600 font-mono uppercase mt-1">
+                                    Upload PDF, Text, or Image to extract characters and setting
+                                </div>
+                                <div className="text-[9px] text-gray-600 font-mono uppercase mt-4">
+                                    Capacity: {sourceFiles.length} / {MAX_SOURCE_FILES} Slots Used
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+
+            {/* Display Attached Source Files */}
+            {sourceFiles.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {sourceFiles.map((file, idx) => (
+                        <div key={idx} className="relative group bg-black border border-gray-800 p-3 rounded-sm flex flex-col items-center justify-center aspect-square overflow-hidden hover:border-fresh-blood/50 transition-colors">
+                            {file.type.startsWith('image/') ? (
+                                <img src={URL.createObjectURL(file)} alt="preview" className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-40 transition-opacity" />
+                            ) : (
+                                <FileText className="w-10 h-10 text-gray-600 mb-2 group-hover:text-gray-400" />
+                            )}
+                            <div className="relative z-10 text-[9px] text-gray-400 font-mono text-center truncate w-full px-2 bg-black/60 py-1 mt-auto">
+                                {file.name}
+                            </div>
+                            <div className="absolute top-2 right-2 flex gap-1">
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); removeSourceFile(idx); }}
+                                    className="text-gray-500 hover:text-red-500 p-1 bg-black/80 rounded-sm border border-gray-700 hover:border-red-500 transition-all"
+                                    title="Remove Source"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                    
+                    {/* Empty Slot Indicators */}
+                    {Array.from({ length: Math.max(0, MAX_SOURCE_FILES - sourceFiles.length) }).map((_, i) => (
+                        <div key={`empty-${i}`} className="border border-gray-800/30 bg-gray-900/10 rounded-sm aspect-square flex items-center justify-center">
+                            <div className="w-1.5 h-1.5 rounded-full bg-gray-800/50"></div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+
+        {/* --- DETECTED CHARACTERS (IF ANY) --- */}
+        {parsedCharacters.length > 0 && (
+            <div className="space-y-6 animate-fadeIn">
+                <div className="flex items-center gap-3 text-sm font-mono uppercase tracking-[0.3em] text-gray-400 border-b border-gray-800 pb-2">
+                    <Users className="w-4 h-4" /> Detected Neural Signals (Select One to Play)
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {parsedCharacters.map((char, i) => (
+                        <button 
+                            key={i}
+                            onClick={() => handleSelectCharacter(char)}
+                            className="text-left bg-black border border-gray-800 p-6 rounded-sm hover:border-fresh-blood hover:bg-fresh-blood/5 transition-all group relative overflow-hidden"
+                        >
+                            <div className="flex justify-between items-start mb-2">
+                                <div className="font-bold text-gray-200 font-mono uppercase">{char.name}</div>
+                                <div className="text-[10px] bg-gray-900 px-2 py-1 rounded text-gray-500 font-mono uppercase group-hover:text-fresh-blood transition-colors">{char.role}</div>
+                            </div>
+                            <div className="text-xs text-gray-500 line-clamp-3 leading-relaxed mb-3">{char.description}</div>
+                            <div className="text-[10px] text-gray-600 font-mono uppercase tracking-wider">{char.traits}</div>
+                        </button>
+                    ))}
+                </div>
+            </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-16">
           <div className="space-y-4 group relative">
             <label className="text-sm font-mono text-gray-400 uppercase flex items-center gap-3 tracking-[0.3em]">
@@ -775,19 +984,43 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
                 </div>
              </div>
           </div>
-          <div className="col-span-1 md:col-span-2 lg:col-span-3 space-y-4 group relative">
+          <div className="col-span-1 md:col-span-2 lg:col-span-3 space-y-6">
             <label className="text-sm font-mono text-gray-400 uppercase flex items-center gap-3 tracking-[0.3em]">
               <Zap className="w-6 h-6 text-fresh-blood" /> Fidelity Level
             </label>
-            <select 
-              value={intensity} 
-              onChange={(e) => setIntensity(e.target.value)}
-              className="w-full bg-black border-2 border-gray-800 text-gray-200 p-6 font-mono text-lg focus:border-fresh-blood outline-none transition-all hover:bg-gray-900 cursor-pointer appearance-none rounded-sm"
-            >
-                {INTENSITY_OPTIONS.map(opt => (
-                    <option key={opt.id} value={opt.id}>{opt.label}</option>
+            <div className="grid grid-cols-1 gap-1 bg-black border border-gray-800 p-1 rounded-sm">
+                {INTENSITY_OPTIONS.map((opt) => (
+                    <button
+                        key={opt.id}
+                        onClick={() => setIntensity(opt.id)}
+                        className={`group relative p-4 text-left transition-all duration-300 border-l-2 ${
+                            intensity.startsWith(opt.id)
+                                ? 'bg-gray-900 border-fresh-blood'
+                                : 'bg-transparent border-transparent hover:bg-gray-900/50 hover:border-gray-700'
+                        }`}
+                    >
+                        <div className="flex justify-between items-center relative z-10">
+                            <span className={`font-mono font-bold uppercase tracking-widest text-sm ${intensity.startsWith(opt.id) ? 'text-white' : 'text-gray-500 group-hover:text-gray-300'}`}>
+                                {opt.label}
+                            </span>
+                            {intensity.startsWith(opt.id) && <Check className="w-4 h-4 text-fresh-blood" />}
+                        </div>
+                        
+                        {/* Hover/Active Description */}
+                        <div className={`mt-2 text-xs font-mono transition-all duration-300 ${
+                            intensity.startsWith(opt.id) ? 'opacity-100 max-h-20' : 'opacity-0 max-h-0 overflow-hidden group-hover:opacity-100 group-hover:max-h-20'
+                        }`}>
+                            <div className="text-gray-400 mb-1">{opt.desc}</div>
+                            <div className={`text-[10px] uppercase tracking-wider font-bold ${
+                                opt.id === 'Level 5' ? 'text-red-600 animate-pulse' : 
+                                opt.id === 'Level 1' ? 'text-green-500' : 'text-amber-500'
+                            }`}>
+                                Content: {opt.warning}
+                            </div>
+                        </div>
+                    </button>
                 ))}
-            </select>
+            </div>
           </div>
           {isVillain && (
             <div className="col-span-1 md:col-span-2 lg:col-span-3 space-y-12 border-y-2 border-fresh-blood/20 py-16 animate-fadeIn bg-red-950/5 px-8">
@@ -980,225 +1213,56 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
   );
 
   const renderSimulationMode = () => (
-    <div className="flex flex-col h-full overflow-hidden bg-[#0a0a0a]">
-      {/* Header */}
-      <div className="p-10 border-b border-amber-500/20 bg-amber-950/10 flex-shrink-0 flex items-center justify-between gap-6">
-         <div className="flex items-center gap-6">
-            <Bot className="w-12 h-12 text-amber-500" />
-            <div>
-               <h2 className="text-4xl font-serif italic text-amber-500 tracking-wide">Telling you a story about...</h2>
-               <p className="text-sm font-mono text-amber-700/80 uppercase tracking-widest mt-1">Sit back. I'll handle the nightmare.</p>
-            </div>
-         </div>
-         <button 
-            onClick={handleAutoPopulate}
-            disabled={isGeneratingIdeas}
-            className="text-amber-500 hover:text-white transition-colors text-xs uppercase tracking-[0.2em] flex items-center gap-3 border border-amber-500 px-6 py-4 bg-amber-500/10 hover:bg-amber-500/30 rounded-sm disabled:opacity-50"
-         >
-            {isGeneratingIdeas ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            Give me some ideas
-         </button>
-      </div>
-
-      {/* Scrollable Form */}
-      <div className="flex-1 overflow-y-auto p-12 space-y-12 custom-scrollbar">
-         
-         {/* Story Length */}
-         <div className="space-y-4 p-6 border border-gray-800 rounded-sm bg-black/40">
-            <label className="text-xs font-mono text-amber-600 uppercase tracking-[0.2em] flex items-center gap-2">
-               <Timer className="w-4 h-4" /> Story Length
-            </label>
-            <div className="flex items-center gap-6">
+    <div className="flex flex-col items-center justify-center h-full p-12 bg-[#030303] text-center space-y-8 animate-fadeIn relative z-10">
+        <div className="text-amber-500 font-mono text-4xl font-bold uppercase tracking-[0.2em] flex items-center gap-4">
+            <Bot className="w-12 h-12" /> Diagnostic Protocol
+        </div>
+        <p className="text-gray-400 font-mono text-sm max-w-xl leading-relaxed tracking-wider uppercase">
+            Autonomous narrative generation testing. The system will execute a predefined number of cycles to verify logic and atmospheric cohesion.
+        </p>
+        
+        <div className="bg-gray-900/20 p-8 border border-gray-800 rounded-sm w-full max-w-md space-y-6 backdrop-blur-sm">
+            <div className="space-y-4 text-left">
+                <label className="text-xs font-mono text-gray-500 uppercase tracking-[0.2em] flex justify-between">
+                    <span>Execution Cycles</span>
+                    <span className="text-amber-500 font-bold">{testCycles}</span>
+                </label>
                 <input 
-                  type="range"
-                  min="5"
-                  max="50"
-                  step="5"
-                  value={testCycles}
-                  onChange={(e) => setTestCycles(parseInt(e.target.value))}
-                  className="flex-1 accent-amber-500 h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer"
-                />
-                <span className="text-amber-500 font-mono text-xl w-16 text-right font-bold">{testCycles} Turns</span>
-            </div>
-         </div>
-
-         {/* Clusters (Reuse from Manual) */}
-         <div className="space-y-6">
-            <label className="text-sm font-mono text-gray-400 uppercase flex items-center gap-3 tracking-[0.3em]">
-              <Settings className="w-6 h-6 text-amber-600" /> Thematic Ingredients
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-              {CLUSTER_OPTIONS.map((opt) => (
-                <button
-                  key={opt.id}
-                  onClick={() => toggleCluster(opt.id)}
-                  className={`p-4 border text-left rounded-sm transition-all duration-300 relative group ${
-                    selectedClusters.includes(opt.id)
-                      ? `border-amber-600 bg-amber-900/20 text-amber-500`
-                      : 'border-gray-800 text-gray-600 hover:border-gray-600 hover:bg-gray-900/50'
-                  }`}
-                >
-                  <div className="text-xs font-bold uppercase tracking-widest mb-2">{opt.label}</div>
-                  {selectedClusters.includes(opt.id) && <Check className="absolute top-2 right-2 w-3 h-3" />}
-                </button>
-              ))}
-            </div>
-         </div>
-
-         {/* Mode & Intensity Row */}
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-             <div className="space-y-4">
-                <label className="text-xs font-mono text-gray-500 uppercase tracking-widest">Focus</label>
-                <select 
-                  value={mode} 
-                  onChange={(e) => setMode(e.target.value)}
-                  className="w-full bg-black border border-gray-800 text-gray-300 p-4 font-mono text-sm focus:border-amber-600 outline-none rounded-sm"
-                >
-                  <option value="The Survivor (Prey Protocol)">Survivor's Perspective</option>
-                  <option value="The Antagonist (Predator Protocol)">Villain's Perspective</option>
-                </select>
-             </div>
-             <div className="space-y-4">
-                <label className="text-xs font-mono text-gray-500 uppercase tracking-widest">Intensity</label>
-                <select 
-                  value={intensity} 
-                  onChange={(e) => setIntensity(e.target.value)}
-                  className="w-full bg-black border border-gray-800 text-gray-300 p-4 font-mono text-sm focus:border-amber-600 outline-none rounded-sm"
-                >
-                    {INTENSITY_OPTIONS.map(opt => (
-                        <option key={opt.id} value={opt.id}>{opt.label}</option>
-                    ))}
-                </select>
-             </div>
-         </div>
-
-         {/* Location & Motif */}
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                    <label className="text-xs font-mono text-gray-500 uppercase tracking-widest">Setting</label>
-                    <ActionButtons fieldKey="Initial Location" value={locationDescription} />
-                </div>
-                <textarea 
-                    value={locationDescription}
-                    onChange={(e) => setLocationDescription(e.target.value)}
-                    placeholder="Where does the story take place?"
-                    className="w-full h-32 bg-black border border-gray-800 text-gray-300 p-4 font-mono text-sm focus:border-amber-600 outline-none resize-none rounded-sm"
+                    type="range" 
+                    min="5" 
+                    max="50" 
+                    step="5" 
+                    value={testCycles} 
+                    onChange={(e) => setTestCycles(parseInt(e.target.value))}
+                    className="w-full accent-amber-500 h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer"
                 />
             </div>
-            <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                    <label className="text-xs font-mono text-gray-500 uppercase tracking-widest">Visual Style</label>
-                    <div className="flex gap-2">
-                        <button 
-                            onClick={() => triggerImageUpload('Visual Motif')}
-                            disabled={generatingFields['Visual Motif']}
-                            className="p-1.5 hover:bg-white/5 rounded-sm transition-colors text-gray-500 hover:text-amber-500 disabled:opacity-50"
-                            title="Upload Image Reference"
-                        >
-                            <Upload className="w-3.5 h-3.5" />
-                        </button>
-                        <ActionButtons fieldKey="Visual Motif" value={visualMotif} />
-                    </div>
-                </div>
-                <textarea 
-                    value={visualMotif}
-                    onChange={(e) => setVisualMotif(e.target.value)}
-                    placeholder="Cinematic style..."
-                    className="w-full h-32 bg-black border border-gray-800 text-gray-300 p-4 font-mono text-sm focus:border-amber-600 outline-none resize-none rounded-sm"
-                />
-            </div>
-         </div>
+        </div>
 
-         {/* Conditional Villain Fields */}
-         {mode.includes('Antagonist') && (
-             <div className="p-8 border border-red-900/30 bg-red-950/10 rounded-sm space-y-6">
-                 <div className="text-red-500 font-mono text-sm uppercase tracking-[0.2em] font-bold">Villain Definition</div>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                        <div className="flex justify-between">
-                            <label className="text-[10px] font-mono text-gray-500 uppercase">Name</label>
-                            <ActionButtons fieldKey="Entity Name" value={villainName} />
-                        </div>
-                        <input value={villainName} onChange={e => setVillainName(e.target.value)} className="w-full bg-black border border-gray-800 p-3 text-sm text-red-200 focus:border-red-600 outline-none" />
-                    </div>
-                    <div className="space-y-2">
-                        <div className="flex justify-between">
-                            <label className="text-[10px] font-mono text-gray-500 uppercase">Goal</label>
-                            <ActionButtons fieldKey="Primary Objective" value={primaryGoal} />
-                        </div>
-                        <input value={primaryGoal} onChange={e => setPrimaryGoal(e.target.value)} className="w-full bg-black border border-gray-800 p-3 text-sm text-red-200 focus:border-red-600 outline-none" />
-                    </div>
-                 </div>
-             </div>
-         )}
-         
-         {!isVillain && (
-             <div className="p-8 border border-green-900/30 bg-green-950/10 rounded-sm space-y-6">
-                 <div className="flex justify-between items-center">
-                     <div className="text-system-green font-mono text-sm uppercase tracking-[0.2em] font-bold">Survivor Definition</div>
-                     <button
-                        onClick={handleGenerateCharacter}
-                        disabled={generatingFields['character_builder']}
-                        className="text-[10px] font-mono uppercase tracking-widest text-system-green hover:text-white transition-colors disabled:opacity-50"
-                     >
-                        {generatingFields['character_builder'] ? "Building..." : "Auto-Build"}
-                     </button>
-                 </div>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                        <div className="flex justify-between">
-                            <label className="text-[10px] font-mono text-gray-500 uppercase">Name</label>
-                            <ActionButtons fieldKey="Identity Name" value={survivorName} />
-                        </div>
-                        <input value={survivorName} onChange={e => setSurvivorName(e.target.value)} className="w-full bg-black border border-gray-800 p-3 text-sm text-gray-200 focus:border-system-green outline-none rounded-sm" />
-                    </div>
-                    <div className="space-y-2">
-                        <div className="flex justify-between">
-                            <label className="text-[10px] font-mono text-gray-500 uppercase">Background</label>
-                            <ActionButtons fieldKey="Backstory" value={survivorBackground} />
-                        </div>
-                        <input value={survivorBackground} onChange={e => setSurvivorBackground(e.target.value)} className="w-full bg-black border border-gray-800 p-3 text-sm text-gray-200 focus:border-system-green outline-none rounded-sm" />
-                    </div>
-                 </div>
-             </div>
-         )}
-
-      </div>
-
-      {/* Footer Actions */}
-      <div className="p-8 border-t border-gray-800 bg-black/40 flex justify-between items-center flex-shrink-0">
-          <button 
-            onClick={() => setSetupMode('choice')}
-            className="text-xs font-mono text-gray-500 hover:text-white uppercase tracking-widest transition-colors"
-          >
-            Back to Selection
-          </button>
-          
-          <button
+        <button 
             onClick={handleStart}
             disabled={isCalibrating}
-            className={`px-10 py-4 bg-amber-600 text-black font-mono font-bold uppercase tracking-[0.2em] hover:bg-amber-500 transition-all rounded-sm ${isCalibrating ? 'opacity-50' : ''}`}
-          >
-            {isCalibrating ? 'Weaving...' : 'Begin Story'}
-          </button>
-      </div>
+            className={`px-12 py-4 bg-amber-500 text-black font-mono font-bold uppercase tracking-[0.2em] hover:bg-amber-400 transition-colors rounded-sm flex items-center gap-3 ${isCalibrating ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
+            {isCalibrating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5 fill-black" />}
+            {isCalibrating ? 'Initializing...' : 'Run Diagnostics'}
+        </button>
+
+        <button 
+            onClick={() => setSetupMode('choice')}
+            className="text-gray-600 hover:text-white transition-colors text-xs font-mono uppercase tracking-[0.2em]"
+        >
+            Abort Sequence
+        </button>
     </div>
   );
 
   return (
-    <div className="fixed inset-0 z-[200] bg-black text-gray-200 font-sans selection:bg-fresh-blood selection:text-black">
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        className="hidden" 
-        accept="image/*"
-        onChange={handleImageUpload}
-      />
-      {setupMode === 'choice' && renderChoiceMode()}
-      {setupMode === 'manual' && renderManualMode()}
-      {setupMode === 'guided' && renderGuidedMode()}
-      {setupMode === 'simulation' && renderSimulationMode()}
+    <div className="fixed inset-0 z-[100] w-full h-full bg-[#030303] text-gray-200 font-sans overflow-hidden">
+        {setupMode === 'choice' && renderChoiceMode()}
+        {setupMode === 'guided' && renderGuidedMode()}
+        {setupMode === 'manual' && renderManualMode()}
+        {setupMode === 'simulation' && renderSimulationMode()}
     </div>
   );
 };
