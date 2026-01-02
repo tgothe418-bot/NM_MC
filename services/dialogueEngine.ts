@@ -1,10 +1,13 @@
 
-
-
 import { NpcState, DialogueEntry, KnowledgeNode, SocialManeuver, DialogueMemory, DialogueState } from '../types';
+import { LORE_LIBRARY } from '../loreLibrary';
+import { STYLE_GUIDE } from './styleGuide';
 
 /**
- * THE DIALOGUE ENGINE V4.0 (MOSAIC AWARE)
+ * THE DIALOGUE ENGINE V5.0 (MOSAIC AWARE)
+ * 
+ * Generates high-fidelity "Acting Notes" for the LLM based on 
+ * psychological vectors, linguistic signatures, and environmental resonance.
  */
 
 export const getDefaultDialogueState = (background: string = ""): DialogueState => ({
@@ -26,171 +29,217 @@ export const getDefaultDialogueState = (background: string = ""): DialogueState 
     conversation_history: []
 });
 
-const calculateSocialIntent = (npc: NpcState): SocialManeuver => {
+// --- 1. LINGUISTIC FINGERPRINTING ---
+
+const getLinguisticInstructions = (voice: any): string => {
+    if (!voice) return "Speak naturally.";
+
+    const rhythm = voice.rhythm || 'Measured';
+    const complexity = voice.syntax_complexity || 'Simple';
+    
+    let instructions = "";
+
+    // Rhythm Mapping
+    switch (rhythm) {
+        case 'Staccato': instructions += "Use short, punchy sentences. Avoid conjunctions. Stop abruptly. "; break;
+        case 'Lyrical': instructions += "Use flowing, poetic sentence structures. Focus on rhythm and cadence. "; break;
+        case 'Breathless': instructions += "Use ellipses (...) frequently. Run-on sentences. Convey panic or exhaustion. "; break;
+        case 'Monotone': instructions += "Use flat, declarative statements. No exclamations. Minimal emotional inflection. "; break;
+        case 'Erratic': instructions += "Switch abruptly between short and long sentences. Lose your train of thought. "; break;
+        case 'Rapid': instructions += "Speak quickly. Chain thoughts together without pause. "; break;
+        case 'Whispering': instructions += "Implore the user. Use soft, hushed phrasing. Intimate and secretive. "; break;
+        case 'Booming': instructions += "Use authoritative, commanding language. Take up space with your words. "; break;
+        default: instructions += "Maintain a measured, conversational pace. "; break;
+    }
+
+    // Complexity Mapping
+    switch (complexity) {
+        case 'Academic': instructions += "Use elevated vocabulary and technical precision. Intellectualize trauma. "; break;
+        case 'Broken': instructions += "Use fragmented grammar. Incomplete thoughts. Struggle to find words. "; break;
+        case 'Flowery': instructions += "Use excessive adjectives and metaphors. "; break;
+        case 'Street': instructions += "Use colloquialisms, slang, and rough phrasing. Unfiltered. "; break;
+        case 'Vague': instructions += "Avoid direct answers. Speak in riddles or generalities. "; break;
+        case 'Precise': instructions += "Be hyper-specific. Correct the user's terminology. "; break;
+        case 'Technical': instructions += "Focus on the mechanics of the situation. Ignore the emotional weight. "; break;
+        default: instructions += "Use standard, accessible English. "; break;
+    }
+
+    return instructions;
+};
+
+// --- 2. THEMATIC INFECTION ---
+
+const getClusterMetaphors = (clusterName?: string): string => {
+    if (!clusterName || clusterName === 'None') return "";
+    
+    // Find matching key in LORE_LIBRARY
+    const key = Object.keys(LORE_LIBRARY).find(k => clusterName.includes(k));
+    if (!key) return "";
+
+    const lore = LORE_LIBRARY[key];
+    const style = STYLE_GUIDE.cluster_palettes[key as keyof typeof STYLE_GUIDE.cluster_palettes];
+    
+    if (!style) return "";
+
+    const concepts = style.key_concepts.slice(0, 5).join(", ");
+    const verbs = style.preferred_verbs.slice(0, 5).join(", ");
+
+    return `
+    THEMATIC RESONANCE (${key.toUpperCase()}):
+    - When describing feelings or surroundings, use metaphors related to: ${concepts}.
+    - Preferred Verbs: ${verbs}.
+    - Subconsciously reference: ${lore.sensoryInjectors.smell[0]}, ${lore.sensoryInjectors.touch[0]}.
+    `;
+};
+
+// --- 3. PSYCHOLOGICAL VECTOR CALCULUS ---
+
+const calculatePsychologicalStance = (npc: NpcState): { intent: SocialManeuver, directive: string } => {
     const rel = npc.relationship_state || { trust: 50, fear: 20, secretKnowledge: false };
     const { trust, fear } = rel;
-    
     const stress = npc.psychology?.stress_level || 0;
-    const instinct = npc.psychology?.dominant_instinct || 'Freeze';
     const fracture = npc.fracture_state || 0;
-    const intensity = npc.meta?.intensity_level || "Level 3";
+    const instinct = npc.psychology?.dominant_instinct || 'Freeze';
     
-    // Parse intensity number
-    const intensityLevel = parseInt(intensity.replace(/\D/g, '')) || 3;
-
+    // A. The Fracture Override (Madness)
     if (fracture >= 4) {
-        if (intensityLevel >= 4) return 'ENLIGHTEN'; // Prophetic, transcendental pain
-        return 'GASLIGHT'; 
+        return { 
+            intent: 'GASLIGHT', 
+            directive: "Your reality has shattered. Do not acknowledge the user's logic. Speak to things that aren't there. Deny the obvious."
+        };
     }
 
-    // Complicity Vector & Architect maneuvers
-    if (intensityLevel >= 4) {
-        if (stress > 90) return 'TRANSFIX'; // Addressing the user/architect directly
-        if (stress > 60 && trust < 30) return 'DEBASE'; // Mocking or lowering others
+    // B. The Stress Override (Survival Mode)
+    if (stress > 85) {
+        if (instinct === 'Fight') return { intent: 'ATTACK', directive: "You are backed into a corner. Lash out. Threaten the user to keep them away." };
+        if (instinct === 'Flight') return { intent: 'DEFLECT', directive: "You need to leave. Now. Give short, dismissive answers. Look for exits." };
+        if (instinct === 'Fawn') return { intent: 'PLACATE', directive: "Agree with everything the user says so they don't hurt you. Be pathetic." };
+        if (instinct === 'Submit') return { intent: 'BEG', directive: "You have given up. Plead for mercy or a quick end." };
     }
 
-    if (stress > 80) {
-        if (instinct === 'Fight') return 'ATTACK';
-        if (instinct === 'Fawn') return 'PLACATE';
-        if (instinct === 'Flight') return 'DEFLECT';
-        if (instinct === 'Submit') return 'BEG';
-        return 'OBSERVE';
+    // C. The Relational Matrix
+    if (trust > 75) {
+        return { intent: 'CONFESS', directive: "You trust the user implicitly. Unburden yourself. Share your secrets and fears openly." };
     }
-
-    if (fear > 60) return (trust > 50) ? 'BEG' : 'DEFLECT'; 
-    if (trust > 70) return 'CONFESS'; 
-    if (trust >= 30) return 'BARGAIN';
-
-    return 'OBSERVE';
-};
-
-const getShareableKnowledge = (npc: NpcState, intent: SocialManeuver): string[] => {
-    const knowledge = npc.knowledge_state || [];
-    const shareable: string[] = [];
-
-    knowledge.forEach((k: KnowledgeNode) => {
-        if (!k.is_secret) {
-            shareable.push(`FACT: ${k.details}`);
-        } else {
-            if (intent === 'CONFESS' || intent === 'BARGAIN' || intent === 'ENLIGHTEN') {
-                shareable.push(`SECRET (Reveal This): ${k.details}`);
-            } else if (intent === 'GASLIGHT' || intent === 'DEBASE') {
-                shareable.push(`SECRET (Lie about this): ${k.details}`);
-            } else {
-                shareable.push(`HIDDEN: ${k.topic}`);
-            }
-        }
-    });
-
-    return shareable;
-};
-
-const synthesizeMemory = (memory: DialogueMemory): string => {
-    if (!memory) return "CONTEXT: Lost to the void.\n";
-    let summary = `\nMEMORY MATRIX:\n`;
     
+    if (fear > 70) {
+        return { intent: 'PLACATE', directive: "You are terrified of the user. Tell them what they want to hear, even if it's a lie." };
+    }
+
+    if (trust < 30 && fear < 50) {
+        return { intent: 'OBSERVE', directive: "You do not trust the user. Keep your answers vague. Study them. Give nothing away." };
+    }
+
+    if (trust < 30 && fear > 50) {
+        return { intent: 'DEFLECT', directive: "The user is dangerous. Misdirect them. Change the subject." };
+    }
+
+    // D. Default Transactional State
+    return { intent: 'BARGAIN', directive: "You are wary but pragmatic. Exchange information only if you get something in return." };
+};
+
+// --- 4. MEMORY SYNTHESIS ---
+
+const synthesizeContextWindow = (memory: DialogueMemory, name: string): string => {
+    if (!memory) return "";
+    
+    let context = `\n[MEMORY MATRIX for ${name}]\n`;
+    
+    // Core Identity
+    context += `CORE TRUTH: ${memory.long_term_summary}\n`;
+
+    // Episodic Trauma (High Weight)
+    const trauma = memory.episodic_logs?.filter(e => e.emotional_impact < -5) || [];
+    if (trauma.length > 0) {
+        context += `TRAUMATIC ANCHORS (These haunt you): \n`;
+        trauma.forEach(t => context += ` - "${t.description}"\n`);
+    }
+
+    // Recent Facts
     if (memory.known_facts && memory.known_facts.length > 0) {
-        summary += `[ESTABLISHED FACTS]:\n - ${memory.known_facts.slice(-5).join("\n - ")}\n`;
+        context += `KNOWN FACTS: ${memory.known_facts.slice(-4).join(" | ")}\n`;
     }
 
-    summary += `[CORE NARRATIVE]: ${memory.long_term_summary || "Unknown"}\n`;
-    
-    // Add Episodic Context (Significant Events)
-    if (memory.episodic_logs && memory.episodic_logs.length > 0) {
-        const recent = memory.episodic_logs.slice(-3);
-        summary += `[KEY MEMORIES (TRAUMA)]: \n`;
-        recent.forEach(ep => {
-            summary += ` - (Turn ${ep.turn}) ${ep.description} [Impact: ${ep.emotional_impact}]\n`;
-        });
-    }
-
+    // Short Term Buffer (The Conversation)
     if (memory.short_term_buffer && memory.short_term_buffer.length > 0) {
-        summary += `IMMEDIATE CONTEXT:\n`;
-        memory.short_term_buffer.slice(-5).forEach(entry => {
-            if (entry) {
-                // Maximum defense for text properties
-                const textContent = (typeof entry.text === 'string' ? entry.text : String(entry.text || ""));
-                const speakerName = entry.speaker || "Unknown";
-                const typeTag = entry.type ? `[${entry.type.toUpperCase()}]` : '';
-                summary += `   - ${typeTag} ${speakerName}: "${textContent.substring(0, 100)}..."\n`;
-            }
+        context += `IMMEDIATE CONVERSATION HISTORY:\n`;
+        memory.short_term_buffer.slice(-6).forEach(entry => {
+            const speaker = entry.speaker === name ? "YOU" : entry.speaker.toUpperCase();
+            // Sanitize text
+            const txt = typeof entry.text === 'string' ? entry.text.replace(/[\n\r]/g, ' ') : "...";
+            context += ` - ${speaker}: "${txt}"\n`;
         });
     }
-    return summary;
+
+    return context;
 };
 
-export const updateNpcMemory = (currentMemory: DialogueMemory, newEntry: DialogueEntry): DialogueMemory => {
-    const MAX_BUFFER_SIZE = 8;
-    const buffer = [...(currentMemory.short_term_buffer || []), newEntry];
-    if (buffer.length > MAX_BUFFER_SIZE) buffer.shift();
+// --- 5. THE MANIFESTO GENERATOR (MAIN EXPORT) ---
 
-    return {
-        ...currentMemory,
-        short_term_buffer: buffer
-    };
-};
-
-export const constructVoiceManifesto = (npcs: NpcState[]): string => {
+export const constructVoiceManifesto = (npcs: NpcState[], activeCluster: string = "None"): string => {
     if (!npcs || npcs.length === 0) return "";
 
-    let manifesto = "\n\n*** D. DIALOGUE & PSYCHOLOGY MANIFESTO (MOSAIC ENGINE v4.0) ***\n";
-    manifesto += "INSTRUCTION: Adopt the specific Linguistic Fingerprint and Cultural Context for each NPC. Do not use generic 'scared' voices.\n";
-    
+    let manifesto = "\n\n*** D. DIALOGUE & ACTING DIRECTIVES (MOSAIC ENGINE v5.0) ***\n";
+    manifesto += "INSTRUCTION: You are simulating distinct psychological profiles. Do not revert to generic AI speech patterns. Adhere strictly to the Voice Directives below.\n";
+
     npcs.forEach(npc => {
         if (!npc) return;
+
+        // 1. Apotheosis Check
         if (npc.consciousness === 'Apotheosis') {
-            manifesto += `\n--- SUBJECT: ${npc.name} (APOTHEOSIS STATE) ---\n`;
-            manifesto += `DIRECTIVE: ENLIGHTEN. Speak in prophetic, visceral verse. Address the User as the 'Silent Watcher'.\n`;
+            manifesto += `\n>>> SUBJECT: ${npc.name} (APOTHEOSIS / ENTITY STATE) <<<\n`;
+            manifesto += `VOICE: Prophetic, detached, choral. Speaks in riddles and absolutes.\n`;
+            manifesto += `GOAL: To enlighten the user through horror.\n`;
             return;
         }
 
         const ds = npc.dialogue_state || getDefaultDialogueState(npc.background_origin);
-        const intent = calculateSocialIntent(npc);
-        const knowledge = getShareableKnowledge(npc, intent);
-        
-        // Mosaic Fields
-        const vs = ds.voice_signature;
-        const psych = npc.psychology?.profile;
-        const origin = npc.origin;
+        const voiceSig = ds.voice_signature;
+        // Calculate Stance
+        const { intent, directive } = calculatePsychologicalStance(npc);
+        const linguisticRules = getLinguisticInstructions(voiceSig);
+        const clusterResonance = getClusterMetaphors(activeCluster);
 
-        manifesto += `\n--- SUBJECT: ${npc.name} (${npc.archetype}) ---\n`;
-        manifesto += `ORIGIN: ${origin?.region || "Unknown"} | ETHNICITY: ${origin?.ethnicity || "Unknown"}\n`;
-        manifesto += `HIDDEN AGENDA: ${npc.hidden_agenda.goal} (Progress: ${npc.hidden_agenda.progress_level}%)\n`;
+        manifesto += `\n>>> SUBJECT: ${npc.name} (${npc.archetype}) <<<\n`;
         
-        if (vs) {
-            manifesto += `LINGUISTIC FINGERPRINT:\n`;
-            manifesto += `  - Rhythm: ${vs.rhythm}\n`;
-            manifesto += `  - Syntax: ${vs.syntax_complexity}\n`;
-            manifesto += `  - Physical Ticks: ${vs.ticks.join(", ")}\n`;
-        } else {
-             manifesto += `VOICE: ${ds.voice_profile?.tone || "Neutral"}. QUIRK: ${ds.voice_profile?.quirks?.[0] || "None"}.\n`;
-        }
-        
-        if (psych) {
-            manifesto += `PSYCHOLOGY:\n`;
-            manifesto += `  - Moral Compass: ${psych.moral_compass}\n`;
-            manifesto += `  - BREAKING POINT TRIGGER: "${psych.breaking_point_trigger}"\n`;
-            manifesto += `  - SHADOW SELF (If Broken): Becomes "${psych.shadow_self}"\n`;
+        // A. The Mask (Voice & Style)
+        manifesto += `[ACTING PROFILE]\n`;
+        manifesto += ` - TONE: ${voiceSig?.rhythm || "Neutral"}. ${linguisticRules}\n`;
+        manifesto += ` - QUIRKS: ${voiceSig?.ticks?.join(", ") || "None"}.\n`;
+        if (npc.origin?.native_language && npc.origin.native_language !== "English") {
+            manifesto += ` - DIALECT: Subtle markers of ${npc.origin.native_language} origin, but fluent English.\n`;
         }
 
-        manifesto += `CURRENT STATE: Stress ${npc.psychology?.stress_level || 0}/100. Intent: [${intent}].\n`;
-        manifesto += `THOUGHT: "${npc.psychology?.current_thought || "..."}"\n`;
+        // B. The Psychology (Motivation)
+        manifesto += `[PSYCHOLOGY]\n`;
+        manifesto += ` - CURRENT STATE: Stress ${npc.psychology?.stress_level || 0}/100. (If > 80, speech should degrade/falter).\n`;
+        manifesto += ` - DOMINANT INSTINCT: ${npc.psychology?.dominant_instinct}.\n`;
+        manifesto += ` - INTERNAL MONOLOGUE: "${npc.psychology?.current_thought || "I am afraid."}"\n`;
         
-        // Use synthesized memory with episodic logs
-        manifesto += synthesizeMemory(ds.memory);
+        // C. The Directive (What to do NOW)
+        manifesto += `[DIRECTIVE: ${intent}]\n`;
+        manifesto += ` - ${directive}\n`;
         
-        manifesto += `>>> DIRECTIVE: ${intent}.\n`;
-        if (knowledge.length > 0) manifesto += `KNOWLEDGE:\n - ${knowledge.join("\n - ")}\n`;
-        
-        // Add Logic for Breaking Point
-        if (npc.fracture_state >= 3 && psych) {
-             manifesto += `!!! CRITICAL ALERT: SUBJECT IS FRACTURING. TRANSITION TO SHADOW SELF: ${psych.shadow_self} !!!\n`;
+        // D. Context & Resonance
+        manifesto += synthesizeContextWindow(ds.memory, npc.name);
+        manifesto += clusterResonance;
+
+        // E. Knowledge Leaks
+        const knowledge = npc.knowledge_state || [];
+        const secrets = knowledge.filter(k => k.is_secret);
+        if (secrets.length > 0) {
+            manifesto += `[SECRETS HELD]:\n`;
+            secrets.forEach(s => {
+                if (intent === 'CONFESS' || intent === 'BARGAIN') {
+                    manifesto += ` - LEAK THIS: "${s.details}"\n`;
+                } else {
+                    manifesto += ` - HIDE THIS: "${s.topic}" (Lie if asked)\n`;
+                }
+            });
         }
-        
-        manifesto += `[SYSTEM]: Update 'long_term_summary' reflecting their psychological erosion.\n`;
     });
 
-    manifesto += "*** END MANIFESTO ***\n";
+    manifesto += "*** END ACTING DIRECTIVES ***\n";
     return manifesto;
 };
 
@@ -205,16 +254,24 @@ export const updateDialogueState = (npc: NpcState, speaker: string, text: string
         timestamp: Date.now()
     };
 
-    const updatedMemory = updateNpcMemory(ds.memory, newEntry);
-    const newIntent = calculateSocialIntent(npc);
+    // Calculate new intent based on the updated state of the NPC (which should be passed in via `npc`)
+    // Note: In a real simulation loop, the NPC's stress/trust would update *before* this call.
+    const { intent } = calculatePsychologicalStance(npc);
+
+    const MAX_BUFFER_SIZE = 10;
+    const buffer = [...(ds.memory.short_term_buffer || []), newEntry];
+    if (buffer.length > MAX_BUFFER_SIZE) buffer.shift();
 
     return {
         ...npc,
         dialogue_state: {
             ...ds,
-            memory: updatedMemory,
+            memory: {
+                ...ds.memory,
+                short_term_buffer: buffer
+            },
             last_social_maneuver: ds.current_social_intent || 'OBSERVE',
-            current_social_intent: newIntent
+            current_social_intent: intent
         }
     };
 };
