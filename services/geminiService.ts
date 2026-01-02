@@ -1,9 +1,16 @@
 
-
 import { GoogleGenAI } from "@google/genai";
-import { GameState, SimulationConfig, NpcState } from "../types";
+import { GameState, SimulationConfig, NpcState, ScenarioConcepts, CharacterProfile, SourceAnalysisResult, RoomNode } from "../types";
 import { PLAYER_SYSTEM_INSTRUCTION, SIMULATOR_INSTRUCTION, NARRATOR_INSTRUCTION } from "../constants";
-import { parseResponse } from "../utils";
+import { 
+  parseSimulatorResponse, 
+  parseNarratorResponse, 
+  parseScenarioConcepts, 
+  parseCharacterProfile, 
+  parseSourceAnalysis, 
+  parseHydratedCharacter,
+  ParseError 
+} from "../parsers";
 
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -30,8 +37,9 @@ export const hydrateUserCharacter = async (description: string, cluster: string)
   });
   
   try {
-      return JSON.parse(res.text || "{}");
+      return parseHydratedCharacter(res.text || "{}");
   } catch (e) {
+      console.error("hydrateUserCharacter parse failed:", e);
       return {};
   }
 };
@@ -61,7 +69,7 @@ export const generateCalibrationField = async (field: string, cluster: string, i
     return res.text?.trim() || "";
 };
 
-export const generateScenarioConcepts = async (cluster: string, intensity: string, mode: string): Promise<any> => {
+export const generateScenarioConcepts = async (cluster: string, intensity: string, mode: string): Promise<ScenarioConcepts | null> => {
     const ai = getAI();
     const prompt = `Generate a cohesive, frightening horror scenario configuration.
     Theme: ${cluster}
@@ -90,14 +98,14 @@ export const generateScenarioConcepts = async (cluster: string, intensity: strin
     });
 
     try {
-        return JSON.parse(res.text || "{}");
+        return parseScenarioConcepts(res.text || "{}");
     } catch (e) {
-        console.error("Failed to parse scenario concepts", e);
-        return {};
+        console.error("generateScenarioConcepts parse failed:", e);
+        return null;
     }
 };
 
-export const generateCharacterProfile = async (cluster: string, intensity: string, role: string): Promise<{name: string, background: string, traits: string}> => {
+export const generateCharacterProfile = async (cluster: string, intensity: string, role: string): Promise<CharacterProfile> => {
     const ai = getAI();
     const prompt = `Generate a cohesive character profile for a "${role}" in a horror story.
     Theme: ${cluster}
@@ -117,30 +125,12 @@ export const generateCharacterProfile = async (cluster: string, intensity: strin
     });
 
     try {
-        const data = JSON.parse(res.text || "{}");
-        return {
-            name: data.name || "Unknown",
-            background: data.background || "No history available.",
-            traits: data.traits || "Survival Instinct"
-        };
+        return parseCharacterProfile(res.text || "{}");
     } catch (e) {
+        console.error("generateCharacterProfile parse failed:", e);
         return { name: "Unknown", background: "Unknown", traits: "Unknown" };
     }
 };
-
-export interface ParsedCharacter {
-  name: string;
-  role: string;
-  description: string;
-  traits: string;
-}
-
-export interface SourceAnalysisResult {
-  characters: ParsedCharacter[];
-  location: string;
-  visual_motif: string;
-  theme_cluster: string;
-}
 
 export const analyzeSourceMaterial = async (file: File): Promise<SourceAnalysisResult> => {
   const ai = getAI();
@@ -167,7 +157,6 @@ export const analyzeSourceMaterial = async (file: File): Promise<SourceAnalysisR
     "theme_cluster": "..."
   }`;
 
-  // Using Pro model for better document/image reasoning
   const res = await ai.models.generateContent({
     model: 'gemini-3-pro-preview',
     contents: {
@@ -180,9 +169,9 @@ export const analyzeSourceMaterial = async (file: File): Promise<SourceAnalysisR
   });
 
   try {
-      return JSON.parse(res.text || "{}");
+      return parseSourceAnalysis(res.text || "{}");
   } catch (e) {
-      console.error("Failed to parse source analysis", e);
+      console.error("analyzeSourceMaterial parse failed:", e);
       return { characters: [], location: "", visual_motif: "", theme_cluster: "" };
   }
 };
@@ -266,7 +255,6 @@ export const processGameTurn = async (
     const ai = getAI();
 
     // 0. IMAGE EDITING / GENERATION PATH
-    // If the user provides an image, we assume they might want to edit it.
     const imageFile = files.find(f => f.type.startsWith('image/'));
     if (imageFile) {
         try {
@@ -291,7 +279,6 @@ export const processGameTurn = async (
             let generatedImage = undefined;
             let generatedText = "The machine reconfigures the visual data...";
 
-            // Iterate through parts to find image
             if (response.candidates?.[0]?.content?.parts) {
                 for (const part of response.candidates[0].content.parts) {
                     if (part.inlineData) {
@@ -302,7 +289,6 @@ export const processGameTurn = async (
                 }
             }
             
-            // If we got an image, return early. We don't advance the game simulation logic (JSON state) for image edits.
             if (generatedImage) {
                 return {
                     gameState,
@@ -312,7 +298,6 @@ export const processGameTurn = async (
             }
         } catch (e) {
             console.error("Image Processing Failed", e);
-            // Fallthrough to normal simulation if image gen fails
         }
     }
 
@@ -339,16 +324,11 @@ export const processGameTurn = async (
 
     let simulatedState = gameState;
     try {
-        const parsed = JSON.parse(simText || "{}");
+        const parsed = parseSimulatorResponse(simText || "{}");
         
-        // CRITICAL: Deep Merge / Preservation Strategy
-        // The Simulator sometimes returns partial states or resets fields. 
-        // We must ensure the user's initial configuration (meta, villain, motif) persists.
         simulatedState = {
-            ...gameState, // Fallback to current state
-            ...parsed,    // Apply updates
-            
-            // Explicitly merge nested objects to prevent overwriting with undefined/partial
+            ...gameState,
+            ...parsed,
             meta: { 
                 ...gameState.meta, 
                 ...(parsed.meta || {}) 
@@ -361,7 +341,6 @@ export const processGameTurn = async (
                 ...gameState.narrative,
                 ...(parsed.narrative || {})
             },
-            // Logic for arrays (replace, do not merge items, to allow removal)
             npc_states: parsed.npc_states || gameState.npc_states || [],
             location_state: parsed.location_state ? {
                 ...gameState.location_state,
@@ -371,7 +350,6 @@ export const processGameTurn = async (
             suggested_actions: parsed.suggested_actions || []
         };
 
-        // Safety enforcement for critical fields
         if (!simulatedState.narrative.visual_motif && gameState.narrative.visual_motif) {
             simulatedState.narrative.visual_motif = gameState.narrative.visual_motif;
         }
@@ -383,8 +361,12 @@ export const processGameTurn = async (
         }
 
     } catch (e) {
-        console.error("Simulator Parse Error", e);
-        if (onStreamUpdate) onStreamUpdate(`\n[ERROR] JSON PARSE FAILED: ${e}\n`, 'logic');
+        if (e instanceof ParseError) {
+            console.error("Simulator parse error:", e.message);
+            if (onStreamUpdate) onStreamUpdate(`\n[PARSE ERROR] ${e.message}\n`, 'logic');
+        } else {
+            console.error("Simulator critical error", e);
+        }
     }
 
     // 2. Narration Step (Prose) - STREAMED
@@ -408,11 +390,24 @@ export const processGameTurn = async (
         }
     }
 
-    const parsed = parseResponse(narrText || "");
-    
-    // 3. Final State Resolution
-    let finalState = parsed.gameState || simulatedState;
+    let finalState = simulatedState;
+    let finalStoryText = "";
 
+    try {
+        const parsed = parseNarratorResponse(narrText || '{"storyText":""}');
+        finalState = parsed.gameState
+          ? { ...simulatedState, ...parsed.gameState }
+          : simulatedState;
+        finalStoryText = parsed.storyText;
+    } catch (e) {
+        if (e instanceof ParseError) {
+            console.error("Narrator parse error:", e.message);
+            finalStoryText = narrText || "The narrative dissolves into static...";
+        } else {
+            console.error("Narrator critical error", e);
+        }
+    }
+    
     // Preservation Strategy for options generated by Simulator if Narrator dropped them
     if (simulatedState.suggested_actions && (!finalState.suggested_actions || finalState.suggested_actions.length === 0)) {
         finalState = {
@@ -421,7 +416,6 @@ export const processGameTurn = async (
         };
     }
 
-    let finalStoryText = parsed.storyText;
     let generatedImageUrl: string | undefined;
 
     // [IMAGE GENERATION TRIGGER - SELF PORTRAIT]
@@ -444,7 +438,6 @@ export const processGameTurn = async (
             for (const part of imageRes.candidates?.[0]?.content?.parts || []) {
                 if (part.inlineData) {
                     generatedImageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-                    // Remove the placeholder tag
                     finalStoryText = finalStoryText.replace(/\[SELF_PORTRAIT\]/g, ''); 
                 }
             }
@@ -455,11 +448,10 @@ export const processGameTurn = async (
     // [IMAGE GENERATION TRIGGER - ESTABLISHING SHOT]
     else if (finalStoryText.includes('[ESTABLISHING_SHOT]')) {
         const loc = finalState.location_state;
-        const currentRoom = loc.room_map[loc.current_room_id];
+        const currentRoom = loc.room_map[loc.current_room_id] as RoomNode | undefined;
         const motif = finalState.narrative.visual_motif || "Cinematic Horror";
         const cluster = finalState.meta.active_cluster || "Horror";
         
-        // Construct rich prompt
         const prompt = `A cinematic wide establishing shot of a horror environment. 
         Location: ${currentRoom?.name || "Unknown Area"}. 
         Details: ${currentRoom?.description_cache || loc.architectural_notes.join(', ') || "ominous shadows"}. 
@@ -500,7 +492,7 @@ export const runStressTest = async (config: SimulationConfig, initialState: Game
     
     const log = (msg: string) => {
         logBuffer += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
-        onLog(logBuffer, 0); // Cycle updated in loop
+        onLog(logBuffer, 0); 
     };
 
     log("Starting Stress Test...");
@@ -509,7 +501,6 @@ export const runStressTest = async (config: SimulationConfig, initialState: Game
         log(`\n--- CYCLE ${i}/${config.cycles} ---`);
         onLog(logBuffer, i);
         
-        // 1. Generate Action
         log("Generating Auto-Player Action...");
         try {
             const actionRes = await ai.models.generateContent({
@@ -520,7 +511,6 @@ export const runStressTest = async (config: SimulationConfig, initialState: Game
             const action = actionRes.text || "Wait.";
             log(`Action: "${action}"`);
 
-            // 2. Simulate
             log("Simulating Outcome...");
             const simRes = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
@@ -531,9 +521,8 @@ export const runStressTest = async (config: SimulationConfig, initialState: Game
                 }
             });
 
-            const nextState = JSON.parse(simRes.text || "{}");
-            // Simulator instruction says "Output ONLY updated JSON state"
-            currentState = nextState;
+            const nextState = parseSimulatorResponse(simRes.text || "{}");
+            currentState = { ...currentState, ...nextState };
             log(`State Updated. Turn: ${currentState.meta?.turn}`);
             
         } catch (e) {

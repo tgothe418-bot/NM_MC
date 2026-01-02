@@ -1,3 +1,4 @@
+
 import { LocationState, RoomNode, GameState } from '../types';
 import { LORE_LIBRARY } from '../loreLibrary';
 
@@ -93,7 +94,7 @@ export const getDefaultLocationState = (cluster: string = "None"): LocationState
 
 export const constructLocationManifesto = (loc: LocationState): string => {
   if (!loc || !loc.room_map) return "";
-  const current = loc.room_map[loc.current_room_id];
+  const current = loc.room_map[loc.current_room_id] as RoomNode | undefined;
   if (!current) return "";
 
   let m = `\n\n*** L. LOCATION MANIFESTO ***\nCURRENT: "${current.name}"\nCACHE: ${current.description_cache}\nEXITS:\n`;
@@ -101,7 +102,7 @@ export const constructLocationManifesto = (loc: LocationState): string => {
     current.exits.forEach(e => {
         let targetName = "UNEXPLORED";
         if (e.target_node_id) {
-            const targetRoom = loc.room_map[e.target_node_id];
+            const targetRoom = loc.room_map[e.target_node_id] as RoomNode | undefined;
             targetName = targetRoom ? targetRoom.name : "UNKNOWN_AREA";
         }
         m += ` - ${e.direction}: ${targetName}\n`;
