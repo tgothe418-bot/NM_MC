@@ -100,7 +100,8 @@ export const ManualCharacterSection: React.FC<Props> = ({ loadingFields, setLoad
                 <div className="space-y-4 group relative">
                   <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">Population Count</label>
                   <div className="flex items-center gap-6 bg-black border-2 border-gray-800 p-6 rounded-sm">
-                    <input type="range" min="1" max="10" value={victimCount} onChange={(e) => setVictimCount(parseInt(e.target.value))} className="flex-1 accent-fresh-blood h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer" />
+                    {/* Max adjusts if import count is higher than standard range */}
+                    <input type="range" min="1" max={Math.max(10, victimCount)} value={victimCount} onChange={(e) => setVictimCount(parseInt(e.target.value))} className="flex-1 accent-fresh-blood h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer" />
                     <span className="text-fresh-blood font-mono text-xl w-8 font-bold">{victimCount}</span>
                   </div>
                 </div>

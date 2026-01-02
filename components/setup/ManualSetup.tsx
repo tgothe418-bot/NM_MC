@@ -104,6 +104,7 @@ export const ManualSetup: React.FC<Props> = ({ onComplete, onBack }) => {
       const roleLower = char.role.toLowerCase();
       const isVillain = roleLower.includes('antagonist') || roleLower.includes('villain') || roleLower.includes('monster') || roleLower.includes('killer');
       
+      // 1. Set Role & Profile
       if (isVillain) {
           store.setMode('The Antagonist (Predator Protocol)');
           store.setVillainName(char.name);
@@ -113,6 +114,25 @@ export const ManualSetup: React.FC<Props> = ({ onComplete, onBack }) => {
           store.setSurvivorName(char.name);
           store.setSurvivorBackground(char.description);
           store.setSurvivorTraits(char.traits);
+      }
+
+      // 2. Populate "Specimen Targets" / Other Characters
+      // Filter out the selected character from the list
+      const others = store.parsedCharacters.filter(c => c.name !== char.name);
+      
+      if (others.length > 0) {
+          store.setVictimCount(others.length);
+          
+          // Construct a rich profile list of the targets
+          const othersDescription = others.map(c => 
+              `SUBJECT: ${c.name}\nROLE: ${c.role}\nPROFILE: ${c.description}\nTRAITS: ${c.traits}`
+          ).join('\n\n');
+          
+          store.setVictimDescription(othersDescription);
+      } else {
+          // If no other characters found, clear it or leave default
+          store.setVictimCount(1);
+          store.setVictimDescription('');
       }
   };
 

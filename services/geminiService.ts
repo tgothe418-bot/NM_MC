@@ -228,9 +228,13 @@ export const analyzeSourceMaterial = async (file: File): Promise<SourceAnalysisR
 
   const prompt = `Analyze this source material (Image or Document) for a horror simulation setup.
   Extract the following structured data to help configure a roleplay scenario:
-  1. A list of key characters found in the source (Name, their suggested Role like 'Survivor' or 'Villain', a brief Description, and key Traits).
+  1. A list of key characters found in the source.
+     - Name
+     - Role: Assign precise roles such as 'Survivor', 'Villain', 'Victim', 'Witness', 'Secondary Antagonist', 'Minion', or 'Neutral Observer'.
+     - Description: Brief visual and narrative summary.
+     - Traits: Key personality traits or flaws.
   2. A detailed description of the main setting/location.
-  3. A visual motif or aesthetic style description (e.g. 'Grainy 16mm', 'Oil Painting').
+  3. A visual motif or aesthetic style description (e.g. 'Grainy 16mm', 'Oil Painting', 'Glitch Art').
   4. The dominant horror theme (choose best fit: Flesh, System, Haunting, Self, Blasphemy, Survival, Desire).
 
   Return strictly valid JSON matching this schema:
