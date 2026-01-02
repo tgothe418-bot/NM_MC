@@ -6,6 +6,9 @@ import { useSetupStore } from './store';
 
 const MAX_SOURCE_FILES = 5;
 
+// Valid clusters matching the keys in ManualSetup/Global Types
+const KNOWN_CLUSTERS = ['Flesh', 'System', 'Haunting', 'Self', 'Blasphemy', 'Survival', 'Desire'];
+
 export const SourceUploader: React.FC = () => {
   const { 
     visualMotif, 
@@ -35,20 +38,29 @@ export const SourceUploader: React.FC = () => {
         for (const file of filesToProcess) {
             const result = await analyzeSourceMaterial(file);
             
-            // Context Merging
+            // 1. Context Merging (Location)
             if (result.location) {
                  setLocationDescription(prev => prev ? `${prev}\n\n[Location Context from ${file.name}]:\n${result.location}` : result.location);
             }
+            
+            // 2. Visual Motif (Set if empty)
             if (result.visual_motif && !visualMotif) {
                  setVisualMotif(result.visual_motif);
             }
+            
+            // 3. Theme Cluster (Add if matched)
             if (result.theme_cluster) {
-                 // Check if cluster exists in current
-                 if (!selectedClusters.some(c => c.toUpperCase().includes(result.theme_cluster.toUpperCase()))) {
-                     // For simplicity, we just keep current unless user manually changes, but we could notify
+                 const match = KNOWN_CLUSTERS.find(c => result.theme_cluster.toLowerCase().includes(c.toLowerCase()));
+                 if (match) {
+                     // Add to selected clusters if not already present
+                     setSelectedClusters(prev => {
+                         if (!prev.includes(match)) return [...prev, match];
+                         return prev;
+                     });
                  }
             }
             
+            // 4. Characters
             if (result.characters && result.characters.length > 0) {
                 setParsedCharacters(prev => [...prev, ...result.characters]);
             }

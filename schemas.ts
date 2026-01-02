@@ -24,7 +24,7 @@ export const MoralCompassSchema = z.enum([
 ]);
 
 export const FidelityStatusSchema = z.enum([
-  'Coherent', 'Fraying', 'Corrupted', 'Dissolving'
+  'Coherent', 'Fraying', 'Corrupted', 'Dissolving', 'Degrading'
 ]);
 
 export const ModeSchema = z.enum(['Survivor', 'Villain', 'Pending']);
@@ -240,7 +240,7 @@ export const GameStateSchema = z.object({
     player_profile: z.object({
       name: z.string(),
       background: z.string(),
-      traits: z.string()
+      traits: z.union([z.string(), z.array(z.string())])
     }).optional()
   }),
   villain_state: VillainStateSchema,
@@ -256,17 +256,41 @@ export const GameStateSchema = z.object({
 
 // ============ LLM Response Schemas ============
 
-// What the SIMULATOR returns (raw GameState, possibly partial)
+// SimulatorResponseSchema: 
+// Relaxed to allow partial updates ("diffs") from the LLM without strict validation failures.
+// Complex objects like npc_states, villain_state, and location_state are typed as `z.any()` 
+// to defer merging logic to the application layer (geminiService.ts).
 export const SimulatorResponseSchema = GameStateSchema.partial().extend({
-  // Simulator sometimes returns these at top level
+  npc_states: z.array(z.any()).optional(),
+  villain_state: z.record(z.string(), z.any()).optional(),
+  location_state: z.record(z.string(), z.any()).optional(),
+  meta: z.record(z.string(), z.any()).optional(),
   suggested_actions: z.array(z.string()).optional(),
 });
 
 // What the NARRATOR returns
-export const NarratorResponseSchema = z.object({
-  gameState: GameStateSchema.partial().optional(),
-  storyText: z.string(),
-});
+// Uses preprocess to map snake_case (prompted) to camelCase (app logic)
+export const NarratorResponseSchema = z.preprocess(
+  (val: any) => {
+    if (typeof val === 'object' && val !== null) {
+      return {
+        gameState: val.gameState || val.game_state,
+        storyText: val.storyText || val.story_text || "",
+      };
+    }
+    return val;
+  },
+  z.object({
+    // Relaxed GameState for Narrator response to support partial updates
+    gameState: GameStateSchema.partial().extend({
+      npc_states: z.array(z.any()).optional(),
+      villain_state: z.record(z.string(), z.any()).optional(),
+      location_state: z.record(z.string(), z.any()).optional(),
+      meta: z.record(z.string(), z.any()).optional(),
+    }).optional(),
+    storyText: z.string().default(""), 
+  })
+);
 
 // generateScenarioConcepts response
 export const ScenarioConceptsSchema = z.object({

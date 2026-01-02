@@ -14,6 +14,90 @@ import {
 
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+// === HELPER: Deep Merge ===
+function deepMerge(target: any, source: any): any {
+    if (typeof target !== 'object' || target === null) return source;
+    if (typeof source !== 'object' || source === null) return source;
+    
+    // Arrays: Replace logic (unless specific append logic is needed, but for state updates, strict replacement is safer to avoid dupes)
+    if (Array.isArray(source)) {
+        return source;
+    }
+
+    const out = { ...target };
+    for (const key in source) {
+        if (Object.prototype.hasOwnProperty.call(source, key)) {
+            const val = source[key];
+            if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
+                out[key] = deepMerge(target[key], val);
+            } else {
+                out[key] = val;
+            }
+        }
+    }
+    return out;
+}
+
+// === HELPER: Merge NPC States ===
+const mergeNpcStates = (current: NpcState[], incoming: any[]): NpcState[] => {
+    if (!incoming || incoming.length === 0) return current;
+    
+    // Map current NPCs by Name for easy lookup
+    const currentMap = new Map(current.map(n => [n.name, n]));
+    const merged: NpcState[] = [];
+    
+    incoming.forEach((inc, idx) => {
+        // Sanitize short_term_buffer if present (fix String vs Object issue)
+        if (inc.dialogue_state?.memory?.short_term_buffer) {
+            inc.dialogue_state.memory.short_term_buffer = inc.dialogue_state.memory.short_term_buffer.map((entry: any) => {
+                if (typeof entry === 'string') {
+                    return {
+                        speaker: "Unknown",
+                        text: entry,
+                        sentiment: "Neutral",
+                        turn: 0,
+                        timestamp: Date.now()
+                    };
+                }
+                return entry;
+            });
+        }
+
+        // Attempt Match
+        let match: NpcState | undefined;
+        if (inc.name) {
+            match = currentMap.get(inc.name);
+        }
+        
+        // Fallback to Index if names match or if name is missing but structure implies update
+        if (!match && idx < current.length) {
+             const potentialMatch = current[idx];
+             // If incoming has no name, or names match, use it. 
+             // If incoming has NEW name, it's a replacement/new char.
+             if (!inc.name || inc.name === potentialMatch.name) {
+                 match = potentialMatch;
+             }
+        }
+        
+        if (match) {
+            merged.push(deepMerge(match, inc));
+        } else {
+            // New Character (or full replacement)
+            // Ensure basic required fields exist if they are missing from partial
+            const base: Partial<NpcState> = {
+                active_injuries: [],
+                fracture_state: 0,
+                knowledge_state: [],
+                resources_held: [],
+                ...inc
+            };
+            merged.push(base as NpcState);
+        }
+    });
+    
+    return merged;
+};
+
 export const generateAutoPlayerAction = async (gameState: GameState): Promise<string> => {
   const ai = getAI();
   const res = await ai.models.generateContent({
@@ -324,29 +408,20 @@ export const processGameTurn = async (
 
     let simulatedState = gameState;
     try {
+        // NOTE: parsed is now partially typed as 'any' for complex nested objects due to schema relaxation
         const parsed = parseSimulatorResponse(simText || "{}");
         
         simulatedState = {
             ...gameState,
             ...parsed,
-            meta: { 
-                ...gameState.meta, 
-                ...(parsed.meta || {}) 
-            },
-            villain_state: { 
-                ...gameState.villain_state, 
-                ...(parsed.villain_state || {}) 
-            },
-            narrative: {
-                ...gameState.narrative,
-                ...(parsed.narrative || {})
-            },
-            npc_states: parsed.npc_states || gameState.npc_states || [],
-            location_state: parsed.location_state ? {
-                ...gameState.location_state,
-                ...parsed.location_state,
-                room_map: { ...gameState.location_state.room_map, ...(parsed.location_state.room_map || {}) }
-            } : gameState.location_state,
+            // Use Deep Merge for meta to preserve partial updates like player_profile.traits only
+            meta: deepMerge(gameState.meta, parsed.meta || {}),
+            // Use Deep Merge for critical states
+            villain_state: deepMerge(gameState.villain_state, parsed.villain_state || {}),
+            narrative: deepMerge(gameState.narrative, parsed.narrative || {}),
+            location_state: deepMerge(gameState.location_state, parsed.location_state || {}),
+            // Special Merging for NPCs
+            npc_states: mergeNpcStates(gameState.npc_states || [], parsed.npc_states || []),
             suggested_actions: parsed.suggested_actions || []
         };
 
@@ -395,9 +470,19 @@ export const processGameTurn = async (
 
     try {
         const parsed = parseNarratorResponse(narrText || '{"storyText":""}');
-        finalState = parsed.gameState
-          ? { ...simulatedState, ...parsed.gameState }
-          : simulatedState;
+        
+        if (parsed.gameState) {
+            // Base merge using deepMerge logic
+            finalState = deepMerge(simulatedState, parsed.gameState);
+            
+            // CRITICAL FIX: If Narrator returned an npc_states array, it was likely just replaced by deepMerge.
+            // We need to re-run mergeNpcStates logic to ensure we didn't wipe out non-updated fields with partial data.
+            // We pass the ORIGINAL simulatedState.npc_states and the NEW incoming partial array.
+            if (parsed.gameState.npc_states) {
+                finalState.npc_states = mergeNpcStates(simulatedState.npc_states || [], parsed.gameState.npc_states);
+            }
+        }
+        
         finalStoryText = parsed.storyText;
     } catch (e) {
         if (e instanceof ParseError) {

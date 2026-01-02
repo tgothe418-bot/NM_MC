@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { ShieldAlert, Sparkles, Loader2, Play, Users, Eye, Cpu, Hourglass, Settings, Check, MapPin, Image, Upload, Zap } from 'lucide-react';
 import { useSetupStore } from './store';
-import { SimulationConfig } from '../../types';
+import { SimulationConfig, ParsedCharacter } from '../../types';
 import { SourceUploader } from './SourceUploader';
 import { ManualCharacterSection } from './ManualCharacterSection';
 import { generateCalibrationField, generateScenarioConcepts, analyzeImageContext } from '../../services/geminiService';
@@ -100,6 +100,22 @@ export const ManualSetup: React.FC<Props> = ({ onComplete, onBack }) => {
       }
   };
 
+  const handleCharacterSelect = (char: ParsedCharacter) => {
+      const roleLower = char.role.toLowerCase();
+      const isVillain = roleLower.includes('antagonist') || roleLower.includes('villain') || roleLower.includes('monster') || roleLower.includes('killer');
+      
+      if (isVillain) {
+          store.setMode('The Antagonist (Predator Protocol)');
+          store.setVillainName(char.name);
+          store.setVillainAppearance(`${char.description}\n\n[Traits]: ${char.traits}`);
+      } else {
+          store.setMode('The Survivor (Prey Protocol)');
+          store.setSurvivorName(char.name);
+          store.setSurvivorBackground(char.description);
+          store.setSurvivorTraits(char.traits);
+      }
+  };
+
   return (
     <div className="flex flex-col h-full overflow-hidden bg-[#030303]">
         <input type="file" ref={fileInputRef} onChange={onImageUpload} className="hidden" accept="image/*" />
@@ -117,9 +133,23 @@ export const ManualSetup: React.FC<Props> = ({ onComplete, onBack }) => {
             {store.parsedCharacters.length > 0 && (
                 <div className="space-y-6 animate-fadeIn">
                     <div className="flex items-center gap-3 text-sm font-mono uppercase tracking-[0.3em] text-gray-400 border-b border-gray-800 pb-2"><Users className="w-4 h-4" /> Detected Neural Signals</div>
-                    <div className="grid grid-cols-3 gap-6">{store.parsedCharacters.map((char, i) => (
-                        <button key={i} onClick={() => { store.setMode(char.role.toLowerCase().includes('antagonist') ? 'The Antagonist' : 'The Survivor'); store.setSurvivorName(char.name); }} className="text-left bg-black border border-gray-800 p-6 hover:border-fresh-blood"><div className="font-bold text-gray-200 font-mono">{char.name}</div><div className="text-xs text-gray-500 line-clamp-2">{char.description}</div></button>
-                    ))}</div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {store.parsedCharacters.map((char, i) => (
+                            <button 
+                                key={i} 
+                                onClick={() => handleCharacterSelect(char)} 
+                                className="text-left bg-black border border-gray-800 p-6 hover:border-fresh-blood group transition-colors"
+                            >
+                                <div className="flex justify-between items-start mb-2">
+                                    <div className="font-bold text-gray-200 font-mono group-hover:text-white">{char.name}</div>
+                                    <span className="text-[10px] uppercase font-mono text-gray-600 border border-gray-800 px-2 py-0.5 rounded group-hover:text-fresh-blood group-hover:border-fresh-blood/30">
+                                        {char.role}
+                                    </span>
+                                </div>
+                                <div className="text-xs text-gray-500 line-clamp-3 leading-relaxed">{char.description}</div>
+                            </button>
+                        ))}
+                    </div>
                 </div>
             )}
 
