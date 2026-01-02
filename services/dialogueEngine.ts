@@ -138,37 +138,59 @@ const calculatePsychologicalStance = (npc: NpcState): { intent: SocialManeuver, 
     return { intent: 'BARGAIN', directive: "You are wary but pragmatic. Exchange information only if you get something in return." };
 };
 
-// --- 4. MEMORY SYNTHESIS ---
+// --- 4. MEMORY SYNTHESIS (CONTEXT OPTIMIZATION) ---
 
-const synthesizeContextWindow = (memory: DialogueMemory, name: string): string => {
+const synthesizeContextWindow = (npc: NpcState): string => {
+    const { dialogue_state, name } = npc;
+    const { memory } = dialogue_state;
     if (!memory) return "";
     
     let context = `\n[MEMORY MATRIX for ${name}]\n`;
     
-    // Core Identity
-    context += `CORE TRUTH: ${memory.long_term_summary}\n`;
-
-    // Episodic Trauma (High Weight)
-    const trauma = memory.episodic_logs?.filter(e => e.emotional_impact < -5) || [];
-    if (trauma.length > 0) {
-        context += `TRAUMATIC ANCHORS (These haunt you): \n`;
-        trauma.forEach(t => context += ` - "${t.description}"\n`);
+    // 1. ACTIVE THREATS & PHYSICAL STATE (Highest Priority)
+    // The LLM must know immediately if the character is dying or terrified.
+    const stress = npc.psychology?.stress_level || 0;
+    const injuries = npc.active_injuries || [];
+    
+    if (stress > 60 || injuries.length > 0) {
+        context += `!!! CRITICAL PHYSIOLOGICAL STATUS !!!\n`;
+        context += ` - STRESS LEVEL: ${stress}% (Impacts speech stability)\n`;
+        if (injuries.length > 0) {
+            context += ` - ACTIVE INJURIES: ${injuries.map(i => `${i.location} (${i.type})`).join(", ")}\n`;
+        }
+        context += ` - DOMINANT INSTINCT: ${npc.psychology?.dominant_instinct}\n`;
     }
 
-    // Recent Facts
-    if (memory.known_facts && memory.known_facts.length > 0) {
-        context += `KNOWN FACTS: ${memory.known_facts.slice(-4).join(" | ")}\n`;
-    }
-
-    // Short Term Buffer (The Conversation)
+    // 2. IMMEDIATE CONVERSATION HISTORY (Recency Bias)
+    // formatted strictly for the model to follow the flow.
     if (memory.short_term_buffer && memory.short_term_buffer.length > 0) {
-        context += `IMMEDIATE CONVERSATION HISTORY:\n`;
-        memory.short_term_buffer.slice(-6).forEach(entry => {
+        context += `IMMEDIATE DIALOGUE LOG (Last 8 Turns):\n`;
+        memory.short_term_buffer.slice(-8).forEach(entry => {
             const speaker = entry.speaker === name ? "YOU" : entry.speaker.toUpperCase();
             // Sanitize text
-            const txt = typeof entry.text === 'string' ? entry.text.replace(/[\n\r]/g, ' ') : "...";
-            context += ` - ${speaker}: "${txt}"\n`;
+            const txt = typeof entry.text === 'string' ? entry.text.replace(/[\n\r]+/g, ' ').trim() : "...";
+            context += `   [${speaker}]: "${txt}"\n`;
         });
+    }
+
+    // 3. CORE TRUTH & HIGH IMPACT MEMORIES
+    context += `CORE IDENTITY: ${memory.long_term_summary}\n`;
+
+    // Sort episodic logs by absolute impact magnitude (Trauma OR Salvation)
+    const significantMemories = [...(memory.episodic_logs || [])]
+        .sort((a, b) => Math.abs(b.emotional_impact) - Math.abs(a.emotional_impact))
+        .slice(0, 3);
+
+    if (significantMemories.length > 0) {
+        context += `DEFINING MEMORIES (These filter your perception):\n`;
+        significantMemories.forEach(m => {
+            context += ` - [Impact ${m.emotional_impact}]: "${m.description}"\n`;
+        });
+    }
+
+    // 4. RECENTLY LEARNED FACTS
+    if (memory.known_facts && memory.known_facts.length > 0) {
+        context += `KNOWN FACTS: ${memory.known_facts.slice(-3).join(" | ")}\n`;
     }
 
     return context;
@@ -212,16 +234,14 @@ export const constructVoiceManifesto = (npcs: NpcState[], activeCluster: string 
 
         // B. The Psychology (Motivation)
         manifesto += `[PSYCHOLOGY]\n`;
-        manifesto += ` - CURRENT STATE: Stress ${npc.psychology?.stress_level || 0}/100. (If > 80, speech should degrade/falter).\n`;
-        manifesto += ` - DOMINANT INSTINCT: ${npc.psychology?.dominant_instinct}.\n`;
         manifesto += ` - INTERNAL MONOLOGUE: "${npc.psychology?.current_thought || "I am afraid."}"\n`;
         
         // C. The Directive (What to do NOW)
         manifesto += `[DIRECTIVE: ${intent}]\n`;
         manifesto += ` - ${directive}\n`;
         
-        // D. Context & Resonance
-        manifesto += synthesizeContextWindow(ds.memory, npc.name);
+        // D. Context & Resonance (Optimized Context Window)
+        manifesto += synthesizeContextWindow(npc);
         manifesto += clusterResonance;
 
         // E. Knowledge Leaks

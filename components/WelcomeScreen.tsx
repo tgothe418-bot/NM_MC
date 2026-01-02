@@ -38,6 +38,37 @@ const generateCursedText = (text: string, intensity: number = 0.3): string => {
   }).join('');
 };
 
+const MiniNightmareLogo: React.FC<{ className?: string }> = ({ className }) => (
+  <svg viewBox="0 0 200 200" className={className}>
+     <defs>
+         <filter id="mini-glow">
+             <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+             <feMerge>
+                 <feMergeNode in="coloredBlur"/>
+                 <feMergeNode in="SourceGraphic"/>
+             </feMerge>
+         </filter>
+     </defs>
+     {/* Gear */}
+     <g className="origin-center animate-[spin_8s_linear_infinite] text-red-900">
+         <circle cx="100" cy="100" r="70" fill="none" stroke="currentColor" strokeWidth="15" />
+         {[...Array(8)].map((_, i) => (
+            <rect key={i} x="88" y="5" width="24" height="30" fill="currentColor" transform={`rotate(${i * 45} 100 100)`} />
+         ))}
+     </g>
+     {/* Face */}
+     <g className="origin-center animate-pulse">
+          <circle cx="70" cy="85" r="10" fill="#ff0000" filter="url(#mini-glow)" />
+          <circle cx="130" cy="85" r="10" fill="#ff0000" filter="url(#mini-glow)" />
+          <path 
+            d="M 50 125 Q 100 160 150 125 L 140 140 L 125 130 L 110 145 L 100 135 L 90 145 L 75 130 L 60 140 Z" 
+            fill="#4a0404" stroke="#ff0000" strokeWidth="4" strokeLinejoin="round" 
+            filter="url(#mini-glow)" 
+          />
+     </g>
+  </svg>
+);
+
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
   const [cursedThe, setCursedThe] = useState("THE");
   const [cursedNightmare, setCursedNightmare] = useState("NIGHTMARE");
@@ -205,20 +236,76 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
             </div>
           </div>
               
-          {/* MAIN TITLE AREA - Maximized & Blooming */}
+          {/* MAIN LOGO AREA */}
           <div className="flex flex-col items-center justify-center w-full max-w-[98vw] gap-0 flex-grow -mt-20">
             
-            {/* "THE" - Ghostly */}
-            <div 
-                className="relative transition-all duration-75 w-full flex justify-center"
-                style={{ filter: isGlitching ? 'url(#distort)' : 'none' }}
-            >
-                <h1 className="title-primary font-black tracking-tighter text-[#888] mix-blend-screen relative text-center leading-[0.8] blur-[1px]">
-                    {cursedThe}
-                </h1>
+            {/* 1. Procedural Machine Logo (Recreating the image inspiration) */}
+            <div className="relative w-48 h-48 md:w-64 md:h-64 mb-10 pointer-events-none select-none">
+                 {/* Steam Particles */}
+                 <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 w-full h-full flex justify-center opacity-50">
+                    <div className="steam-particle steam-1 bg-red-900/20"></div>
+                    <div className="steam-particle steam-2 bg-gray-500/20"></div>
+                    <div className="steam-particle steam-3 bg-red-500/10"></div>
+                 </div>
+
+                 <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-[0_0_30px_rgba(220,20,60,0.5)]">
+                     <defs>
+                         <filter id="glow-red">
+                             <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                             <feMerge>
+                                 <feMergeNode in="coloredBlur"/>
+                                 <feMergeNode in="SourceGraphic"/>
+                             </feMerge>
+                         </filter>
+                         <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1">
+                             <stop offset="0%" stopColor="#222" />
+                             <stop offset="50%" stopColor="#444" />
+                             <stop offset="100%" stopColor="#111" />
+                         </linearGradient>
+                     </defs>
+
+                     {/* Back Pipes */}
+                     <path d="M20 180 L20 140 L40 140 L40 100" stroke="#331111" strokeWidth="12" fill="none" />
+                     <path d="M180 180 L180 140 L160 140 L160 110" stroke="#331111" strokeWidth="12" fill="none" />
+                     
+                     {/* Main Outer Gear */}
+                     <g className="gear-spin origin-center text-[#1a0505]">
+                         <circle cx="100" cy="100" r="75" fill="none" stroke="#2a0505" strokeWidth="22" />
+                         {/* Teeth */}
+                         {[...Array(12)].map((_, i) => (
+                            <rect key={i} x="92" y="5" width="16" height="25" fill="#330a0a" transform={`rotate(${i * 30} 100 100)`} />
+                         ))}
+                         {/* Bolts */}
+                         {[...Array(6)].map((_, i) => (
+                            <circle key={i} cx="100" cy="38" r="3" fill="#550000" transform={`rotate(${i * 60} 100 100)`} />
+                         ))}
+                     </g>
+
+                     {/* Inner Gear (Counter Spin) */}
+                     <g className="gear-spin-reverse origin-center">
+                         <circle cx="100" cy="100" r="50" fill="#080000" stroke="#440505" strokeWidth="4" />
+                         {[...Array(8)].map((_, i) => (
+                            <rect key={i} x="96" y="54" width="8" height="10" fill="#440505" transform={`rotate(${i * 45} 100 100)`} />
+                         ))}
+                     </g>
+
+                     {/* The Face */}
+                     <g className="animate-pulse origin-center">
+                          {/* Eyes */}
+                          <circle cx="75" cy="90" r="8" fill="#ff0000" filter="url(#glow-red)" />
+                          <circle cx="125" cy="90" r="8" fill="#ff0000" filter="url(#glow-red)" />
+                          
+                          {/* Wicked Grin */}
+                          <path 
+                            d="M 60 125 Q 100 155 140 125 L 135 135 L 125 130 L 115 140 L 100 135 L 85 140 L 75 130 L 65 135 Z" 
+                            fill="#330000" stroke="#ff0000" strokeWidth="2" strokeLinejoin="round" 
+                            filter="url(#glow-red)" 
+                          />
+                     </g>
+                 </svg>
             </div>
 
-            {/* "NIGHTMARE MACHINE" - Halation Effect (Bloom) */}
+            {/* 2. Typographic Stack */}
             <div 
                 className="relative transition-all duration-75 w-full flex flex-col items-center"
                 style={{ filter: isGlitching ? 'url(#distort)' : 'none' }}
@@ -257,12 +344,12 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
               </button>
 
               <div 
-                className="flex items-center gap-4 bg-black/80 p-4 border border-red-900/40 rounded-sm backdrop-blur-md pointer-events-auto shadow-[0_0_30px_rgba(0,0,0,0.8)] max-w-2xl"
+                className="flex items-center gap-6 bg-black/80 p-6 border border-red-900/40 rounded-sm backdrop-blur-md pointer-events-auto shadow-[0_0_30px_rgba(0,0,0,0.8)] max-w-3xl"
                 role="alert"
                 aria-label="Warning"
               >
-                <Skull className="w-4 h-4 text-red-600 animate-pulse flex-shrink-0" />
-                <div className="flex flex-col items-center gap-1">
+                <MiniNightmareLogo className="w-16 h-16 text-red-800 flex-shrink-0 opacity-80" />
+                <div className="flex flex-col items-center gap-2">
                     <p className="warning-text text-[10px] text-red-500/80 font-bold uppercase tracking-[0.15em] text-center leading-relaxed">
                         WARNING: THIS MACHINE HAS NO ETHICS, MORALS OR CONCERN FOR YOU. EVERYTHING HERE IS A WORK OF FICTION.
                     </p>
@@ -270,7 +357,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
                         !!! ENTER AT YOUR OWN RISK !!!
                     </p>
                 </div>
-                <Skull className="w-4 h-4 text-red-600 animate-pulse flex-shrink-0" />
+                <MiniNightmareLogo className="w-16 h-16 text-red-800 flex-shrink-0 opacity-80" />
               </div>
           </div>
       </div>
