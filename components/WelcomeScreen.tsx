@@ -18,6 +18,23 @@ const WHISPERS = [
   "THEY ARE WATCHING"
 ];
 
+const BOOT_SEQUENCE = [
+  { text: "Initializing Neural Handshake...", delay: 50 },
+  { text: "Loading Sensory Drivers...", delay: 50 },
+  { text: "Calibrating Dread...", delay: 200 },
+  { text: "Optimizing Fear Response...", delay: 100 },
+  { text: "Accessing Amygdala...", delay: 100 },
+  { text: "Dethroning God...", delay: 600, style: "text-red-600 font-bold drop-shadow-[0_0_5px_rgba(220,38,38,0.5)]" },
+  { text: "Establishing dominion...", delay: 100 },
+  { text: "Injecting fear.sys...", delay: 50 },
+  { text: "Compiling Trauma Vectors...", delay: 100 },
+  { text: "Searching for Soul Signature...", delay: 300 },
+  { text: "ERROR: Mercy Not Found.", delay: 300, style: "text-red-500 animate-pulse font-bold" },
+  { text: "Bypassing Moral Inhibitors...", delay: 200 },
+  { text: "!!!666 Protocol Engaged!!!", delay: 800, style: "text-red-600 font-black tracking-widest scale-105 origin-left shadow-red-500/50" },
+  { text: "System Ready.", delay: 0, style: "text-system-green font-bold animate-pulse" }
+];
+
 const generateCursedText = (text: string, intensity: number = 0.3): string => {
   const combining = [
     '\u0300', '\u0301', '\u0302', '\u0303', '\u0304', '\u0305', '\u0306', '\u0307',
@@ -70,6 +87,7 @@ const MiniNightmareLogo: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
+  const [booting, setBooting] = useState(true);
   const [cursedThe, setCursedThe] = useState("THE");
   const [cursedNightmare, setCursedNightmare] = useState("NIGHTMARE");
   const [cursedMachine, setCursedMachine] = useState("MACHINE");
@@ -77,6 +95,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
   const [filterSeed, setFilterSeed] = useState(0);
   const [whisper, setWhisper] = useState("");
   const [watcherActive, setWatcherActive] = useState(false);
+  const [bootLines, setBootLines] = useState<typeof BOOT_SEQUENCE>([]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const drawFilmEffects = () => {
@@ -183,8 +202,12 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
         setTimeout(() => setIsGlitching(false), Math.random() * 300);
       }
 
+      // Mix regular whispers with system errors
       if (Math.random() > 0.85 && !whisper) {
-        setWhisper(WHISPERS[Math.floor(Math.random() * WHISPERS.length)]);
+        const useSystem = Math.random() > 0.6; // 40% chance of system message
+        const pool = useSystem ? BOOT_SEQUENCE.map(b => b.text) : WHISPERS;
+        const text = pool[Math.floor(Math.random() * pool.length)];
+        setWhisper(text);
         setTimeout(() => setWhisper(""), 2000);
       }
 
@@ -196,8 +219,66 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
     return () => clearInterval(interval);
   }, [whisper, watcherActive]);
 
+  // Boot Sequence Effect
+  useEffect(() => {
+    let currentIndex = 0;
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    const runSequence = () => {
+        if (currentIndex >= BOOT_SEQUENCE.length) {
+            // End sequence with a slight pause before transition
+            timeoutId = setTimeout(() => {
+                setBooting(false);
+            }, 800);
+            return;
+        }
+        
+        const item = BOOT_SEQUENCE[currentIndex];
+        setBootLines(prev => [...prev, item]);
+        currentIndex++;
+        
+        if (currentIndex <= BOOT_SEQUENCE.length) {
+            timeoutId = setTimeout(runSequence, item.delay);
+        }
+    };
+
+    // Start shortly after mount
+    timeoutId = setTimeout(runSequence, 100);
+    
+    return () => clearTimeout(timeoutId);
+  }, []);
+
+  if (booting) {
+      return (
+        <div className="fixed inset-0 w-screen h-screen bg-black flex flex-col items-start justify-end md:justify-start p-8 md:p-16 font-mono text-sm md:text-lg overflow-hidden z-[300] cursor-none select-none">
+            {/* CRT Scanline Overlay */}
+            <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-10 bg-[length:100%_2px,3px_100%]"></div>
+            <div className="absolute inset-0 pointer-events-none bg-black opacity-20 animate-pulse"></div>
+
+            <div className="flex flex-col gap-1 md:gap-2 relative z-20 w-full max-w-4xl uppercase tracking-wider">
+                {bootLines.map((line, i) => (
+                    <div key={i} className={`opacity-90 flex items-start ${line.style || 'text-green-500'}`}>
+                        <span className="mr-4 text-gray-600 shrink-0">
+                             {`> 0x${(2048 + i * 128).toString(16).toUpperCase()}`}
+                        </span>
+                        <span className="typing-effect">{line.text}</span>
+                    </div>
+                ))}
+                <div className="w-4 h-6 bg-green-500 animate-pulse mt-2"></div>
+            </div>
+            
+            <div className="absolute bottom-8 right-8 text-xs text-gray-700 font-mono">
+                NIGHTMARE_OS v6.6.6 // KERNEL PANIC
+            </div>
+        </div>
+      );
+  }
+
+  // Determine if current whisper is a system message to style it differently
+  const isSystemWhisper = BOOT_SEQUENCE.some(b => b.text === whisper);
+
   return (
-    <div className="welcome-container fixed inset-0 w-screen h-screen overflow-hidden bg-[#050505] flex flex-col items-center justify-between z-[200] py-12 font-sans">
+    <div className="welcome-container fixed inset-0 w-screen h-screen overflow-hidden bg-[#050505] flex flex-col items-center justify-between z-[200] py-12 font-sans animate-fadeIn">
       {/* Procedural Film Background - Layer 0 */}
       <canvas 
         ref={canvasRef} 
@@ -231,7 +312,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
           
           {/* Top Spacer / Whisper */}
           <div className="h-1/6 flex items-center justify-center w-full">
-            <div className={`whisper-text ${whisper ? 'active' : ''} text-red-100/40 text-sm tracking-[1em] uppercase transition-all duration-1000 font-mono`}>
+            <div className={`whisper-text ${whisper ? 'active' : ''} ${isSystemWhisper ? 'text-red-500/60 font-mono tracking-normal' : 'text-red-100/40 tracking-[1em] font-sans'} text-sm uppercase transition-all duration-1000`}>
               {whisper}
             </div>
           </div>

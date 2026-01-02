@@ -16,7 +16,8 @@ export const SourceUploader: React.FC = () => {
     setLocationDescription, 
     setVisualMotif, 
     setSelectedClusters, 
-    setParsedCharacters 
+    setParsedCharacters,
+    setIntensity
   } = useSetupStore();
   
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -60,7 +61,16 @@ export const SourceUploader: React.FC = () => {
                  }
             }
             
-            // 4. Characters
+            // 4. Intensity Adjustment
+            if (result.intensity) {
+                 // Robust extraction for "Level 3", "level 3", "3", etc.
+                 const levelMatch = result.intensity.match(/[1-5]/);
+                 if (levelMatch) {
+                     setIntensity(`Level ${levelMatch[0]}`);
+                 }
+            }
+            
+            // 5. Characters
             if (result.characters && result.characters.length > 0) {
                 setParsedCharacters(prev => [...prev, ...result.characters]);
             }
@@ -104,7 +114,7 @@ export const SourceUploader: React.FC = () => {
                         <div>
                             <div className="text-sm font-mono uppercase tracking-widest text-gray-400 group-hover:text-gray-200">Ingest Source Material</div>
                             <div className="text-[10px] text-gray-600 font-mono uppercase mt-1">
-                                Upload PDF, Text, or Image to extract characters and setting
+                                Upload PDF, Text, or Image to extract characters, setting, and intensity
                             </div>
                             <div className="text-[9px] text-gray-600 font-mono uppercase mt-4">
                                 Capacity: {files.length} / {MAX_SOURCE_FILES} Slots Used
