@@ -18,49 +18,49 @@ const CLUSTER_OPTIONS = [
   { 
     id: 'Flesh', 
     label: 'THE FLESH', 
-    desc: 'Visceral & Organic', 
+    desc: 'Body Horror & Biological', 
     color: 'border-red-900 text-red-500',
     tooltip: "Bio-organic horror focused on the fragility of the physical form. Expect wet textures, medical gore, and atavistic resurgence."
   },
   { 
     id: 'System', 
     label: 'THE SYSTEM', 
-    desc: 'Digital & Industrial', 
+    desc: 'Cyberpunk Dystopia & Glitch', 
     color: 'border-system-green text-system-green',
     tooltip: "Technological dread and the cold logic of an indifferent machine. Expect glitch art, data corruption, and industrial noise."
   },
   { 
     id: 'Haunting', 
     label: 'THE HAUNTING', 
-    desc: 'Eerie & Spectral', 
+    desc: 'Gothic Dread & Spectral', 
     color: 'border-haunt-gold text-haunt-gold',
     tooltip: "The eerie presence of agency in desolate landscapes. Expect lingering trauma, spectral apparitions, and the weight of history."
   },
   { 
     id: 'Self', 
     label: 'THE SELF', 
-    desc: 'Psychological & Ego', 
+    desc: 'Psychological Thriller', 
     color: 'border-psych-indigo text-indigo-400',
     tooltip: "Psychological erosion and the breakdown of identity. Expect hall-of-mirror effects, dissociation, and meta-narrative collapse."
   },
   { 
     id: 'Blasphemy', 
     label: 'THE BLASPHEMY', 
-    desc: 'Transgressive & Profane', 
+    desc: 'Cult Horror & Transgression', 
     color: 'border-blasphemy-purple text-purple-400',
     tooltip: "Shock-driven horror exploring the intersection of the sacred and the profane. Expect inverted rituals and systematic moral erosion."
   },
   { 
     id: 'Survival', 
     label: 'THE VOID', 
-    desc: 'Desolate & Cold', 
+    desc: 'Environmental Survival', 
     color: 'border-survival-ice text-cyan-400',
     tooltip: "Existential cold and the absolute indifference of nature. Expect whiteouts, starvation cycles, and the silence of the void."
   },
   { 
     id: 'Desire', 
     label: 'THE HUNGER', 
-    desc: 'Predatory & Lush', 
+    desc: 'Gothic Romance & Predatory', 
     color: 'border-rose-900 text-rose-500',
     tooltip: "The intertwining of Eros and Thanatos. Expect predatory intimacy, decadent decay, and the ultimate consumption of the beloved."
   },
