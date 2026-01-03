@@ -141,9 +141,13 @@ const calculatePsychologicalStance = (npc: NpcState): { intent: SocialManeuver, 
 // --- 4. MEMORY SYNTHESIS (CONTEXT OPTIMIZATION) ---
 
 const synthesizeContextWindow = (npc: NpcState): string => {
-    const { dialogue_state, name } = npc;
+    const { name } = npc;
+    // DEFENSIVE: Handle malformed NPC state where dialogue_state might be missing from LLM response
+    const dialogue_state = npc.dialogue_state;
+    
+    if (!dialogue_state || !dialogue_state.memory) return "";
+    
     const { memory } = dialogue_state;
-    if (!memory) return "";
     
     let context = `\n[MEMORY MATRIX for ${name}]\n`;
     
@@ -166,7 +170,10 @@ const synthesizeContextWindow = (npc: NpcState): string => {
     if (memory.short_term_buffer && memory.short_term_buffer.length > 0) {
         context += `IMMEDIATE DIALOGUE LOG (Last 8 Turns):\n`;
         memory.short_term_buffer.slice(-8).forEach(entry => {
-            const speaker = entry.speaker === name ? "YOU" : entry.speaker.toUpperCase();
+            // DEFENSIVE: Ensure speaker exists and force string conversion to prevent undefined.toUpperCase() crash
+            const speakerName = entry.speaker || "UNKNOWN";
+            const speaker = speakerName === name ? "YOU" : String(speakerName).toUpperCase();
+            
             // Sanitize text
             const txt = typeof entry.text === 'string' ? entry.text.replace(/[\n\r]+/g, ' ').trim() : "...";
             context += `   [${speaker}]: "${txt}"\n`;

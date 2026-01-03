@@ -136,19 +136,34 @@ const FormattedText: React.FC<{ text: string, cluster?: string }> = ({ text, clu
   const cleanHtmlString = (str: string) => str.replace(/<br\s*\/?>/gi, '\n').replace(/<b>(.*?)<\/b>/gi, '**$1**').replace(/<i>(.*?)<\/i>/gi, '*$1*').replace(/<strong>(.*?)<\/strong>/gi, '**$1**').replace(/<em>(.*?)<\/em>/gi, '*$1*');
   const processedText = cleanHtmlString(text);
   
-  // Robust Regex to catch HTML span tags with attributes, tolerating whitespace
-  const spanRegex = /(<span\s+style=['"][^'"]*color:\s*[^'"]*['"]>[\s\S]*?<\/span>)/gi;
+  // Robust Regex to catch HTML span tags with attributes, tolerating whitespace and different quote types
+  const spanRegex = /(<span\s+[^>]*>[\s\S]*?<\/span>)/gi;
   const parts = processedText.split(spanRegex);
 
   return (
     <span>
       {parts.map((part, index) => {
-        if (part.match(spanRegex)) {
-           // Parse the span
+        if (part.match(/^<span/i)) {
+           // Parse the span content
            const contentMatch = part.match(/>([\s\S]*?)<\/span>/i);
            const content = contentMatch ? contentMatch[1] : "";
-           const colorMatch = part.match(/color:\s*([a-z]+|#[0-9a-f]{3,6})/i);
-           const color = colorMatch ? colorMatch[1] : "";
+           
+           // Determine color based on class or style
+           let color = "";
+           
+           // Check for class (e.g. class="blue")
+           const classMatch = part.match(/class=['"]([^'"]*)['"]/i);
+           if (classMatch) {
+             const cls = classMatch[1].toLowerCase();
+             if (cls.includes('blue')) color = 'blue';
+             else if (cls.includes('red')) color = 'red';
+           }
+           
+           // Fallback: Check for inline style color if class didn't catch it
+           if (!color) {
+               const styleMatch = part.match(/color:\s*([a-z]+|#[0-9a-f]{3,6})/i);
+               if (styleMatch) color = styleMatch[1];
+           }
            
            return (
              <span key={index} className={getColorClass(color)}>
