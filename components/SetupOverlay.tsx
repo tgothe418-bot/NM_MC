@@ -6,6 +6,7 @@ import { ChoiceModeSelector } from './setup/ChoiceModeSelector';
 import { GuidedSetup } from './setup/GuidedSetup';
 import { ManualSetup } from './setup/ManualSetup';
 import { SimulationSetup } from './setup/SimulationSetup';
+import { NpcSelector } from './setup/NpcSelector';
 
 interface SetupOverlayProps {
   onComplete: (config: SimulationConfig) => void;
@@ -13,13 +14,48 @@ interface SetupOverlayProps {
 
 export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
   const [setupMode, setSetupMode] = useState<SetupMode>('choice');
+  const [pendingConfig, setPendingConfig] = useState<SimulationConfig | null>(null);
+
+  const handleInitialSetupComplete = (config: SimulationConfig) => {
+    setPendingConfig(config);
+    setSetupMode('npc-selection');
+  };
 
   return (
     <div className="fixed inset-0 z-[100] w-full h-full bg-[#030303] text-gray-200 font-sans overflow-hidden">
-        {setupMode === 'choice' && <ChoiceModeSelector onSelect={setSetupMode} />}
-        {setupMode === 'guided' && <GuidedSetup onComplete={onComplete} onBack={() => setSetupMode('choice')} />}
-        {setupMode === 'manual' && <ManualSetup onComplete={onComplete} onBack={() => setSetupMode('choice')} />}
-        {setupMode === 'simulation' && <SimulationSetup onRun={onComplete} onBack={() => setSetupMode('choice')} />}
+        {setupMode === 'choice' && (
+            <ChoiceModeSelector onSelect={setSetupMode} />
+        )}
+        
+        {setupMode === 'guided' && (
+            <GuidedSetup 
+                onComplete={handleInitialSetupComplete} 
+                onBack={() => setSetupMode('choice')} 
+            />
+        )}
+        
+        {setupMode === 'manual' && (
+            <ManualSetup 
+                onComplete={handleInitialSetupComplete} 
+                onBack={() => setSetupMode('choice')} 
+            />
+        )}
+
+        {/* Note: Simulation Setup usually skips manual NPC selection as it's a diagnostic tool, keeping direct onComplete */}
+        {setupMode === 'simulation' && (
+            <SimulationSetup 
+                onRun={onComplete} 
+                onBack={() => setSetupMode('choice')} 
+            />
+        )}
+
+        {setupMode === 'npc-selection' && pendingConfig && (
+            <NpcSelector 
+                config={pendingConfig}
+                onConfirm={onComplete}
+                onBack={() => setSetupMode('choice')}
+            />
+        )}
     </div>
   );
 };

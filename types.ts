@@ -68,6 +68,8 @@ export interface SimulationConfig {
   survivor_name?: string;
   survivor_background?: string;
   survivor_traits?: string;
+  // New: Pre-selected NPCs from setup
+  pre_generated_npcs?: NpcState[];
 }
 
 export interface KnowledgeNode {

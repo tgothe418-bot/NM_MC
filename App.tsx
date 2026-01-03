@@ -11,6 +11,7 @@ import { ApiKeyModal } from './components/ApiKeyModal';
 import { INITIAL_GREETING } from './constants';
 import { generateAutoPlayerAction, processGameTurn } from './services/geminiService';
 import { getDefaultLocationState } from './services/locationEngine';
+import { generateProceduralNpc } from './services/npcGenerator';
 
 export default function App() {
   const [apiKey, setApiKey] = useState(process.env.API_KEY || "");
@@ -45,6 +46,19 @@ export default function App() {
   }, [apiKey]);
 
   const handleSetupComplete = (config: SimulationConfig) => {
+    // 1. DETERMINISTIC GENERATION: Create victims locally
+    // Use user-selected NPCs if available, otherwise generate default amount
+    let initialNpcs: NpcState[] = [];
+    
+    if (config.pre_generated_npcs && config.pre_generated_npcs.length > 0) {
+        initialNpcs = config.pre_generated_npcs;
+    } else {
+        const victimCount = config.victim_count || 3;
+        initialNpcs = Array.from({ length: victimCount }).map(() => 
+            generateProceduralNpc(config.cluster, config.intensity)
+        );
+    }
+
     // Initialize Game State based on config
     const newState: GameState = {
         meta: {
@@ -68,7 +82,7 @@ export default function App() {
             current_tactic: "Stalking",
             victim_profile: config.victim_description || "Unknown Victims"
         },
-        npc_states: [], // Will be populated by Simulator
+        npc_states: initialNpcs, // Injected pre-generated NPCs
         location_state: {
             ...getDefaultLocationState(),
             architectural_notes: config.location_description ? [config.location_description] : []
