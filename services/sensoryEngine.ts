@@ -56,8 +56,7 @@ export const constructSensoryManifesto = (gameState: GameState): string => {
     });
 
     manifesto += `\nVOCABULARY BLACKLIST (NEVER USE THESE VERBATIM):\n`;
-    const randomBlacklist = getRandomElements(STYLE_GUIDE.vocabulary_blacklist, 5); // Just show a few random ones to save tokens, or all? 
-    // Actually, listing all is safer for the model to know what NOT to use.
+    const randomBlacklist = getRandomElements(STYLE_GUIDE.vocabulary_blacklist, 5); 
     STYLE_GUIDE.vocabulary_blacklist.forEach(word => {
       manifesto += ` - "${word}"\n`;
     });
@@ -74,7 +73,29 @@ export const constructSensoryManifesto = (gameState: GameState): string => {
         manifesto += `\nATMOSPHERE: ${gameState.location_state.weather_state} (Time: ${gameState.location_state.time_of_day})\n`;
     }
 
+    // Integrated Liminal Logic
+    if (["System", "Self", "Haunting", "Survival"].some(c => activeClusterName.includes(c))) {
+        manifesto += constructLiminalManifesto(activeClusterName);
+    }
+
     manifesto += `\n*** END MANIFESTO ***\n`;
 
     return manifesto;
+};
+
+export const constructLiminalManifesto = (locationType: string): string => {
+  // Based on "Liminal Space" aesthetic papers
+  const liminalTriggers = [
+    "Anachronistic Technology (CRT TVs, old vending machines)",
+    "Infinite Repetition (Hallways that don't end)",
+    "Functional Mismatch (A playground in a basement)",
+    "Acoustic Deadness (Sound does not carry)"
+  ];
+  
+  return `
+  *** LIMITAL AESTHETIC PROTOCOL ***
+  Apply 'Kenopsia': Describe the space as if it is waiting for people who will never arrive.
+  Use 'Flat Lighting' and 'Muted Textures'.
+  Mandatory Element: ${liminalTriggers[Math.floor(Math.random() * liminalTriggers.length)]}
+  `;
 };

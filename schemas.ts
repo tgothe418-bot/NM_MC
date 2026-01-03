@@ -18,7 +18,7 @@ export const RoomNodeSchema = z.object({
 
 export const LocationStateSchema = z.object({
   current_room_id: z.string(),
-  room_map: z.record(RoomNodeSchema),
+  room_map: z.record(z.string(), RoomNodeSchema),
   fidelity_status: z.string(),
   spatial_logic: z.string(),
   current_state: z.number(),
@@ -176,7 +176,7 @@ export const GameStateSchema = z.object({
     player_profile: z.object({
         name: z.string(),
         background: z.string(),
-        traits: z.string()
+        traits: z.union([z.string(), z.array(z.string())])
     }).optional()
   }),
   villain_state: VillainStateSchema,
@@ -189,11 +189,12 @@ export const GameStateSchema = z.object({
   suggested_actions: z.array(z.string()),
 });
 
-export const SimulatorResponseSchema = GameStateSchema.deepPartial();
+export const SimulatorResponseSchema = z.any();
 
 export const NarratorResponseSchema = z.object({
   story_text: z.string(),
-  game_state: GameStateSchema.optional(),
+  // Relaxed to z.any() to allow partial updates from LLM without strict validation failure
+  game_state: z.any().optional(),
 });
 
 export const ClusterResonanceSchema = z.object({
@@ -235,4 +236,4 @@ export const CharacterProfileSchema = z.object({
   traits: z.string(),
 });
 
-export const HydratedCharacterSchema = NpcStateSchema.deepPartial();
+export const HydratedCharacterSchema = z.any();

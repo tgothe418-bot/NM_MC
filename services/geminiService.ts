@@ -61,19 +61,19 @@ export const processGameTurn = async (
         ]
     },
     config: {
-        systemInstruction: SIMULATOR_INSTRUCTION,
-        responseMimeType: 'application/json'
+        systemInstruction: SIMULATOR_INSTRUCTION
+        // NOTE: responseMimeType removed to avoid 500 errors on complex prompts without schemas
     }
   });
 
   const simText = simResponse.text || "{}";
   if (onStreamLogic) onStreamLogic(simText + "\n\n", 'logic');
   
-  const partialState = parseSimulatorResponse(simText);
+  const partialState = parseSimulatorResponse(simText) as any;
   
   const updatedState: GameState = {
       ...currentState,
-      ...partialState as any,
+      ...partialState,
       meta: { ...currentState.meta, ...partialState.meta },
       villain_state: { ...currentState.villain_state, ...partialState.villain_state },
       narrative: { ...currentState.narrative, ...partialState.narrative },
@@ -92,13 +92,13 @@ export const processGameTurn = async (
           ]
       },
       config: {
-          systemInstruction: NARRATOR_INSTRUCTION,
-          responseMimeType: 'application/json'
+          systemInstruction: NARRATOR_INSTRUCTION
+          // NOTE: responseMimeType removed to avoid 500 errors on complex prompts without schemas
       }
   });
 
   const narrText = narratorResponse.text || "{}";
-  const narrResult = parseNarratorResponse(narrText);
+  const narrResult = parseNarratorResponse(narrText) as { story_text: string, game_state?: GameState };
   
   // 4. IMAGE GENERATION (If requested)
   let imageUrl: string | undefined;
@@ -169,7 +169,17 @@ export const analyzeSourceMaterial = async (file: File): Promise<SourceAnalysisR
   const base64Content = base64Data.split(',')[1];
 
   const prompt = `Analyze this source material (Image or Document) for a horror simulation setup.
-  Extract structured data: characters, location, visual_motif, theme_cluster, intensity.`;
+  
+  Return a valid JSON object matching this structure exactly (do not wrap in markdown):
+  {
+    "characters": [
+      { "name": "Name", "role": "Archetype/Job", "description": "Brief physical/psychological bio", "traits": "Key personality traits" }
+    ],
+    "location": "Detailed description of the setting/environment found in the source",
+    "visual_motif": "Cinematic visual style description (e.g. Grainy 16mm, Digital Glitch)",
+    "theme_cluster": "One of: Flesh, System, Haunting, Self, Blasphemy, Survival, Desire",
+    "intensity": "Level 1 to 5"
+  }`;
 
   const res = await ai.models.generateContent({
     model: 'gemini-3-pro-preview',
@@ -180,22 +190,7 @@ export const analyzeSourceMaterial = async (file: File): Promise<SourceAnalysisR
       ]
     },
     config: { 
-        responseMimeType: 'application/json',
-        responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-                characters: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: {
-                    name: { type: Type.STRING },
-                    role: { type: Type.STRING },
-                    description: { type: Type.STRING },
-                    traits: { type: Type.STRING }
-                }}},
-                location: { type: Type.STRING },
-                visual_motif: { type: Type.STRING },
-                theme_cluster: { type: Type.STRING },
-                intensity: { type: Type.STRING }
-            }
-        }
+        // Strict schema removed to prevent timeouts/500s on large context. Relies on prompt instruction.
     }
   });
 
@@ -278,7 +273,9 @@ export const generateScenarioConcepts = async (cluster: string, intensity: strin
     const res = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
         contents: { parts: [{ text: `Generate a full scenario concept JSON. Cluster: ${cluster}, Mode: ${mode}, Intensity: ${intensity}.` }] },
-        config: { responseMimeType: 'application/json' }
+        config: {
+             // responseMimeType: 'application/json' // REMOVED
+        }
     });
     return parseScenarioConcepts(res.text || "{}");
 };

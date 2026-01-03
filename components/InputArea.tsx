@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Send, Activity, Camera, Film, FastForward, Paperclip, X, 
   FileText, Terminal, ChevronRight, MessageSquare, Eye, 
-  Zap, Hand, Mic
+  Zap, Hand
 } from 'lucide-react';
 
 interface InputAreaProps {
@@ -25,12 +25,10 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
   const [files, setFiles] = useState<File[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isVoiceActive, setIsVoiceActive] = useState(false);
 
   useEffect(() => {
     if (externalValue !== undefined) {
       setText(externalValue);
-      setIsVoiceActive(!!externalValue);
     }
   }, [externalValue]);
 
@@ -40,7 +38,6 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
       onSend(text, files);
       setText('');
       setFiles([]);
-      setIsVoiceActive(false);
     }
   };
 
@@ -143,8 +140,8 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
       )}
 
       <form onSubmit={handleSubmit} className="relative group">
-        <div className={`absolute -inset-1 bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 rounded-2xl blur-md opacity-30 group-hover:opacity-70 transition duration-1000 ${isLoading ? 'animate-pulse' : ''} ${isVoiceActive ? 'opacity-90 from-red-900 via-red-600 to-red-900' : ''}`}></div>
-        <div className={`relative flex flex-col bg-black/90 border-2 rounded-2xl p-4 shadow-3xl transition-all duration-700 backdrop-blur-xl ${isVoiceActive ? 'border-red-900 shadow-[0_0_40px_rgba(220,20,60,0.2)]' : 'border-gray-800 group-hover:border-gray-700'}`}>
+        <div className={`absolute -inset-1 bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 rounded-2xl blur-md opacity-30 group-hover:opacity-70 transition duration-1000 ${isLoading ? 'animate-pulse' : ''}`}></div>
+        <div className={`relative flex flex-col bg-black/90 border-2 rounded-2xl p-4 shadow-3xl transition-all duration-700 backdrop-blur-xl border-gray-800 group-hover:border-gray-700`}>
           
           {/* File Previews */}
           {files.length > 0 && (
@@ -263,27 +260,22 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
             </div>
 
             <div className="relative w-full px-4 self-center">
-              {isVoiceActive && (
-                   <div className="absolute -top-10 left-4 flex items-center gap-3 text-xs text-red-500 font-mono uppercase tracking-[0.4em] animate-pulse font-bold">
-                       <Mic className="w-4 h-4" /> System Listening...
-                   </div>
-              )}
               <textarea
                   ref={textareaRef}
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={isLoading ? "Architect is reweaving the simulation..." : (isVoiceActive ? "Speak to the Void..." : "Define your volition...")}
+                  placeholder={isLoading ? "Architect is reweaving the simulation..." : "Define your volition..."}
                   disabled={isLoading}
                   rows={1}
-                  className={`w-full bg-transparent text-gray-100 placeholder-gray-700 px-2 py-4 focus:outline-none resize-none font-serif text-2xl max-h-64 disabled:opacity-50 transition-all ${isVoiceActive ? 'text-red-100 placeholder-red-900/40' : ''}`}
+                  className={`w-full bg-transparent text-gray-100 placeholder-gray-700 px-2 py-4 focus:outline-none resize-none font-serif text-2xl max-h-64 disabled:opacity-50 transition-all`}
               />
             </div>
             
             <button
               type="submit"
               disabled={(!text.trim() && files.length === 0) || isLoading}
-              className={`p-4 rounded-xl text-gray-600 hover:text-white hover:bg-gray-800 transition-all disabled:opacity-10 disabled:cursor-not-allowed self-end ${isVoiceActive ? 'text-red-500 hover:bg-red-900/30 animate-pulse' : ''}`}
+              className={`p-4 rounded-xl text-gray-600 hover:text-white hover:bg-gray-800 transition-all disabled:opacity-10 disabled:cursor-not-allowed self-end`}
             >
               {isLoading ? <Activity className="w-8 h-8 animate-spin" /> : <Send className="w-8 h-8" />}
             </button>

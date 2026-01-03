@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Key, Lock } from 'lucide-react';
 
@@ -30,7 +31,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ onSetKey }) => {
         </div>
 
         <p className="text-gray-400 mb-6 font-mono text-sm leading-relaxed">
-          Accessing the Architect Engine requires a valid Google GenAI API key. 
+          Accessing The Nightmare Machine requires a valid Google GenAI API key. 
           Your key acts as the tether to the simulation.
         </p>
 

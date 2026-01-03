@@ -181,7 +181,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
 
   useEffect(() => {
     // Redraw film effects on interval to simulate 12fps/18fps projection
-    const filmLoop = setInterval(drawFilmEffects, 120); // ~8fps for choppy look
+    // Slowing down by 75% (approx 4x slower) to reduce load. Was 120ms.
+    const filmLoop = setInterval(drawFilmEffects, 480);
     const handleResize = () => drawFilmEffects();
     window.addEventListener('resize', handleResize);
     return () => {
@@ -191,6 +192,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
   }, []);
 
   useEffect(() => {
+    // Slowing down text effects by 75% (approx 4x slower) to reduce load. Was 1500ms.
     const interval = setInterval(() => {
       setCursedThe(generateCursedText("THE", 0.15));
       setCursedNightmare(generateCursedText("NIGHTMARE", 0.15));
@@ -215,7 +217,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
         setWatcherActive(true);
         setTimeout(() => setWatcherActive(false), 800);
       }
-    }, 1500);
+    }, 6000);
     return () => clearInterval(interval);
   }, [whisper, watcherActive]);
 

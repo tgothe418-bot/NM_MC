@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { GameState, SimulationConfig, ChatMessage, NpcState } from './types';
 import { WelcomeScreen } from './components/WelcomeScreen';
@@ -9,7 +8,6 @@ import { StoryLog } from './components/StoryLog';
 import { InputArea } from './components/InputArea';
 import { SimulationModal } from './components/SimulationModal';
 import { ApiKeyModal } from './components/ApiKeyModal';
-import { VoiceControl } from './components/VoiceControl';
 import { INITIAL_GREETING } from './constants';
 import { generateAutoPlayerAction, processGameTurn } from './services/geminiService';
 import { getDefaultLocationState } from './services/locationEngine';
@@ -249,15 +247,12 @@ export default function App() {
                     onSend={(text, files) => handleSendMessage(text, files)} 
                     isLoading={isLoading} 
                     onAdvance={() => handleSendMessage("Wait. Observe.")}
+                    onSnapshot={() => handleSendMessage("GENERATE VISUAL ARTIFACT.")}
+                    onVideoCutscene={() => handleSendMessage("GENERATE CINEMATIC SEQUENCE.")}
                     showLogic={showLogic}
                     onToggleLogic={() => setShowLogic(!showLogic)}
                     options={gameState.suggested_actions}
                 />
-            </div>
-            
-            {/* Overlay Controls */}
-            <div className="absolute top-6 right-6 z-30">
-                <VoiceControl onProcessAction={processAction} />
             </div>
         </div>
 
