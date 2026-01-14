@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Target, Skull, Wand2, Users, UserCheck, StickyNote, Fingerprint, Loader2, UserPlus } from 'lucide-react';
 import { useSetupStore } from './store';
@@ -28,7 +27,7 @@ export const ManualCharacterSection: React.FC<Props> = ({ loadingFields, setLoad
               field === 'Entity Name' ? villainName :
               field === 'Form & Appearance' ? villainAppearance :
               field === 'Modus Operandi' ? villainMethods :
-              field === 'Specimen Targets' ? victimDescription :
+              field === 'Specimen Targets' || field === 'Companion Profiles' ? victimDescription :
               field === 'Primary Objective' ? primaryGoal :
               field === 'Identity Name' ? survivorName :
               field === 'Backstory' ? survivorBackground :
@@ -38,7 +37,7 @@ export const ManualCharacterSection: React.FC<Props> = ({ loadingFields, setLoad
           if (field === 'Entity Name') setVillainName(val);
           else if (field === 'Form & Appearance') setVillainAppearance(val);
           else if (field === 'Modus Operandi') setVillainMethods(val);
-          else if (field === 'Specimen Targets') setVictimDescription(val);
+          else if (field === 'Specimen Targets' || field === 'Companion Profiles') setVictimDescription(val);
           else if (field === 'Primary Objective') setPrimaryGoal(val);
           else if (field === 'Identity Name') setSurvivorName(val);
           else if (field === 'Backstory') setSurvivorBackground(val);
@@ -124,6 +123,24 @@ export const ManualCharacterSection: React.FC<Props> = ({ loadingFields, setLoad
             <Field label="Identity Name" icon={Users} value={survivorName} onChange={setSurvivorName} fieldKey="Identity Name" />
             <div className="md:col-span-2"><Field label="Backstory" icon={StickyNote} value={survivorBackground} onChange={setSurvivorBackground} fieldKey="Backstory" isTextarea /></div>
             <div className="md:col-span-2"><Field label="Traits & Flaws" icon={Fingerprint} value={survivorTraits} onChange={setSurvivorTraits} fieldKey="Traits & Flaws" isTextarea /></div>
+            
+            {/* NEW SECTION FOR OTHERS */}
+            <div className="md:col-span-2 border-t border-system-green/20 pt-8 mt-4">
+                 <div className="text-system-green font-mono text-sm font-bold uppercase tracking-[0.3em] mb-6 flex items-center gap-3 opacity-80">
+                    <Users className="w-4 h-4" /> Additional Survivors
+                 </div>
+                 <div className="grid grid-cols-1 gap-8">
+                    <Field label="Companion Profiles" icon={Users} value={victimDescription} onChange={setVictimDescription} fieldKey="Companion Profiles" isTextarea />
+                    
+                    <div className="space-y-4 group relative">
+                      <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">Group Size</label>
+                      <div className="flex items-center gap-6 bg-black border-2 border-gray-800 p-6 rounded-sm">
+                        <input type="range" min="1" max={Math.max(10, victimCount)} value={victimCount} onChange={(e) => setVictimCount(parseInt(e.target.value))} className="flex-1 accent-system-green h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer" />
+                        <span className="text-system-green font-mono text-xl w-8 font-bold">{victimCount}</span>
+                      </div>
+                    </div>
+                 </div>
+            </div>
         </div>
     </div>
   );

@@ -35,6 +35,7 @@ export const ManualSetup: React.FC<Props> = ({ onComplete, onBack }) => {
   const [loadingFields, setLoadingFields] = useState<Record<string, boolean>>({});
   const [isGeneratingIdeas, setIsGeneratingIdeas] = useState(false);
   const [isCalibrating, setIsCalibrating] = useState(false);
+  const [selectedCharName, setSelectedCharName] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleStart = () => {
@@ -101,38 +102,76 @@ export const ManualSetup: React.FC<Props> = ({ onComplete, onBack }) => {
   };
 
   const handleCharacterSelect = (char: ParsedCharacter) => {
+      setSelectedCharName(char.name);
+
       const roleLower = char.role.toLowerCase();
-      const isVillain = roleLower.includes('antagonist') || roleLower.includes('villain') || roleLower.includes('monster') || roleLower.includes('killer');
+      // Expanded keyword check for robustness
+      const isSelectedVillain = roleLower.includes('antagonist') || roleLower.includes('villain') || 
+                                roleLower.includes('monster') || roleLower.includes('killer') || 
+                                roleLower.includes('entity') || roleLower.includes('computer') ||
+                                roleLower.includes('ai') || roleLower.includes('master');
       
-      // 1. Set Role & Profile
-      if (isVillain) {
+      const others = store.parsedCharacters.filter(c => c.name !== char.name);
+
+      if (isSelectedVillain) {
+          // 1. User is playing AS the Villain
           store.setMode('The Antagonist (Predator Protocol)');
+          
+          // CRITICAL: Clear Survivor fields to prevent prompt bleeding
+          store.setSurvivorName('');
+          store.setSurvivorBackground('');
+          store.setSurvivorTraits('');
+
           store.setVillainName(char.name);
           store.setVillainAppearance(`${char.description}\n\n[Traits]: ${char.traits}`);
+          
+          if (char.goal) store.setPrimaryGoal(char.goal);
+          if (char.methodology) store.setVillainMethods(char.methodology);
+          
+          // Targets are everyone else
+          if (others.length > 0) {
+              store.setVictimCount(others.length);
+              const othersDescription = others.map(c => 
+                  `SUBJECT: ${c.name}\nROLE: ${c.role}\nPROFILE: ${c.description}\nTRAITS: ${c.traits}`
+              ).join('\n\n');
+              store.setVictimDescription(othersDescription);
+          }
       } else {
+          // 2. User is playing AS a Survivor
           store.setMode('The Survivor (Prey Protocol)');
           store.setSurvivorName(char.name);
           store.setSurvivorBackground(char.description);
           store.setSurvivorTraits(char.traits);
-      }
 
-      // 2. Populate "Specimen Targets" / Other Characters
-      // Filter out the selected character from the list
-      const others = store.parsedCharacters.filter(c => c.name !== char.name);
-      
-      if (others.length > 0) {
-          store.setVictimCount(others.length);
-          
-          // Construct a rich profile list of the targets
-          const othersDescription = others.map(c => 
-              `SUBJECT: ${c.name}\nROLE: ${c.role}\nPROFILE: ${c.description}\nTRAITS: ${c.traits}`
-          ).join('\n\n');
-          
-          store.setVictimDescription(othersDescription);
-      } else {
-          // If no other characters found, clear it or leave default
-          store.setVictimCount(1);
-          store.setVictimDescription('');
+          // Smart detection: Do we have a designated villain in the remaining list?
+          const detectedVillain = others.find(c => {
+              const r = c.role.toLowerCase();
+              return r.includes('antagonist') || r.includes('villain') || r.includes('monster') || 
+                     r.includes('killer') || r.includes('entity') || r.includes('computer');
+          });
+
+          const companions = others.filter(c => c !== detectedVillain);
+
+          // If we found a villain among the others, set them up automatically
+          if (detectedVillain) {
+              store.setVillainName(detectedVillain.name);
+              store.setVillainAppearance(`${detectedVillain.description}\n\n[Traits]: ${detectedVillain.traits}`);
+              if (detectedVillain.goal) store.setPrimaryGoal(detectedVillain.goal);
+              if (detectedVillain.methodology) store.setVillainMethods(detectedVillain.methodology);
+          }
+
+          // Populate companions
+          if (companions.length > 0) {
+              store.setVictimCount(companions.length);
+              
+              const compDescription = companions.map(c => 
+                  `COMPANION: ${c.name}\nROLE: ${c.role}\nPROFILE: ${c.description}\nTRAITS: ${c.traits}`
+              ).join('\n\n');
+              store.setVictimDescription(compDescription);
+          } else {
+              store.setVictimCount(0); 
+              store.setVictimDescription('');
+          }
       }
   };
 
@@ -148,27 +187,49 @@ export const ManualSetup: React.FC<Props> = ({ onComplete, onBack }) => {
                 </div>
             </div>
 
-            <SourceUploader />
+            <SourceUploader compact={true} />
 
             {store.parsedCharacters.length > 0 && (
                 <div className="space-y-6 animate-fadeIn">
                     <div className="flex items-center gap-3 text-sm font-mono uppercase tracking-[0.3em] text-gray-400 border-b border-gray-800 pb-2"><Users className="w-4 h-4" /> Detected Neural Signals</div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {store.parsedCharacters.map((char, i) => (
-                            <button 
-                                key={i} 
-                                onClick={() => handleCharacterSelect(char)} 
-                                className="text-left bg-black border border-gray-800 p-6 hover:border-fresh-blood group transition-colors"
-                            >
-                                <div className="flex justify-between items-start mb-2">
-                                    <div className="font-bold text-gray-200 font-mono group-hover:text-white">{char.name}</div>
-                                    <span className="text-[10px] uppercase font-mono text-gray-600 border border-gray-800 px-2 py-0.5 rounded group-hover:text-fresh-blood group-hover:border-fresh-blood/30">
-                                        {char.role}
-                                    </span>
-                                </div>
-                                <div className="text-xs text-gray-500 line-clamp-3 leading-relaxed">{char.description}</div>
-                            </button>
-                        ))}
+                        {store.parsedCharacters.map((char, i) => {
+                            const isSelected = selectedCharName === char.name;
+                            return (
+                                <button 
+                                    key={i} 
+                                    onClick={() => handleCharacterSelect(char)} 
+                                    className={`text-left p-6 group transition-all duration-300 relative overflow-hidden flex flex-col justify-between h-full min-h-[140px]
+                                        ${isSelected 
+                                            ? 'bg-fresh-blood/10 border-2 border-fresh-blood shadow-[0_0_20px_rgba(136,8,8,0.2)]' 
+                                            : 'bg-black border border-gray-800 hover:border-gray-600'
+                                        }`}
+                                >
+                                    {isSelected && (
+                                        <div className="absolute top-0 right-0 p-2 bg-fresh-blood/20 rounded-bl-lg">
+                                            <Check className="w-4 h-4 text-fresh-blood" />
+                                        </div>
+                                    )}
+                                    <div>
+                                        <div className="flex justify-between items-start mb-2 pr-6">
+                                            <div className={`font-bold font-mono transition-colors ${isSelected ? 'text-fresh-blood' : 'text-gray-200 group-hover:text-white'}`}>{char.name}</div>
+                                        </div>
+                                        <span className={`text-[10px] uppercase font-mono px-2 py-0.5 rounded border inline-block mb-3
+                                            ${isSelected 
+                                                ? 'text-fresh-blood border-fresh-blood/50 bg-fresh-blood/10' 
+                                                : 'text-gray-600 border-gray-800'
+                                            }`}>
+                                            {char.role}
+                                        </span>
+                                        <div className={`text-xs line-clamp-3 leading-relaxed ${isSelected ? 'text-gray-300' : 'text-gray-500'}`}>{char.description}</div>
+                                    </div>
+                                    <div className="mt-4 pt-3 border-t border-gray-800/50 flex justify-between items-center opacity-60">
+                                        <span className="text-[9px] font-mono uppercase tracking-wider text-gray-500">Neural Pattern</span>
+                                        <Cpu className={`w-3 h-3 ${isSelected ? 'text-fresh-blood' : 'text-gray-700'}`} />
+                                    </div>
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
             )}
@@ -189,16 +250,16 @@ export const ManualSetup: React.FC<Props> = ({ onComplete, onBack }) => {
                 </div>
 
                 <div className="col-span-full space-y-6">
-                    <label className="text-sm font-mono text-gray-400 flex gap-3"><Zap className="text-fresh-blood" /> Intensity</label>
+                    <label className="text-sm font-mono text-gray-400 flex gap-3 uppercase tracking-widest"><Zap className="text-fresh-blood" /> Intensity</label>
                     <div className="grid gap-1 bg-black border border-gray-800 p-1">
                         {INTENSITY_OPTIONS.map(opt => (
                             <button 
                                 key={opt.id} 
                                 onClick={() => store.setIntensity(opt.id)} 
-                                className={`p-4 text-left border-l-2 transition-all flex justify-between items-center group ${store.intensity === opt.id ? 'bg-gray-900 border-fresh-blood text-white' : 'border-transparent text-gray-500 hover:bg-gray-900/50'}`}
+                                className={`p-3 text-left border-l-2 transition-all flex justify-between items-center group ${store.intensity === opt.id ? 'bg-gray-900 border-fresh-blood text-white' : 'border-transparent text-gray-500 hover:bg-gray-900/50'}`}
                             >
-                                <span className="font-bold">{opt.label}</span>
-                                <span className={`text-xs font-mono uppercase tracking-wider transition-opacity ${store.intensity === opt.id ? 'opacity-100 text-fresh-blood' : 'opacity-40 group-hover:opacity-70'}`}>
+                                <span className="font-bold text-xs font-mono uppercase">{opt.label}</span>
+                                <span className={`text-[10px] font-mono uppercase tracking-wider transition-opacity ${store.intensity === opt.id ? 'opacity-100 text-fresh-blood' : 'opacity-40 group-hover:opacity-70'}`}>
                                     {opt.desc}
                                 </span>
                             </button>

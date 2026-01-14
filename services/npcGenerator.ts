@@ -9,14 +9,11 @@ import { getDefaultDialogueState } from './dialogueEngine';
 import { hydrateUserCharacter } from './geminiService';
 
 /**
- * NPC GENERATOR ENGINE V7.6 (VOICE SIGNATURE MAPPING)
+ * NPC GENERATOR ENGINE V8.0 (ANTI-COLLISION & EXPANDED POOLS)
  * 
  * "High-Resolution" Character Synthesis.
- * Creates procedural characters with specific, tangible histories,
- * distinctive voices, and traumatic anchors.
+ * Includes duplicate prevention and vastly expanded semantic pools.
  */
-
-// --- 1. MASSIVE PROFESSION POOLS (Class & Context Aware) ---
 
 const JOBS_MEDICAL = [
   "Trauma Surgeon", "Hospice Nurse", "Forensic Pathologist", "Sleep Technician", 
@@ -29,7 +26,8 @@ const JOBS_MEDICAL = [
   "Psychiatric Orderly", "Blood Bank Manager", "Medical Examiner", "Genealogist",
   "Epidemiologist", "Night Shift Paramedic", "Geriatric Care Specialist",
   "Cryogenics Technician", "Bio-Hazard Decontamination Specialist", "Speech Pathologist",
-  "Audiologist", "Embalmer", "Plastic Surgeon", "Surgical Scrub Tech"
+  "Audiologist", "Embalmer", "Plastic Surgeon", "Surgical Scrub Tech",
+  "Oncology Nurse", "Radiotherapy Technician", "Hazardous Material Medic", "Flight Nurse"
 ];
 
 const JOBS_ACADEMIC = [
@@ -43,7 +41,8 @@ const JOBS_ACADEMIC = [
   "Professor of Architecture", "Semiotics Expert", "Classical Philologist",
   "Industrial Designer", "Acoustics Researcher", "Demonologist (Academic)",
   "Victorian Literature Scholar", "Numismatist", "Horologist (Time)", 
-  "Theoretical Astrophysicist", "Memory Researcher", "Comparative Religion Scholar"
+  "Theoretical Astrophysicist", "Memory Researcher", "Comparative Religion Scholar",
+  "Dendrochronologist", "Palaeographer", "Forensic Linguist"
 ];
 
 const JOBS_LABOR = [
@@ -57,7 +56,8 @@ const JOBS_LABOR = [
   "Junkyard Manager", "Demolition Expert", "Railroad Track Inspector",
   "Crane Operator", "Industrial Diver", "Waste Management Specialist",
   "Elevator Mechanic", "Locksmith (Industrial)", "Cargo Ship Engineer", 
-  "Water Treatment Plant Operator", "Tunnel Boring Machine Operator"
+  "Water Treatment Plant Operator", "Tunnel Boring Machine Operator",
+  "Cell Tower Climber", "Blast Furnace Technician", "Recycling Center Sorter"
 ];
 
 const JOBS_SERVICE = [
@@ -68,7 +68,8 @@ const JOBS_SERVICE = [
   "Night Shift Gas Station Clerk", "Pawn Shop Clerk", "Antique Store Owner",
   "Funeral Director", "Subway Conductor", "Theme Park Mascot", "Zookeeper",
   "Library Assistant", "Call Center Operator", "Bus Driver", "Postal Worker",
-  "Tailor", "Dry Cleaner", "Florist", "Caterer", "Event Photographer"
+  "Tailor", "Dry Cleaner", "Florist", "Caterer", "Event Photographer",
+  "Animal Control Officer", "Process Server", "Repossession Agent"
 ];
 
 const JOBS_GIG_ECONOMY = [
@@ -77,7 +78,8 @@ const JOBS_GIG_ECONOMY = [
   "Food Courier", "Twitch Streamer (Small)", "Etsy Seller", "Crypto Day Trader",
   "Mechanical Turk Worker", "Professional Cuddler", "Virtual Assistant",
   "Podcast Editor", "Drone Photographer", "Mystery Shopper", "User Experience Tester",
-  "Transcriptionist", "Online Tutor", "Social Media Manager for a Dead Brand"
+  "Transcriptionist", "Online Tutor", "Social Media Manager for a Dead Brand",
+  "AI Training Data Labeler", "Professional Queuer", "House Sitter"
 ];
 
 const JOBS_UNDERWORLD = [
@@ -86,7 +88,8 @@ const JOBS_UNDERWORLD = [
   "Loan Shark Enforcer", "Hacker", "Counterfeiter", "Safe Cracker",
   "Cleaner (Crime Scene - Illegal)", "Identity Broker", "Exotic Pet Dealer",
   "Organ Harvester", "Cult Recruiter", "Drug Chemist", "Arms Dealer",
-  "Information Broker", "Blackmail Artist", "Getaway Driver", "Art Thief"
+  "Information Broker", "Blackmail Artist", "Getaway Driver", "Art Thief",
+  "Urban Explorer (Trespasser)", "Underground Fight Promoter"
 ];
 
 const JOBS_OFFICIAL = [
@@ -95,7 +98,8 @@ const JOBS_OFFICIAL = [
   "Forensic Accountant", "Building Inspector", "Wildlife Ranger", 
   "Air Traffic Controller", "Coast Guard Officer", "Transit Cop",
   "Judge", "Public Defender", "District Attorney", "City Council Member",
-  "Diplomat", "Internal Affairs Officer", "Probation Officer"
+  "Diplomat", "Internal Affairs Officer", "Probation Officer",
+  "Census Taker", "Coroner", "Fire Marshal", "Game Warden"
 ];
 
 const JOBS_CREATIVE = [
@@ -103,15 +107,14 @@ const JOBS_CREATIVE = [
   "Documentary Filmmaker", "Method Actor", "Puppeteer", "Glassblower",
   "Violinist", "Conceptual Artist", "Fashion Designer", "Playwright",
   "Architectural Photographer", "Makeup Artist (SFX)", "Illustrator",
-  "Poet", "Graffiti Artist", "Video Game Developer"
+  "Poet", "Graffiti Artist", "Video Game Developer",
+  "Foley Artist", "Luthier", "Neon Bender"
 ];
 
 const JOBS = [
   ...JOBS_MEDICAL, ...JOBS_ACADEMIC, ...JOBS_LABOR, ...JOBS_SERVICE, 
   ...JOBS_GIG_ECONOMY, ...JOBS_UNDERWORLD, ...JOBS_OFFICIAL, ...JOBS_CREATIVE
 ];
-
-// --- 1a. CONTEXTUAL ITEM POOLS (Mapped to Professions) ---
 
 const ITEMS_MEDICAL = [
   "A pager that receives texts from a dead number.",
@@ -223,52 +226,114 @@ const ITEMS_GENERAL = [
   "A book with all the text redacted."
 ];
 
-// --- 2. GLOBAL ORIGIN POOLS ---
-
 const ORIGIN_POOLS = {
   "North_America": {
-    names: ["James", "Sarah", "Michael", "Emily", "David", "Jessica", "Robert", "Jennifer", "William", "Elizabeth", "Caleb", "Hannah", "Ethan", "Madison", "Mason", "Ava"],
-    surnames: ["Smith", "Johnson", "Williams", "Brown", "Jones", "Miller", "Davis", "Garcia", "Rodriguez", "Wilson", "Vance", "Holloway", "Carpenter", "Blackwood", "Thorne"],
+    names: [
+      "James", "Sarah", "Michael", "Emily", "David", "Jessica", "Robert", "Jennifer", "William", "Elizabeth", "Caleb", "Hannah", "Ethan", "Madison", "Mason", "Ava",
+      "Lucas", "Samantha", "Daniel", "Ashley", "Noah", "Olivia", "Liam", "Sophia", "Logan", "Isabella", "Benjamin", "Mia", "Elijah", "Charlotte",
+      "Jackson", "Amelia", "Aiden", "Harper", "Sebastian", "Evelyn", "Jack", "Abigail", "Owen", "Ella", "Theodore", "Scarlett", "Wyatt", "Grace",
+      "Carter", "Lily", "Julian", "Aria", "Levi", "Chloe", "Isaac", "Layla", "Gabriel", "Riley", "Lincoln", "Zoey", "Ryan", "Nora"
+    ],
+    surnames: [
+      "Smith", "Johnson", "Williams", "Brown", "Jones", "Miller", "Davis", "Garcia", "Rodriguez", "Wilson", "Vance", "Holloway", "Carpenter", "Blackwood", "Thorne",
+      "Anderson", "Taylor", "Thomas", "Hernandez", "Moore", "Martin", "Jackson", "Thompson", "White", "Lopez", "Lee", "Gonzalez", "Harris", "Clark", "Lewis",
+      "Robinson", "Walker", "Perez", "Hall", "Young", "Allen", "Sanchez", "Wright", "King", "Scott", "Green", "Baker", "Adams", "Nelson", "Hill",
+      "Ramirez", "Campbell", "Mitchell", "Roberts", "Carter", "Phillips", "Evans", "Turner", "Torres", "Parker", "Collins", "Edwards", "Stewart", "Flores", "Morris"
+    ],
     regions: ["Chicago (Rust Belt)", "New Orleans (Gothic South)", "Seattle (Rain)", "Detroit (Industrial)", "Appalachia (Hollows)", "Toronto (Urban)", "Vancouver (Coastal)", "The Mojave (Desert)"]
   },
   "Western_Europe": {
-    names: ["Arthur", "Sophie", "Lucas", "Emma", "Gabriel", "Clara", "Leo", "Marie", "Hugo", "Alice", "Matteo", "Giulia", "Oliver", "Charlotte", "Louis", "Chloe"],
-    surnames: ["Dubois", "Müller", "Rossi", "Silva", "Weber", "Lefevre", "Bianchi", "Fischer", "Moreau", "Schneider", "Laurent", "Wagner"],
+    names: [
+      "Arthur", "Sophie", "Lucas", "Emma", "Gabriel", "Clara", "Leo", "Marie", "Hugo", "Alice", "Matteo", "Giulia", "Oliver", "Charlotte", "Louis", "Chloe",
+      "Adam", "Sarah", "Raphael", "Ines", "Paul", "Léa", "Maël", "Camille", "Noah", "Louise", "Jules", "Mila", "Liam", "Manon", "Ethan", "Eva",
+      "Sven", "Anna", "Felix", "Lena", "Maximilian", "Laura", "Elias", "Mia", "Ben", "Lea", "Jonas", "Sophia", "Leon", "Emilia", "Finn", "Hannah"
+    ],
+    surnames: [
+      "Dubois", "Müller", "Rossi", "Silva", "Weber", "Lefevre", "Bianchi", "Fischer", "Moreau", "Schneider", "Laurent", "Wagner",
+      "Petit", "Schmidt", "Ferrari", "Santos", "Meyer", "Leroy", "Esposito", "Ferreira", "Schulz", "Roux", "Ricci", "Pereira", "Hoffmann", "Gauthier", "Marino", "Oliveira", "Becker",
+      "Fournier", "Keller", "Greco", "Rodrigues", "Richter", "Mercier", "Wolf", "Bruno", "Costa", "Bauer", "Dupont", "Schäfer", "Gallo", "Sousa", "Koch"
+    ],
     regions: ["Lyon (Old City)", "Berlin (Concrete)", "Milan (Fashion)", "Lisbon (Coastal)", "Brussels (Bureaucracy)", "Vienna (Imperial)", "Zurich (Clean)", "Marseille (Port)"]
   },
   "Eastern_Europe": {
-    names: ["Dmitri", "Anastasia", "Pavel", "Elena", "Andrei", "Katya", "Viktor", "Natalia", "Ivan", "Olga", "Nikolai", "Tatiana", "Boris", "Irina"],
-    surnames: ["Volkov", "Ivanov", "Petrov", "Sokolov", "Popov", "Kozlov", "Morozov", "Lebedev", "Orlov", "Smirnov", "Novikov"],
+    names: [
+      "Dmitri", "Anastasia", "Pavel", "Elena", "Andrei", "Katya", "Viktor", "Natalia", "Ivan", "Olga", "Nikolai", "Tatiana", "Boris", "Irina",
+      "Aleksandr", "Svetlana", "Mikhail", "Yulia", "Sergei", "Maria", "Vladimir", "Daria", "Igor", "Polina", "Maksim", "Anna", "Oleg", "Marina", "Artem", "Victoria",
+      "Anton", "Ekaterina", "Yuri", "Ksenia", "Roman", "Alina", "Kirill", "Veronika", "Stanislav", "Diana", "Vadim", "Sofia", "Lev", "Margarita"
+    ],
+    surnames: [
+      "Volkov", "Ivanov", "Petrov", "Sokolov", "Popov", "Kozlov", "Morozov", "Lebedev", "Orlov", "Smirnov", "Novikov",
+      "Kuznetsov", "Pavlov", "Semenov", "Golubev", "Vinogradov", "Bogdanov", "Vorobyev", "Fedorov", "Mikhailov", "Belov", "Gusev", "Ilyin", "Kiselyov", "Sorokin",
+      "Vasilyev", "Zaitsev", "Solovyov", "Kovalev", "Tarasov", "Belyayev", "Komarov", "Frolov", "Alexandrov", "Baranov", "Kulikov", "Nikitin", "Zakharov"
+    ],
     regions: ["St. Petersburg (Winter)", "Warsaw (Rebuilt)", "Prague (Gothic)", "Budapest (Danube)", "Kyiv (Historic)", "Sofia (Ancient)", "Tallinn (Medieval)"]
   },
   "East_Asia": {
-    names: ["Kenji", "Yuki", "Wei", "Mei", "Jin", "Hana", "Hiroshi", "Sakura", "Jun", "Min-ji", "Takeshi", "Yuna", "Ren", "Aiko"],
-    surnames: ["Tanaka", "Chen", "Kim", "Lee", "Wong", "Sato", "Suzuki", "Takahashi", "Park", "Yamamoto", "Nakamura", "Liu", "Zhang"],
+    names: [
+      "Kenji", "Yuki", "Wei", "Mei", "Jin", "Hana", "Hiroshi", "Sakura", "Jun", "Min-ji", "Takeshi", "Yuna", "Ren", "Aiko",
+      "Daiki", "Yui", "Sota", "Rio", "Haruto", "Hina", "Riku", "Akari", "Yuto", "Miyu", "Hayato", "Kanna", "Kaito", "Misaki",
+      "Chen", "Li", "Wang", "Zhang", "Liu", "Yang", "Huang", "Zhao", "Wu", "Zhou", "Xu", "Sun", "Ma", "Zhu"
+    ],
+    surnames: [
+      "Tanaka", "Chen", "Kim", "Lee", "Wong", "Sato", "Suzuki", "Takahashi", "Park", "Yamamoto", "Nakamura", "Liu", "Zhang",
+      "Kobayashi", "Kato", "Yoshida", "Yamada", "Sasaki", "Yamaguchi", "Matsumoto", "Inoue", "Kimura", "Shimizu", "Hayashi", "Saito",
+      "Wang", "Li", "Zhao", "Wu", "Zhou", "Xu", "Sun", "Ma", "Zhu", "Hu", "Guo", "He", "Gao", "Lin", "Luo"
+    ],
     regions: ["Tokyo (Neon)", "Seoul (High-Tech)", "Shanghai (Skyline)", "Singapore (Garden)", "Osaka (Merchant)", "Taipei (Market)", "Kyoto (Temple)"]
   },
   "South_Asia": {
-    names: ["Arjun", "Priya", "Rahul", "Ananya", "Rohan", "Saanvi", "Aarav", "Diya", "Kabir", "Zara", "Dev", "Isha", "Aditya", "Mira"],
-    surnames: ["Patel", "Sharma", "Singh", "Kumar", "Gupta", "Reddy", "Mishra", "Khan", "Das", "Chopra", "Desai", "Malhotra"],
+    names: [
+      "Arjun", "Priya", "Rahul", "Ananya", "Rohan", "Saanvi", "Aarav", "Diya", "Kabir", "Zara", "Dev", "Isha", "Aditya", "Mira",
+      "Vihaan", "Aadhya", "Sai", "Fatima", "Reyansh", "Myra", "Vivaan", "Amara", "Aryan", "Aylin", "Ishaan", "Zoya", "Dhruv", "Sana",
+      "Krishna", "Riya", "Atharva", "Kiara", "Shaurya", "Kavya", "Ayaan", "Siya", "Ansh", "Pari", "Advik", "Anika"
+    ],
+    surnames: [
+      "Patel", "Sharma", "Singh", "Kumar", "Gupta", "Reddy", "Mishra", "Khan", "Das", "Chopra", "Desai", "Malhotra",
+      "Jain", "Mehta", "Shah", "Agarwal", "Verma", "Nair", "Iyer", "Rao", "Joshi", "Bhat", "Saxena", "Choudhury", "Roy",
+      "Sinha", "Menon", "Pillai", "Mukherjee", "Banerjee", "Chatterjee", "Dutta", "Bose", "Ghosh", "Sengupta", "Nandi"
+    ],
     regions: ["Mumbai (Chaos)", "Delhi (History)", "Bangalore (Tech)", "Dhaka (River)", "Colombo (Island)", "Karachi (Coast)"]
   },
   "Middle_East": {
-    names: ["Omar", "Layla", "Youssef", "Fatima", "Hassan", "Noor", "Ali", "Mariam", "Ibrahim", "Zainab", "Khalid", "Amira"],
-    surnames: ["Ahmed", "Mahmoud", "Hassan", "Khalil", "Abdallah", "Saleh", "Rahman", "Farid", "Nasser"],
+    names: [
+      "Omar", "Layla", "Youssef", "Fatima", "Hassan", "Noor", "Ali", "Mariam", "Ibrahim", "Zainab", "Khalid", "Amira",
+      "Ahmed", "Sara", "Mohamed", "Hana", "Mahmoud", "Salma", "Hussein", "Jana", "Mostafa", "Leila", "Tarek", "Nour", "Karim", "Aya",
+      "Abdallah", "Maya", "Amr", "Malak", "Sherif", "Karma", "Hazem", "Lara", "Hamza", "Judy", "Yassin", "Farida"
+    ],
+    surnames: [
+      "Ahmed", "Mahmoud", "Hassan", "Khalil", "Abdallah", "Saleh", "Rahman", "Farid", "Nasser",
+      "Mohamed", "Ali", "Ibrahim", "Said", "Mustafa", "Othman", "Helmy", "Fawzy", "Soliman", "Amer", "Ghanem", "Zaki", "Saber",
+      "Ramadan", "Fathy", "Mansour", "Badawy", "Kamel", "Younis", "Hamdy", "Nour", "Ezzat", "Tawfik", "Radi", "Mokhtar"
+    ],
     regions: ["Cairo (Sand)", "Beirut (Cedars)", "Istanbul (Straits)", "Tehran (Mountains)", "Amman (Stone)", "Casablanca (Ocean)"]
   },
   "Latin_America": {
-    names: ["Mateo", "Sofia", "Alejandro", "Valentina", "Gabriel", "Camila", "Santiago", "Isabella", "Diego", "Maria", "Lucas", "Valeria"],
-    surnames: ["Garcia", "Rodriguez", "Martinez", "Hernandez", "Lopez", "Gonzalez", "Perez", "Sanchez", "Ramirez", "Torres", "Flores"],
+    names: [
+      "Mateo", "Sofia", "Alejandro", "Valentina", "Gabriel", "Camila", "Santiago", "Isabella", "Diego", "Maria", "Lucas", "Valeria",
+      "Nicolas", "Martina", "Samuel", "Luciana", "Benjamin", "Ximena", "Daniel", "Victoria", "Sebastian", "Renata", "Joaquin", "Antonella",
+      "Emmanuel", "Romina", "Thiago", "Julieta", "Felipe", "Regina", "Tomas", "Fernanda", "Emiliano", "Catalina", "Agustin", "Daniela"
+    ],
+    surnames: [
+      "Garcia", "Rodriguez", "Martinez", "Hernandez", "Lopez", "Gonzalez", "Perez", "Sanchez", "Ramirez", "Torres", "Flores",
+      "Diaz", "Vargas", "Morales", "Castillo", "Ortega", "Mendoza", "Romero", "Gutierrez", "Ruiz", "Alvarez", "Rivera", "Reyes",
+      "Gomez", "Fernandez", "Silva", "Cruz", "Rojas", "Jimenez", "Moreno", "Castro", "Ortiz", "Chavez", "Herrera", "Medina"
+    ],
     regions: ["Mexico City (Sprawl)", "Buenos Aires (Paris of South)", "Sao Paulo (Concrete)", "Bogota (Andes)", "Lima (Mist)", "Santiago (Valley)"]
   },
   "Scandinavia": {
-    names: ["Erik", "Astrid", "Lars", "Freya", "Bjorn", "Ingrid", "Sven", "Elsa", "Magnus", "Sigrid", "Anders", "Karin"],
-    surnames: ["Jensen", "Hansen", "Johansson", "Olsen", "Larsen", "Andersson", "Nielsen", "Lindberg", "Berg"],
+    names: [
+      "Erik", "Astrid", "Lars", "Freya", "Bjorn", "Ingrid", "Sven", "Elsa", "Magnus", "Sigrid", "Anders", "Karin",
+      "Olav", "Solveig", "Henrik", "Liv", "Thor", "Tuva", "Knut", "Ebba", "Leif", "Linnea", "Rune", "Agnes", "Stig", "Ida",
+      "Arne", "Maja", "Nils", "Alma", "Per", "Vera", "Gunnar", "Signe", "Harald", "Wilma", "Einar", "Klara"
+    ],
+    surnames: [
+      "Jensen", "Hansen", "Johansson", "Olsen", "Larsen", "Andersson", "Nielsen", "Lindberg", "Berg",
+      "Pedersen", "Kristiansen", "Karlsson", "Andersen", "Eriksson", "Holm", "Persson", "Rasmussen", "Nilsson", "Olavsson", "Larsson",
+      "Svensson", "Christensen", "Pettersen", "Gustafsson", "Johnsen", "Lund", "Haugen", "Bakke", "Hagen", "Lie", "Moen"
+    ],
     regions: ["Oslo (Fjord)", "Stockholm (Archipelago)", "Copenhagen (Harbor)", "Reykjavik (Volcanic)", "Helsinki (White)", "Bergen (Rain)"]
   }
 };
-
-// --- 3. HIGH-RES PERSONALITY & DRIVES ---
 
 const CORE_DRIVES = [
   "To atone for a fatal medical error that killed a child.",
@@ -388,8 +453,6 @@ const PHOBIAS = [
   "Eisoptrophobia (Reflections)", "Kenophobia (Voids)", "Taphephobia (Buried Alive)"
 ];
 
-// --- 3a. VISUAL FEATURE POOLS ---
-
 const PHYSICAL_BUILDS = ["Gaunt", "Stocky", "Athletic", "Soft", "Wiry", "Imposing", "Frail", "Hunched", "Elegant", "Scarred", "Lanky", "Petite", "Broad-shouldered"];
 const HAIR_STYLES = ["Unkempt", "Buzzcut", "Long and greasy", "Tied back strictly", "Balding", "Dyed unnatural color", "Shaved sides", "Overgrown", "Braided tightly", "Wild curls"];
 const EYE_COLORS = ["Piercing Blue", "Hollow Brown", "Pale Grey", "Bloodshot", "Dark almost black", "Hazel", "One glass eye", "Mismatched (Heterochromia)", "Golden brown", "Steel grey"];
@@ -411,8 +474,6 @@ const DISTINGUISHING_FEATURES = [
   "Skin is uncomfortably pale",
   "A port-wine stain birthmark"
 ];
-
-// --- 4. CLUSTER-SPECIFIC TRAUMA (HIGH RES) ---
 
 const CLUSTER_SPECIFIC_TRAUMAS: Record<string, string[]> = {
   "Flesh": [
@@ -620,7 +681,7 @@ const generateVoiceSignature = (region: string, personality: any): VoiceSignatur
 
 // --- 6. MAIN GENERATOR LOGIC ---
 
-export const generateProceduralNpc = (clusterName: string = "Flesh", intensity: string = "Level 3"): NpcState => {
+export const generateProceduralNpc = (clusterName: string = "Flesh", intensity: string = "Level 3", forbiddenNames: Set<string> = new Set()): NpcState => {
   
   const intensityLevel = parseInt(intensity.replace(/\D/g, '')) || 3;
   const isHighIntensity = intensityLevel >= 4;
@@ -628,7 +689,19 @@ export const generateProceduralNpc = (clusterName: string = "Flesh", intensity: 
   // 1. Generate Base Human (Cluster Agnostic for Realism)
   const originKey = pickRandomKey(ORIGIN_POOLS);
   const pool = ORIGIN_POOLS[originKey as keyof typeof ORIGIN_POOLS];
-  const name = `${pickRandom(pool.names)} ${pickRandom(pool.surnames)}`;
+  
+  // UNIQUE NAME GENERATION LOGIC
+  let name = "";
+  let attempts = 0;
+  // Retry loop to ensure uniqueness
+  do {
+      name = `${pickRandom(pool.names)} ${pickRandom(pool.surnames)}`;
+      attempts++;
+  } while (forbiddenNames.has(name) && attempts < 20);
+  
+  // Register the new name
+  forbiddenNames.add(name);
+
   const region = pickRandom(pool.regions);
   const job = pickRandom(JOBS);
   const drive = pickRandom(CORE_DRIVES);
@@ -747,32 +820,68 @@ SECRET: They are hiding the fact that they feel guilty about [Generate based on 
 export const createNpcFactory = async (
   cluster: string, 
   intensity: string, 
-  userDescription?: string
+  userDescription?: string,
+  seedObj?: Partial<NpcState>,
+  forbiddenNames: Set<string> = new Set()
 ): Promise<NpcState> => {
-  // If user provides a custom description, try to hydrate it via AI
-  if (userDescription && userDescription.trim().length > 5) {
+  // 1. Generate Base with uniqueness check
+  const base = generateProceduralNpc(cluster, intensity, forbiddenNames);
+
+  // 2. Hydration via Prompt (Legacy/Fallback)
+  if (userDescription && !seedObj) {
     try {
       const hydratedPartial = await hydrateUserCharacter(userDescription, cluster);
-      const base = generateProceduralNpc(cluster, intensity);
+      // If hydration provided a name, add it to forbidden
+      if (hydratedPartial.name) forbiddenNames.add(hydratedPartial.name);
       
-      // Merge AI hydration with procedural base for maximum robustness
       return { 
           ...base, 
           ...hydratedPartial,
-          // Ensure critical fields are not overwritten by empty AI responses
-          psychology: {
-              ...base.psychology,
-              ...hydratedPartial.psychology
-          },
-          // Re-assert deep history with new details
+          psychology: { ...base.psychology, ...hydratedPartial.psychology },
           background_origin: `CUSTOM CHARACTER: ${hydratedPartial.name || base.name}. ${hydratedPartial.background_origin || base.background_origin}`
       };
     } catch (e) {
       console.warn("Semantic Resonance Failed, falling back to procedural:", e);
-      return generateProceduralNpc(cluster, intensity);
+      return base;
     }
+  }
+
+  // 3. Hydration via Seed Object (High Priority - extracted list)
+  if (seedObj) {
+      // If seed has a name, register it
+      if (seedObj.name) forbiddenNames.add(seedObj.name);
+
+      return {
+          ...base,
+          ...seedObj,
+          // Deep Merge Psychology
+          psychology: {
+              ...base.psychology,
+              ...(seedObj.psychology || {})
+          },
+          // Deep Merge Physical
+          physical: {
+              ...base.physical,
+              ...(seedObj.physical || {})
+          },
+          // Deep Merge Personality
+          personality: {
+              ...base.personality,
+              ...(seedObj.personality || {})
+          },
+          // Ensure Deep History reflects the overwrite
+          background_origin: seedObj.background_origin || seedObj.name ? `CUSTOM SUBJECT: ${seedObj.name}. ${seedObj.background_origin || base.background_origin}` : base.background_origin,
+          // Ensure dialogue state tracks the custom background
+          dialogue_state: {
+              ...base.dialogue_state,
+              memory: {
+                  ...base.dialogue_state.memory,
+                  long_term_summary: seedObj.background_origin || seedObj.name ? `CUSTOM SUBJECT: ${seedObj.name}. ${seedObj.background_origin}` : base.dialogue_state.memory.long_term_summary
+              }
+          }
+      };
   }
   
   // Default Path: Pure Procedural
-  return generateProceduralNpc(cluster, intensity);
+  return base;
 };

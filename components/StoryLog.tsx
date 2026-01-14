@@ -1,7 +1,6 @@
-
 import React, { useEffect, useRef } from 'react';
 import { ChatMessage } from '../types';
-import { Image, FileText, Film, Terminal } from 'lucide-react';
+import { Image, FileText, Film, Terminal, Feather } from 'lucide-react';
 import { SigilLoader } from './SigilLoader';
 
 interface StoryLogProps {
@@ -9,7 +8,8 @@ interface StoryLogProps {
   isLoading: boolean;
   activeCluster?: string;
   showLogic?: boolean;
-  streamedLogic?: string;
+  logicStream?: string;
+  narrativeStream?: string;
   streamPhase?: 'logic' | 'narrative';
 }
 
@@ -178,18 +178,18 @@ const FormattedText: React.FC<{ text: string, cluster?: string }> = ({ text, clu
   );
 };
 
-export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, activeCluster, showLogic, streamedLogic, streamPhase }) => {
+export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, activeCluster, showLogic, logicStream, narrativeStream, streamPhase }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const logicRef = useRef<HTMLDivElement>(null);
+  const narrativeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [history, isLoading]);
   
   // Auto-scroll logic stream
   useEffect(() => {
-      if (showLogic && logicRef.current) {
-          logicRef.current.scrollTop = logicRef.current.scrollHeight;
-      }
-  }, [streamedLogic, showLogic]);
+      if (showLogic && logicRef.current) logicRef.current.scrollTop = logicRef.current.scrollHeight;
+      if (showLogic && narrativeRef.current) narrativeRef.current.scrollTop = narrativeRef.current.scrollHeight;
+  }, [logicStream, narrativeStream, showLogic]);
 
   const latestModelMsg = [...history].reverse().find(m => m.role === 'model');
   const footnotes: string[] = [];
@@ -199,13 +199,16 @@ export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, activeCl
       while ((match = regex.exec(latestModelMsg.text)) !== null) footnotes.push(`${match[1]}. ${match[2]}`);
   }
 
+  // Derived loading state text
+  const loadingText = streamPhase === 'logic' ? 'Calculating Consequences...' : 'Rendering Narrative...';
+
   return (
     <div className="flex-1 overflow-y-auto p-10 lg:p-20 custom-scrollbar bg-transparent relative z-10">
       <div className="max-w-4xl mx-auto space-y-16 pb-64 min-h-full">
         {/* If history is empty and loading, show a centered initialization screen */}
         {history.length === 0 && isLoading && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <SigilLoader cluster={activeCluster} text="Constructing Reality..." />
+                <SigilLoader cluster={activeCluster} text={loadingText} />
             </div>
         )}
 
@@ -265,21 +268,37 @@ export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, activeCl
             </div>
         )}
         
-        {/* Loading State & Logic Stream - Only show here if history exists, otherwise use centered loader */}
+        {/* Loading State & Logic Stream - Only show here if history exists */}
         {isLoading && history.length > 0 && (
-            <div className="animate-fadeIn">
+            <div className="animate-fadeIn mt-12 w-full max-w-4xl space-y-4">
                 {showLogic ? (
-                    <div className="border-l-2 border-green-500 pl-6 py-2 bg-black/40 rounded-r-lg max-w-4xl font-mono text-xs overflow-hidden border border-gray-800 shadow-2xl mt-10">
-                        <div className="flex items-center gap-2 text-green-500 uppercase tracking-[0.3em] font-bold mb-4 border-b border-gray-800 pb-2">
-                            <Terminal className="w-4 h-4 animate-pulse" />
-                            {streamPhase === 'logic' ? 'Calculating Consequences...' : 'Rendering Narrative...'}
+                    <div className="flex flex-col gap-4">
+                        {/* Logic Stream Panel */}
+                        <div className={`border-l-4 pl-4 py-4 bg-black/60 rounded-r-lg font-mono text-xs overflow-hidden border border-gray-800 transition-all duration-500 ${streamPhase === 'logic' ? 'border-l-green-500 shadow-[0_0_20px_rgba(16,185,129,0.1)] opacity-100' : 'border-l-gray-700 opacity-50'}`}>
+                            <div className={`flex items-center gap-2 uppercase tracking-[0.2em] font-bold mb-3 border-b border-gray-800 pb-2 ${streamPhase === 'logic' ? 'text-green-500' : 'text-gray-500'}`}>
+                                <Terminal className={`w-3.5 h-3.5 ${streamPhase === 'logic' ? 'animate-pulse' : ''}`} />
+                                Logic Core (Simulator)
+                            </div>
+                            <div ref={logicRef} className="max-h-48 overflow-y-auto custom-scrollbar whitespace-pre-wrap text-green-400/90 leading-relaxed font-semibold">
+                                {logicStream || <span className="text-gray-600 italic">Waiting for connection...</span>}
+                            </div>
                         </div>
-                        <div ref={logicRef} className="max-h-64 overflow-y-auto custom-scrollbar whitespace-pre-wrap text-green-400/80 leading-relaxed">
-                            {streamedLogic || <span className="animate-pulse">_</span>}
+
+                        {/* Narrative Stream Panel */}
+                        <div className={`border-l-4 pl-4 py-4 bg-black/60 rounded-r-lg font-mono text-xs overflow-hidden border border-gray-800 transition-all duration-500 ${streamPhase === 'narrative' ? 'border-l-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.1)] opacity-100' : 'border-l-gray-700 opacity-50'}`}>
+                            <div className={`flex items-center gap-2 uppercase tracking-[0.2em] font-bold mb-3 border-b border-gray-800 pb-2 ${streamPhase === 'narrative' ? 'text-amber-500' : 'text-gray-500'}`}>
+                                <Feather className={`w-3.5 h-3.5 ${streamPhase === 'narrative' ? 'animate-pulse' : ''}`} />
+                                Narrative Engine (Synthesizer)
+                            </div>
+                            <div ref={narrativeRef} className="max-h-48 overflow-y-auto custom-scrollbar whitespace-pre-wrap text-amber-200/90 leading-relaxed italic">
+                                {narrativeStream || <span className="text-gray-600 italic">Waiting for logic resolve...</span>}
+                            </div>
                         </div>
                     </div>
                 ) : (
-                    <SigilLoader cluster={activeCluster} text="Synchronizing Temporal Anomalies..." />
+                    <div className="flex justify-center py-8">
+                       <SigilLoader cluster={activeCluster} text={loadingText} />
+                    </div>
                 )}
             </div>
         )}

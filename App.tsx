@@ -35,7 +35,8 @@ export default function App() {
 
   // Logic Viewing State
   const [showLogic, setShowLogic] = useState(false);
-  const [streamedLogic, setStreamedLogic] = useState("");
+  const [logicStream, setLogicStream] = useState("");
+  const [narrativeStream, setNarrativeStream] = useState("");
   const [streamPhase, setStreamPhase] = useState<'logic' | 'narrative'>('logic');
 
   // Helper to ensure global API key access if set via modal
@@ -54,10 +55,26 @@ export default function App() {
         initialNpcs = config.pre_generated_npcs;
     } else {
         const victimCount = config.victim_count || 3;
+        const usedNames = new Set<string>();
         initialNpcs = Array.from({ length: victimCount }).map(() => 
-            generateProceduralNpc(config.cluster, config.intensity)
+            generateProceduralNpc(config.cluster, config.intensity, usedNames)
         );
     }
+
+    const isVillainMode = config.mode === 'Villain';
+
+    // Construct Player Profile: If Villain, the "Player" is the Entity.
+    const playerProfile = isVillainMode 
+        ? {
+            name: config.villain_name || "The Entity",
+            background: `ROLE: Antagonist/Monster. ARCHETYPE: ${config.villain_appearance || "Unknown Horror"}. GOAL: ${config.primary_goal || "Torment"}.`,
+            traits: config.villain_methods || "Cruelty, Omniscience"
+        }
+        : (config.survivor_name || config.survivor_background ? {
+            name: config.survivor_name || "Survivor",
+            background: config.survivor_background || "No history provided.",
+            traits: config.survivor_traits || "Unknown"
+        } : undefined);
 
     // Initialize Game State based on config
     const newState: GameState = {
@@ -67,12 +84,7 @@ export default function App() {
             mode: config.mode as 'Survivor' | 'Villain',
             intensity_level: config.intensity,
             active_cluster: config.cluster,
-            // If survivor fields are present, store them in meta so Gemini knows who the user is
-            player_profile: config.survivor_name || config.survivor_background ? {
-                name: config.survivor_name || "Survivor",
-                background: config.survivor_background || "No history provided.",
-                traits: config.survivor_traits || "Unknown"
-            } : undefined
+            player_profile: playerProfile
         },
         villain_state: {
             name: config.villain_name || "The Entity",
@@ -136,7 +148,8 @@ export default function App() {
     }
     
     setIsLoading(true);
-    setStreamedLogic("");
+    setLogicStream("");
+    setNarrativeStream("");
     setStreamPhase('logic');
 
     // CRITICAL: Use overrideState if provided (initial setup), otherwise use current state
@@ -145,7 +158,11 @@ export default function App() {
     try {
         const result = await processGameTurn(currentState, text, files, (chunk, phase) => {
             setStreamPhase(phase);
-            setStreamedLogic(prev => prev + chunk);
+            if (phase === 'logic') {
+                setLogicStream(prev => prev + chunk);
+            } else {
+                setNarrativeStream(prev => prev + chunk);
+            }
         });
         
         setGameState(result.gameState);
@@ -167,13 +184,6 @@ export default function App() {
     } finally {
         setIsLoading(false);
     }
-  };
-
-  // Wrapper for Voice/Status Panel
-  const processAction = async (action: string): Promise<string> => {
-     await handleSendMessage(action);
-     // Return the last model message text
-     return history[history.length - 1]?.text || ""; 
   };
 
   // State Updater for specific NPC (passed to StatusPanel -> CharacterPortrait)
@@ -232,31 +242,21 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen bg-[#050505] text-gray-200 overflow-hidden font-sans">
+    <div className="flex flex-col h-screen bg-[#050505] text-gray-200 overflow-hidden font-sans relative">
         
-        {/* Left Panel: Status & Diagnostics */}
-        <StatusPanel 
-            gameState={gameState} 
-            onProcessAction={processAction} 
-            onOpenSimulation={() => setShowSimModal(true)}
-            isTesting={autoMode.active}
-            onAbortTest={() => setAutoMode({ active: false, remainingCycles: 0 })}
-            onUpdateNpc={handleUpdateNpc}
-            onReset={handleResetGame}
-        />
-
-        {/* Center: Main Narrative Log */}
-        <div className="flex-1 flex flex-col relative">
+        {/* Main Narrative Log - Now Full Width */}
+        <div className="flex-1 flex flex-col relative z-10 h-full pb-12">
             <StoryLog 
                 history={history} 
                 isLoading={isLoading} 
                 activeCluster={gameState.meta.active_cluster}
                 showLogic={showLogic}
-                streamedLogic={streamedLogic}
+                logicStream={logicStream}
+                narrativeStream={narrativeStream}
                 streamPhase={streamPhase}
             />
             
-            <div className="p-6 bg-gradient-to-t from-black via-black to-transparent z-20">
+            <div className="p-6 bg-gradient-to-t from-black via-black/90 to-transparent z-20 pb-20">
                 <InputArea 
                     onSend={(text, files) => handleSendMessage(text, files)} 
                     isLoading={isLoading} 
@@ -269,6 +269,16 @@ export default function App() {
                 />
             </div>
         </div>
+
+        {/* Bottom Status Panel (Fixed Overlay) */}
+        <StatusPanel 
+            gameState={gameState} 
+            onOpenSimulation={() => setShowSimModal(true)}
+            isTesting={autoMode.active}
+            onAbortTest={() => setAutoMode({ active: false, remainingCycles: 0 })}
+            onUpdateNpc={handleUpdateNpc}
+            onReset={handleResetGame}
+        />
 
         {/* Simulation Modal */}
         <SimulationModal 

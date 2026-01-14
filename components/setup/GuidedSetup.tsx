@@ -1,10 +1,10 @@
 
 import React, { useState, useRef } from 'react';
-import { ChevronRight, Image, Loader2, UserPlus, Eye, Clapperboard, Activity, Cpu, Ghost, Fingerprint, Zap, Radio, Flame, UserCheck, Skull } from 'lucide-react';
+import { ChevronRight, Image, Loader2, UserPlus, Eye, Clapperboard, Activity, Cpu, Ghost, Fingerprint, Zap, Radio, Flame, UserCheck, Skull, Wand2, Users } from 'lucide-react';
 import { useSetupStore } from './store';
 import { GuidedQuestion } from './types';
 import { NeuralPet } from '../NeuralPet';
-import { analyzeImageContext, generateCharacterProfile } from '../../services/geminiService';
+import { analyzeImageContext, generateCharacterProfile, generateCalibrationField } from '../../services/geminiService';
 import { SimulationConfig } from '../../types';
 
 interface Props {
@@ -67,18 +67,28 @@ const QUESTIONS: GuidedQuestion[] = [
         hasHelper: true
     },
     {
+        q: "Are you alone, or do others share your fate?",
+        sub: "List any companions. The Machine will extract their souls for the simulation.",
+        placeholder: "e.g. Marcus (Soldier), Sarah (Medic)... or leave blank for isolation.",
+        key: "victim_description",
+        type: "text",
+        hasHelper: true
+    },
+    {
       q: "Where does this ordeal begin?",
       sub: "Define the architecture of the starting location.",
       placeholder: "e.g. A sterile hospital basement, a decaying Victorian mansion...",
       key: "location_description",
-      type: "text"
+      type: "text",
+      hasHelper: true
     },
     {
       q: "Describe the visual motif of this nightmare.",
       sub: "Describe it manually, or attach an image to let the machine extract its soul.",
       placeholder: "e.g. Gritty 70s slasher, Static-heavy VHS...",
       key: "visual_motif",
-      type: "text"
+      type: "text",
+      hasHelper: true
     },
     {
       q: "Finally... how much fidelity can your psyche withstand?",
@@ -103,21 +113,22 @@ export const GuidedSetup: React.FC<Props> = ({ onComplete, onBack }) => {
     const answer = val || input;
     const q = QUESTIONS[step];
     
-    if (!answer && !q.options) return;
+    if (!answer && !q.options && q.key !== 'victim_description') return; // victim_description can be empty
 
-    // Update Global State
+    // Update Global Store with Answer
     if (q.key === 'mode') store.setMode(answer === 'Survivor' ? 'The Survivor (Prey Protocol)' : 'The Antagonist (Predator Protocol)');
     if (q.key === 'perspective') store.setPerspective(answer === 'First Person' ? 'First Person (Direct Immersion)' : 'Third Person (Observational Dread)');
     if (q.key === 'cluster') store.setSelectedClusters([answer]);
     if (q.key === 'location_description') store.setLocationDescription(answer);
     if (q.key === 'visual_motif') store.setVisualMotif(answer);
     if (q.key === 'character_description') store.setSurvivorBackground(answer);
+    if (q.key === 'victim_description') store.setVictimDescription(answer);
     if (q.key === 'intensity') {
         const level = answer.split(':')[0].trim();
         store.setIntensity(level);
     }
 
-    setAnswers([...answers, answer]);
+    setAnswers([...answers, answer || "None"]);
     setInput('');
     
     if (step < QUESTIONS.length - 1) {
@@ -144,6 +155,7 @@ export const GuidedSetup: React.FC<Props> = ({ onComplete, onBack }) => {
               location_description: store.locationDescription,
               survivor_background: store.survivorBackground,
               survivor_name: store.survivorName,
+              victim_description: store.victimDescription, // Pass companions to NpcSelector
           });
       }, 2000);
   };
@@ -161,14 +173,38 @@ export const GuidedSetup: React.FC<Props> = ({ onComplete, onBack }) => {
       }
   };
 
-  const handleGenChar = async () => {
+  const handleMachineSuggest = async () => {
       setIsProcessing(true);
+      const q = QUESTIONS[step];
+      const cluster = store.selectedClusters.join(', ') || 'Flesh';
+      const intensity = store.intensity || 'Level 3';
+
       try {
-          const profile = await generateCharacterProfile(store.selectedClusters.join(', '), store.intensity, 'Survivor');
-          store.setSurvivorName(profile.name);
-          store.setSurvivorBackground(profile.background);
-          store.setSurvivorTraits(profile.traits);
-          setInput(`${profile.name}: ${profile.background}`);
+          let suggestion = "";
+
+          // Special case for Character to get a structured profile first
+          if (q.key === 'character_description') {
+              const profile = await generateCharacterProfile(cluster, intensity, 'Survivor');
+              store.setSurvivorName(profile.name);
+              store.setSurvivorBackground(profile.background);
+              store.setSurvivorTraits(profile.traits);
+              suggestion = `${profile.name}: ${profile.background}`;
+          } 
+          else {
+              // Generic Field Generation
+              let fieldPrompt = "Concept";
+              if (q.key === 'location_description') fieldPrompt = "Initial Location";
+              if (q.key === 'visual_motif') fieldPrompt = "Visual Motif";
+              if (q.key === 'victim_description') fieldPrompt = "Companion Profiles";
+
+              suggestion = await generateCalibrationField(fieldPrompt, cluster, intensity);
+          }
+
+          if (suggestion) {
+              setInput(suggestion);
+          }
+      } catch (e) {
+          console.error("Machine Suggestion Failed", e);
       } finally {
           setIsProcessing(false);
       }
@@ -222,6 +258,8 @@ export const GuidedSetup: React.FC<Props> = ({ onComplete, onBack }) => {
                                 disabled={isCalibrating || isProcessing}
                                 className="w-full bg-transparent border-b-2 border-gray-800 text-gray-100 text-3xl py-4 focus:outline-none focus:border-haunt-gold transition-all font-serif italic disabled:opacity-50 placeholder:text-gray-800 pr-12"
                             />
+                            
+                            {/* Image Upload for Visual Motif */}
                             {q.key === 'visual_motif' && (
                                 <>
                                     <input type="file" ref={fileRef} className="hidden" onChange={handleImageUpload} accept="image/*" />
@@ -230,14 +268,26 @@ export const GuidedSetup: React.FC<Props> = ({ onComplete, onBack }) => {
                                     </button>
                                 </>
                             )}
+
+                            {/* Machine Suggestion Button */}
                             {q.hasHelper && (
-                                <button onClick={handleGenChar} disabled={isProcessing} className="absolute right-4 top-4 text-gray-500 hover:text-haunt-gold transition-colors flex items-center gap-2 bg-black/50 px-3 py-1 rounded-sm border border-gray-800">
-                                    {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-                                    <span className="text-xs font-mono uppercase hidden md:inline">Help me build them</span>
+                                <button 
+                                    onClick={handleMachineSuggest} 
+                                    disabled={isProcessing} 
+                                    className="absolute right-4 top-4 text-gray-500 hover:text-haunt-gold transition-colors flex items-center gap-2 bg-black/50 px-3 py-1 rounded-sm border border-gray-800 group"
+                                >
+                                    {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4 group-hover:animate-pulse" />}
+                                    <span className="text-xs font-mono uppercase hidden md:inline">Consult Machine</span>
                                 </button>
                             )}
-                            <div className="flex justify-end">
-                                <button onClick={() => handleNext()} disabled={!input.trim() || isCalibrating} className="flex items-center gap-4 bg-haunt-gold text-black px-10 py-4 rounded-sm font-mono text-xs font-bold uppercase tracking-[0.3em] hover:bg-white transition-colors disabled:opacity-20">
+
+                            <div className="flex justify-end gap-4">
+                                {(q.key === 'victim_description' || q.key === 'character_description') && !input && (
+                                    <button onClick={() => handleNext("")} className="text-gray-600 hover:text-white transition-colors text-xs font-mono uppercase tracking-[0.2em] px-4">
+                                        Skip (None)
+                                    </button>
+                                )}
+                                <button onClick={() => handleNext()} disabled={(!input.trim() && q.key !== 'victim_description') || isCalibrating} className="flex items-center gap-4 bg-haunt-gold text-black px-10 py-4 rounded-sm font-mono text-xs font-bold uppercase tracking-[0.3em] hover:bg-white transition-colors disabled:opacity-20">
                                     Confirm Signal <ChevronRight className="w-4 h-4" />
                                 </button>
                             </div>

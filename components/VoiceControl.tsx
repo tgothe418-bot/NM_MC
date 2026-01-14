@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Radio, X, Activity, Volume2, VolumeX, MessageSquare } from 'lucide-react';
 import { LiveClient } from '../services/liveClient';

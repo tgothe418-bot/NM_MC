@@ -1,5 +1,3 @@
-
-
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Send, Activity, Camera, Film, FastForward, Paperclip, X, 
@@ -118,21 +116,21 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
   };
 
   return (
-    <div className="relative w-full max-w-5xl mx-auto flex flex-col gap-4">
+    <div className="relative w-full max-w-[1600px] mx-auto flex flex-col gap-4">
       
-      {/* Options/Suggestions Area */}
+      {/* Options/Suggestions Area - Horizontal Scrollable for max view */}
       {options && options.length > 0 && !isLoading && (
-        <div className="flex flex-wrap justify-end gap-3 mb-4 animate-fadeIn">
+        <div className="flex flex-wrap justify-end gap-3 mb-2 animate-fadeIn pb-2">
           {options.map((option, idx) => {
             const { icon: Icon, style } = getActionStyle(option);
             return (
               <button
                 key={idx}
                 onClick={() => handleOptionClick(option)}
-                className={`px-5 py-3 border rounded-sm text-sm font-mono tracking-wide transition-all duration-300 flex items-center gap-3 group backdrop-blur-md shadow-lg ${style}`}
+                className={`px-6 py-3 border rounded-sm text-sm font-mono tracking-wide transition-all duration-300 flex items-center gap-3 group backdrop-blur-md shadow-lg ${style}`}
               >
                 <Icon className="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity group-hover:scale-110 duration-200" />
-                <span className="font-semibold">{option}</span>
+                <span className="font-semibold text-left">{option}</span>
               </button>
             );
           })}
@@ -140,8 +138,8 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
       )}
 
       <form onSubmit={handleSubmit} className="relative group">
-        <div className={`absolute -inset-1 bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 rounded-2xl blur-md opacity-30 group-hover:opacity-70 transition duration-1000 ${isLoading ? 'animate-pulse' : ''}`}></div>
-        <div className={`relative flex flex-col bg-black/90 border-2 rounded-2xl p-4 shadow-3xl transition-all duration-700 backdrop-blur-xl border-gray-800 group-hover:border-gray-700`}>
+        <div className={`absolute -inset-1 bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 rounded-lg blur-md opacity-30 group-hover:opacity-70 transition duration-1000 ${isLoading ? 'animate-pulse' : ''}`}></div>
+        <div className={`relative flex flex-col bg-black/90 border-2 rounded-lg p-4 shadow-3xl transition-all duration-700 backdrop-blur-xl border-gray-800 group-hover:border-gray-700`}>
           
           {/* File Previews */}
           {files.length > 0 && (
@@ -190,7 +188,7 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isLoading}
-                className="p-3 rounded-xl text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed relative group/attach"
+                className="p-3 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed relative group/attach"
                 title="Attach Data"
               >
                 <Paperclip className="w-6 h-6" />
@@ -204,7 +202,7 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
                   type="button"
                   onClick={onAdvance}
                   disabled={isLoading}
-                  className="p-3 rounded-xl text-gray-500 hover:text-amber-500 hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed group/adv relative"
+                  className="p-3 rounded-lg text-gray-500 hover:text-amber-500 hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed group/adv relative"
                   title="Advance Narrative"
                 >
                    <FastForward className="w-6 h-6" />
@@ -219,7 +217,7 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
                   type="button"
                   onClick={onSnapshot}
                   disabled={isLoading}
-                  className="p-3 rounded-xl text-gray-500 hover:text-system-cyan hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed group/cam relative"
+                  className="p-3 rounded-lg text-gray-500 hover:text-system-cyan hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed group/cam relative"
                   title="Visualize Neural Landscape"
                 >
                    <Camera className="w-6 h-6" />
@@ -234,7 +232,7 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
                   type="button"
                   onClick={onVideoCutscene}
                   disabled={isLoading}
-                  className="p-3 rounded-xl text-gray-500 hover:text-red-500 hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed group/vid relative"
+                  className="p-3 rounded-lg text-gray-500 hover:text-red-500 hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed group/vid relative"
                   title="Cinematic Cutscene"
                 >
                    <Film className="w-6 h-6" />
@@ -248,7 +246,7 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
                 <button
                   type="button"
                   onClick={onToggleLogic}
-                  className={`p-3 rounded-xl transition-all relative group/logic ${showLogic ? 'text-green-500 bg-green-900/20' : 'text-gray-500 hover:text-green-400 hover:bg-gray-800'}`}
+                  className={`p-3 rounded-lg transition-all relative group/logic ${showLogic ? 'text-green-500 bg-green-900/20' : 'text-gray-500 hover:text-green-400 hover:bg-gray-800'}`}
                   title="Toggle Logic Visualization"
                 >
                    <Terminal className="w-6 h-6" />
@@ -268,14 +266,15 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
                   placeholder={isLoading ? "Architect is reweaving the simulation..." : "Define your volition..."}
                   disabled={isLoading}
                   rows={1}
-                  className={`w-full bg-transparent text-gray-100 placeholder-gray-700 px-2 py-4 focus:outline-none resize-none font-serif text-2xl max-h-64 disabled:opacity-50 transition-all`}
+                  className={`w-full bg-transparent text-gray-100 placeholder-gray-700 px-2 py-4 focus:outline-none resize-none font-serif text-2xl max-h-96 disabled:opacity-50 transition-all`}
+                  style={{ minHeight: '60px' }}
               />
             </div>
             
             <button
               type="submit"
               disabled={(!text.trim() && files.length === 0) || isLoading}
-              className={`p-4 rounded-xl text-gray-600 hover:text-white hover:bg-gray-800 transition-all disabled:opacity-10 disabled:cursor-not-allowed self-end`}
+              className={`p-4 rounded-lg text-gray-600 hover:text-white hover:bg-gray-800 transition-all disabled:opacity-10 disabled:cursor-not-allowed self-end`}
             >
               {isLoading ? <Activity className="w-8 h-8 animate-spin" /> : <Send className="w-8 h-8" />}
             </button>

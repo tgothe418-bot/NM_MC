@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, LiveServerMessage, Modality, FunctionDeclaration, Type } from "@google/genai";
 import { float32To16BitPCM, arrayBufferToBase64, base64ToFloat32Array } from "./audioUtils";
 
@@ -70,7 +69,6 @@ export class LiveClient {
         speechConfig: {
           voiceConfig: { prebuiltVoiceConfig: { voiceName: config.voiceName } }
         },
-        // Using empty object as per guidelines for input audio transcription
         inputAudioTranscription: {}, 
         systemInstruction: systemInstruction,
         tools: [{ functionDeclarations: [SUBMIT_ACTION_TOOL] }],
@@ -92,7 +90,6 @@ export class LiveClient {
       const base64Data = arrayBufferToBase64(pcmBuffer);
 
       if (this.sessionPromise) {
-        // CRITICAL: Solely rely on sessionPromise resolves and then call `session.sendRealtimeInput`
         this.sessionPromise.then(session => {
           session.sendRealtimeInput({
             media: {
@@ -110,7 +107,6 @@ export class LiveClient {
 
   private async handleMessage(msg: LiveServerMessage) {
     // 1. Handle Audio Output (Narrator Voice)
-    // Scheduling each new audio chunk to start at this time ensures smooth, gapless playback.
     const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
     if (audioData && this.outputContext) {
       this.nextStartTime = Math.max(this.nextStartTime, this.outputContext.currentTime);
@@ -129,13 +125,12 @@ export class LiveClient {
     // 2. Handle Real-time Input Transcription (User Voice -> Text)
     const transcription = msg.serverContent?.inputTranscription;
     if (transcription && transcription.text && this.onInputProgress) {
-        // Stream text to UI
         this.onInputProgress(transcription.text, false);
     }
     
     // 3. Handle Turn Completion (Finalize Text)
     if (msg.serverContent?.turnComplete && this.onInputProgress) {
-        this.onInputProgress("", true); // Signal completion/reset
+        this.onInputProgress("", true);
     }
 
     // 4. Handle Tool Calls (Bridging Voice to Game Engine)
@@ -145,11 +140,8 @@ export class LiveClient {
           const actionText = (fc.args as any).action;
           
           try {
-             // Call the main game engine (App.tsx)
              const resultText = await this.onAction(actionText);
 
-             // Send the result back to the Live Model so it can narrate it
-             // Using object format for functionResponses as per guidelines
              this.sessionPromise?.then(session => {
                 session.sendToolResponse({
                    functionResponses: {
@@ -178,13 +170,11 @@ export class LiveClient {
   }
 
   disconnect() {
-    // Clean up Web Audio
     if (this.inputSource) this.inputSource.disconnect();
     if (this.inputProcessor) this.inputProcessor.disconnect();
     if (this.inputContext) this.inputContext.close();
     if (this.outputContext) this.outputContext.close();
     
-    // Attempt to close session if possible
     if (this.sessionPromise) {
         this.sessionPromise.then(session => {
             if (session.close) session.close();

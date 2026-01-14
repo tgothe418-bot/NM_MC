@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { 
   GameState, 
@@ -9,12 +10,13 @@ import {
 import { 
   parseSimulatorResponse, 
   parseNarratorResponse, 
-  parseSourceAnalysis,
-  parseScenarioConcepts,
-  parseCharacterProfile,
+  parseSourceAnalysis, 
+  parseScenarioConcepts, 
+  parseCharacterProfile, 
   parseHydratedCharacter
 } from '../parsers';
 import { SIMULATOR_INSTRUCTION } from '../prompts/simulator';
+import { NARRATION_PROFILES } from './ttsService';
 import { NARRATOR_INSTRUCTION } from '../prompts/narrator';
 import { constructVoiceManifesto } from './dialogueEngine';
 import { constructSensoryManifesto } from './sensoryEngine';
@@ -61,8 +63,8 @@ export const processGameTurn = async (
         ]
     },
     config: {
-        systemInstruction: SIMULATOR_INSTRUCTION
-        // NOTE: responseMimeType removed to avoid 500 errors on complex prompts without schemas
+        systemInstruction: SIMULATOR_INSTRUCTION,
+        responseMimeType: 'application/json'
     }
   });
 
@@ -92,26 +94,50 @@ export const processGameTurn = async (
           ]
       },
       config: {
-          systemInstruction: NARRATOR_INSTRUCTION
-          // NOTE: responseMimeType removed to avoid 500 errors on complex prompts without schemas
+          systemInstruction: NARRATOR_INSTRUCTION,
+          responseMimeType: 'application/json'
       }
   });
 
   const narrText = narratorResponse.text || "{}";
   const narrResult = parseNarratorResponse(narrText) as { story_text: string, game_state?: GameState };
   
-  // 4. IMAGE GENERATION (If requested)
+  // DETECT & STRIP VISUAL TAGS
+  let finalStoryText = narrResult.story_text;
+  let hasVisualTag = false;
+
+  if (finalStoryText.includes('[ESTABLISHING_SHOT]')) {
+      hasVisualTag = true;
+      finalStoryText = finalStoryText.replace(/\[ESTABLISHING_SHOT\]/g, '');
+  }
+  if (finalStoryText.includes('[SELF_PORTRAIT]')) {
+      hasVisualTag = true; // Use same flag for now, or distinguish if needed
+      finalStoryText = finalStoryText.replace(/\[SELF_PORTRAIT\]/g, '');
+  }
+
+  // 4. IMAGE GENERATION (If requested via State OR Tag)
   let imageUrl: string | undefined;
-  if (updatedState.narrative.illustration_request || narrResult.game_state?.narrative.illustration_request) {
+  const requestFromState = updatedState.narrative.illustration_request || narrResult.game_state?.narrative.illustration_request;
+  
+  // Consolidate trigger
+  const triggerImage = requestFromState || hasVisualTag;
+
+  if (triggerImage) {
       if (onStreamLogic) onStreamLogic("generating visual artifact...\n", 'narrative');
+      
+      const prompt = typeof requestFromState === 'string' ? requestFromState : "Establishing Shot";
+      
       imageUrl = await generateImage(
-          updatedState.narrative.illustration_request || narrResult.game_state?.narrative.illustration_request || "Dark scene", 
+          prompt, 
           updatedState.narrative.visual_motif,
           updatedState.location_state.room_map[updatedState.location_state.current_room_id]?.description_cache
       );
       
-      // Clear request
+      // Clear request from state so it doesn't loop
       updatedState.narrative.illustration_request = null;
+      if (narrResult.game_state?.narrative) {
+          narrResult.game_state.narrative.illustration_request = null;
+      }
   }
 
   const finalState = {
@@ -121,7 +147,7 @@ export const processGameTurn = async (
 
   return {
       gameState: finalState,
-      storyText: narrResult.story_text,
+      storyText: finalStoryText, // Return cleaned text
       imageUrl
   };
 };
@@ -141,7 +167,8 @@ export const generateAutoPlayerAction = async (state: GameState): Promise<string
 
 export const generateImage = async (prompt: string, motif: string, context: string = ""): Promise<string | undefined> => {
     const ai = getAI();
-    const fullPrompt = `Horror Scene. Style: ${motif}. Context: ${context}. Subject: ${prompt}. No text.`;
+    // Optimize prompt for the model
+    const fullPrompt = `Horror Art. Style: ${motif}. Scene: ${context}. Detail: ${prompt}. Photorealistic, cinematic lighting, 8k. No text.`;
     
     try {
         const res = await ai.models.generateContent({
@@ -165,32 +192,61 @@ export const generateImage = async (prompt: string, motif: string, context: stri
 
 export const analyzeSourceMaterial = async (file: File): Promise<SourceAnalysisResult> => {
   const ai = getAI();
-  const base64Data = await fileToBase64(file);
-  const base64Content = base64Data.split(',')[1];
+  const isText = file.type.startsWith('text/') || 
+                 file.name.endsWith('.txt') || 
+                 file.name.endsWith('.md') || 
+                 file.name.endsWith('.csv') || 
+                 file.name.endsWith('.json');
 
-  const prompt = `Analyze this source material (Image or Document) for a horror simulation setup.
+  let parts: any[] = [];
+
+  if (isText) {
+      const textContent = await fileToText(file);
+      parts = [{ text: `[SOURCE MATERIAL: ${file.name}]\n${textContent}` }];
+  } else {
+      const base64Data = await fileToBase64(file);
+      const base64Content = base64Data.split(',')[1];
+      parts = [{ inlineData: { mimeType: file.type, data: base64Content } }];
+  }
+
+  const prompt = `Analyze this source material for a horror simulation setup.
   
-  Return a valid JSON object matching this structure exactly (do not wrap in markdown):
+  CRITICAL INSTRUCTION: Extract ALL characters, including:
+  1. The Protagonists/Survivors.
+  2. The ANTAGONIST (Villain, Monster, AI, Mastercomputer). Even if it is a machine or abstract entity (like AM), it MUST be listed as a character with the role 'Antagonist' or 'Villain'.
+  
+  ALSO EXTRACT:
+  - Aesthetics (Visual Motif)
+  - Intensity Level (1-5)
+  - Core Themes
+  - Plot Elements (Hooks)
+
+  Return a valid JSON object matching this structure exactly:
   {
     "characters": [
-      { "name": "Name", "role": "Archetype/Job", "description": "Brief physical/psychological bio", "traits": "Key personality traits" }
+      { 
+        "name": "Name", 
+        "role": "Archetype/Job (e.g. 'Survivor', 'Antagonist', 'AI')", 
+        "description": "Detailed bio. For Antagonists, describe their form and origin.", 
+        "traits": "Personality traits.",
+        "goal": "Primary objective (e.g. 'Torture forever', 'Escape'). Essential for Antagonists.",
+        "methodology": "Methods of torment/attack. Essential for Antagonists."
+      }
     ],
     "location": "Detailed description of the setting/environment found in the source",
     "visual_motif": "Cinematic visual style description (e.g. Grainy 16mm, Digital Glitch)",
     "theme_cluster": "One of: Flesh, System, Haunting, Self, Blasphemy, Survival, Desire",
-    "intensity": "Level 1 to 5"
+    "intensity": "Level 1 to 5",
+    "plot_hook": "The immediate situation, conflict, or inciting incident present in the source."
   }`;
+
+  parts.push({ text: prompt });
 
   const res = await ai.models.generateContent({
     model: 'gemini-3-pro-preview',
-    contents: {
-      parts: [
-        { inlineData: { mimeType: file.type, data: base64Content } },
-        { text: prompt }
-      ]
-    },
+    contents: { parts: parts },
     config: { 
-        // Strict schema removed to prevent timeouts/500s on large context. Relies on prompt instruction.
+        responseMimeType: 'application/json'
     }
   });
 
@@ -227,6 +283,41 @@ export const hydrateUserCharacter = async (description: string, cluster: string)
         config: { responseMimeType: 'application/json' }
     });
     return parseHydratedCharacter(res.text || "{}");
+};
+
+export const extractCharactersFromText = async (text: string, cluster: string): Promise<Partial<NpcState>[]> => {
+  const ai = getAI();
+  const prompt = `Analyze the following text which describes a group of characters for a horror simulation (Theme: ${cluster}).
+  
+  Extract EACH character into a JSON object.
+  Return a JSON ARRAY.
+  
+  Schema per character:
+  {
+    "name": "String",
+    "archetype": "String (Role/Job)",
+    "background_origin": "String (Brief bio including traits)",
+    "personality": { "dominant_trait": "String", "fatal_flaw": "String" },
+    "physical": { "distinguishing_feature": "String" }
+  }
+  
+  Input Text:
+  "${text}"`;
+
+  try {
+      const res = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: { parts: [{ text: prompt }] },
+        config: { responseMimeType: 'application/json' }
+      });
+      
+      const json = JSON.parse(res.text || "[]");
+      if (Array.isArray(json)) return json;
+      return [];
+  } catch (e) {
+      console.error("Failed to parse character extraction", e);
+      return [];
+  }
 };
 
 export const generateNpcPortrait = async (npc: NpcState): Promise<string | undefined> => {
@@ -271,10 +362,25 @@ export const generateCharacterProfile = async (cluster: string, intensity: strin
 export const generateScenarioConcepts = async (cluster: string, intensity: string, mode: string): Promise<ScenarioConcepts> => {
     const ai = getAI();
     const res = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: { parts: [{ text: `Generate a full scenario concept JSON. Cluster: ${cluster}, Mode: ${mode}, Intensity: ${intensity}.` }] },
+        model: 'gemini-3-flash-preview',
+        contents: { parts: [{ text: `Generate a full scenario concept JSON object. Cluster: ${cluster}, Mode: ${mode}, Intensity: ${intensity}.` }] },
         config: {
-             // responseMimeType: 'application/json' // REMOVED
+             responseMimeType: 'application/json',
+             responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    villain_name: { type: Type.STRING },
+                    villain_appearance: { type: Type.STRING },
+                    villain_methods: { type: Type.STRING },
+                    primary_goal: { type: Type.STRING },
+                    victim_description: { type: Type.STRING },
+                    survivor_name: { type: Type.STRING },
+                    survivor_background: { type: Type.STRING },
+                    survivor_traits: { type: Type.STRING },
+                    location_description: { type: Type.STRING },
+                    visual_motif: { type: Type.STRING }
+                }
+             }
         }
     });
     return parseScenarioConcepts(res.text || "{}");
@@ -287,5 +393,14 @@ const fileToBase64 = (file: File): Promise<string> => {
         reader.onload = () => resolve(reader.result as string);
         reader.onerror = reject;
         reader.readAsDataURL(file);
+    });
+};
+
+const fileToText = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsText(file);
     });
 };

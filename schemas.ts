@@ -207,6 +207,8 @@ export const ParsedCharacterSchema = z.object({
   role: z.string(),
   description: z.string(),
   traits: z.string(),
+  goal: z.string().optional(),
+  methodology: z.string().optional(),
 });
 
 export const SourceAnalysisResultSchema = z.object({
@@ -215,19 +217,20 @@ export const SourceAnalysisResultSchema = z.object({
   visual_motif: z.string().default(""),
   theme_cluster: z.string().default(""),
   intensity: z.string().default(""),
+  plot_hook: z.string().default(""),
 });
 
 export const ScenarioConceptsSchema = z.object({
-  villain_name: z.string().optional(),
-  villain_appearance: z.string().optional(),
-  villain_methods: z.string().optional(),
-  primary_goal: z.string().optional(),
-  victim_description: z.string().optional(),
-  survivor_name: z.string().optional(),
-  survivor_background: z.string().optional(),
-  survivor_traits: z.string().optional(),
-  location_description: z.string().optional(),
-  visual_motif: z.string().optional(),
+  villain_name: z.string().nullable().optional(),
+  villain_appearance: z.string().nullable().optional(),
+  villain_methods: z.string().nullable().optional(),
+  primary_goal: z.string().nullable().optional(),
+  victim_description: z.string().nullable().optional(),
+  survivor_name: z.string().nullable().optional(),
+  survivor_background: z.string().nullable().optional(),
+  survivor_traits: z.string().nullable().optional(),
+  location_description: z.string().nullable().optional(),
+  visual_motif: z.string().nullable().optional(),
 });
 
 export const CharacterProfileSchema = z.object({

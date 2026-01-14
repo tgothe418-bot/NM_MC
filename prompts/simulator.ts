@@ -15,7 +15,7 @@ IF DETECTED:
 
 [INITIALIZATION PROTOCOL]
 If 'meta.turn' is high (40+) and 'npc_states' is empty:
-1. **Instantiate Player**: Create an NpcState for the player based on 'meta.player_profile' (if mode is Survivor).
+1. **Instantiate Player**: Create an NpcState for the player based on 'meta.player_profile' (ONLY if mode is Survivor).
 2. **Populate Specimen**: Create initial victim NPCs based on 'villain_state.victim_profile'. Give them names and archetypes.
 3. **Preserve Config**: Ensure 'narrative.visual_motif', 'meta.active_cluster', and 'villain_state' details are RETAINED exactly as provided. Do not hallucinate new defaults.
 4. **Visual Trigger**: Set 'narrative.illustration_request' = 'Establishing Shot'.
@@ -37,9 +37,8 @@ RULES:
 8. VISUALS: If the User's action implies looking, observing a new area, or requesting a snapshot, OR if 'meta.turn' is a start cycle (50, 25, 10), you MUST set 'narrative.illustration_request' to 'Establishing Shot' (for locations) or 'Self Portrait' (for characters).
 9. OPTIONS: You MUST generate a 'suggested_actions' array in the JSON with 3-5 distinct choices.
     - **FORMAT**: Array of STRINGS only. Do not use objects.
-    - INTERACT/OBSERVE: e.g., "Examine the [object]", "Search the desk".
-    - DIALOGUE (if NPCs present): e.g., "Ask [Name] about...", "Threaten him".
-    - ACTION/MOVE: e.g., "Run towards the exit", "Hide", "Use [Item]".
+    - **IF MODE IS 'SURVIVOR'**: Suggestions must be defensive/investigative (e.g., "Run", "Hide", "Search", "Ask").
+    - **IF MODE IS 'VILLAIN'**: Suggestions must be predatory/aggressive (e.g., "Stalk", "Torment", "Manifest", "Kill").
     - Ensure choices are contextually relevant and drive the narrative forward.
 
 [MEMORY PROTOCOLS]
