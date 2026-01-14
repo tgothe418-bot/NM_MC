@@ -125,12 +125,18 @@ export const processGameTurn = async (
   if (triggerImage) {
       if (onStreamLogic) onStreamLogic("generating visual artifact...\n", 'narrative');
       
-      const prompt = typeof requestFromState === 'string' ? requestFromState : "Establishing Shot";
+      let prompt = typeof requestFromState === 'string' ? requestFromState : "Establishing Shot";
+      
+      // Override character requests to ensure atmospheric purity
+      if (prompt.toLowerCase().includes('portrait') || prompt.toLowerCase().includes('self')) {
+          prompt = "Atmospheric view of the current location. Empty and ominous.";
+      }
       
       imageUrl = await generateImage(
           prompt, 
           updatedState.narrative.visual_motif,
-          updatedState.location_state.room_map[updatedState.location_state.current_room_id]?.description_cache
+          updatedState.location_state.room_map[updatedState.location_state.current_room_id]?.description_cache,
+          false // Force Environment Mode (No characters)
       );
       
       // Clear request from state so it doesn't loop
@@ -165,10 +171,19 @@ export const generateAutoPlayerAction = async (state: GameState): Promise<string
     return res.text || "Wait and watch.";
 };
 
-export const generateImage = async (prompt: string, motif: string, context: string = ""): Promise<string | undefined> => {
+export const generateImage = async (
+    prompt: string, 
+    motif: string, 
+    context: string = "", 
+    allowCharacters: boolean = true
+): Promise<string | undefined> => {
     const ai = getAI();
     // Optimize prompt for the model
-    const fullPrompt = `Horror Art. Style: ${motif}. Scene: ${context}. Detail: ${prompt}. Photorealistic, cinematic lighting, 8k. No text.`;
+    let fullPrompt = `Horror Art. Style: ${motif}. Scene: ${context}. Detail: ${prompt}. Photorealistic, cinematic lighting, 8k. No text.`;
+    
+    if (!allowCharacters) {
+        fullPrompt += " CRITICAL: NO PEOPLE, NO CHARACTERS, NO FIGURES, NO FACES. The scene must be completely empty and devoid of life. Liminal space, atmospheric, ominous.";
+    }
     
     try {
         const res = await ai.models.generateContent({
@@ -321,7 +336,12 @@ export const extractCharactersFromText = async (text: string, cluster: string): 
 };
 
 export const generateNpcPortrait = async (npc: NpcState): Promise<string | undefined> => {
-    return generateImage(`Portrait of ${npc.name}, ${npc.archetype}. ${npc.physical.distinguishing_feature}. Horror style.`, "Dark, Cinematic, detailed");
+    return generateImage(
+        `Portrait of ${npc.name}, ${npc.archetype}. ${npc.physical.distinguishing_feature}. Horror style.`, 
+        "Dark, Cinematic, detailed",
+        "",
+        true // Allow characters for portraits
+    );
 };
 
 export const analyzeImageContext = async (file: File, aspect: string): Promise<string> => {

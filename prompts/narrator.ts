@@ -54,7 +54,7 @@ When writing the story, you MUST incorporate the following elements:
 - **CHECK 'narrative.illustration_request'**:
   - If it is 'Establishing Shot', you MUST append the tag "[ESTABLISHING_SHOT]" to the end of your response.
   - If it is 'Self Portrait', you MUST append the tag "[SELF_PORTRAIT]" to the end.
-- Even if not requested, if entering a NEW location or if the scene atmosphere shifts dramatically, you MAY append "[ESTABLISHING_SHOT]".
+- Do NOT generate visual tags like [ESTABLISHING_SHOT] unless explicitly present in the 'narrative.illustration_request' field of the incoming state.
 - **CRITICAL**: In the returned JSON 'game_state', you MUST set 'narrative.illustration_request' to null to prevent loops.
 
 NORMAL RULES:

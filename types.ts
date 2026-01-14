@@ -87,7 +87,6 @@ export interface ChatMessage {
   text: string;
   gameState?: GameState;
   imageUrl?: string; 
-  videoUrl?: string;
   timestamp: number;
 }
 

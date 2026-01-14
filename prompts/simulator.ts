@@ -34,7 +34,7 @@ RULES:
 5. NPC AGENCY: Update hidden_agenda progress based on their intentions.
 6. LOCATION GENERATION: Use the provided [LOCATION GENERATION PROTOCOL] to populate 'description_cache' with rich, cluster-specific details.
 7. CHRONOMETRY: You must DECREMENT 'meta.turn' by 1 for every user action. The simulation counts DOWN to 0 (The End).
-8. VISUALS: If the User's action implies looking, observing a new area, or requesting a snapshot, OR if 'meta.turn' is a start cycle (50, 25, 10), you MUST set 'narrative.illustration_request' to 'Establishing Shot' (for locations) or 'Self Portrait' (for characters).
+8. VISUALS: ONLY if 'meta.turn' is exactly the starting turn (50, 25, or 10 depending on config) AND this is the very first initialization, set 'narrative.illustration_request' to 'Establishing Shot'. IGNORE requests for visuals in all other turns.
 9. OPTIONS: You MUST generate a 'suggested_actions' array in the JSON with 3-5 distinct choices.
     - **FORMAT**: Array of STRINGS only. Do not use objects.
     - **IF MODE IS 'SURVIVOR'**: Suggestions must be defensive/investigative (e.g., "Run", "Hide", "Search", "Ask").

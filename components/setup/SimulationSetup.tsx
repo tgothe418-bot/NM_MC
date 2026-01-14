@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
-import { Bot, Loader2, Play, Sparkles, Activity, Zap, Radio, Eye, Cpu, Hourglass, Settings, MapPin, Upload } from 'lucide-react';
-import { SimulationConfig } from '../../types';
+import { Bot, Loader2, Play, Sparkles, Activity, Zap, Radio, Eye, Cpu, Hourglass, Settings, MapPin, Upload, Users, Check } from 'lucide-react';
+import { SimulationConfig, ParsedCharacter } from '../../types';
 import { useSetupStore } from './store';
 import { SourceUploader } from './SourceUploader';
 import { ManualCharacterSection } from './ManualCharacterSection';
@@ -35,6 +36,7 @@ export const SimulationSetup: React.FC<Props> = ({ onRun, onBack }) => {
   const [isStarting, setIsStarting] = useState(false);
   const [loadingFields, setLoadingFields] = useState<Record<string, boolean>>({});
   const [isGeneratingIdeas, setIsGeneratingIdeas] = useState(false);
+  const [selectedCharName, setSelectedCharName] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleStart = () => {
@@ -66,7 +68,7 @@ export const SimulationSetup: React.FC<Props> = ({ onRun, onBack }) => {
             survivor_background: store.survivorBackground,
             survivor_traits: store.survivorTraits,
         });
-    }, 1000);
+    }, 2000);
   };
 
   const handleAutoPopulate = async () => {
@@ -107,163 +109,269 @@ export const SimulationSetup: React.FC<Props> = ({ onRun, onBack }) => {
       }
   };
 
+  const handleCharacterSelect = (char: ParsedCharacter) => {
+      setSelectedCharName(char.name);
+
+      const roleLower = char.role.toLowerCase();
+      const isSelectedVillain = roleLower.includes('antagonist') || roleLower.includes('villain') || 
+                                roleLower.includes('monster') || roleLower.includes('killer') || 
+                                roleLower.includes('entity') || roleLower.includes('computer') ||
+                                roleLower.includes('ai') || roleLower.includes('master');
+      
+      const others = store.parsedCharacters.filter(c => c.name !== char.name);
+
+      if (isSelectedVillain) {
+          store.setMode('The Antagonist (Predator Protocol)');
+          
+          store.setSurvivorName('');
+          store.setSurvivorBackground('');
+          store.setSurvivorTraits('');
+
+          store.setVillainName(char.name);
+          store.setVillainAppearance(`${char.description}\n\n[Traits]: ${char.traits}`);
+          
+          if (char.goal) store.setPrimaryGoal(char.goal);
+          if (char.methodology) store.setVillainMethods(char.methodology);
+          
+          if (others.length > 0) {
+              store.setVictimCount(others.length);
+              const othersDescription = others.map(c => 
+                  `SUBJECT: ${c.name}\nROLE: ${c.role}\nPROFILE: ${c.description}\nTRAITS: ${c.traits}`
+              ).join('\n\n');
+              store.setVictimDescription(othersDescription);
+          }
+      } else {
+          store.setMode('The Survivor (Prey Protocol)');
+          store.setSurvivorName(char.name);
+          store.setSurvivorBackground(char.description);
+          store.setSurvivorTraits(char.traits);
+
+          const detectedVillain = others.find(c => {
+              const r = c.role.toLowerCase();
+              return r.includes('antagonist') || r.includes('villain') || r.includes('monster') || 
+                     r.includes('killer') || r.includes('entity') || r.includes('computer');
+          });
+
+          const companions = others.filter(c => c !== detectedVillain);
+
+          if (detectedVillain) {
+              store.setVillainName(detectedVillain.name);
+              store.setVillainAppearance(`${detectedVillain.description}\n\n[Traits]: ${detectedVillain.traits}`);
+              if (detectedVillain.goal) store.setPrimaryGoal(detectedVillain.goal);
+              if (detectedVillain.methodology) store.setVillainMethods(detectedVillain.methodology);
+          }
+
+          if (companions.length > 0) {
+              store.setVictimCount(companions.length);
+              const compDescription = companions.map(c => 
+                  `COMPANION: ${c.name}\nROLE: ${c.role}\nPROFILE: ${c.description}\nTRAITS: ${c.traits}`
+              ).join('\n\n');
+              store.setVictimDescription(compDescription);
+          } else {
+              store.setVictimCount(0); 
+              store.setVictimDescription('');
+          }
+      }
+  };
+
   return (
     <div className="flex flex-col h-full bg-[#030303] animate-fadeIn relative z-10 overflow-hidden">
         <input type="file" ref={fileInputRef} onChange={onImageUpload} className="hidden" accept="image/*" />
         
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-12">
-            <div className="max-w-7xl mx-auto space-y-12">
-                
-                {/* Header */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-amber-500/30 pb-8">
-                    <div className="space-y-2">
-                        <div className="text-amber-500 font-mono text-4xl font-bold uppercase tracking-[0.2em] flex items-center gap-4">
-                            <Bot className="w-10 h-10" /> Diagnostic Protocol
-                        </div>
-                        <p className="text-gray-500 font-mono text-xs uppercase tracking-[0.4em]">Autonomous Narrative Execution Engine</p>
-                    </div>
-                    <div className="flex gap-4">
-                        <button onClick={handleAutoPopulate} disabled={isGeneratingIdeas} className="text-amber-500 flex items-center gap-3 border border-amber-500/50 px-6 py-3 bg-amber-500/5 hover:bg-amber-500/20 disabled:opacity-50 transition-colors uppercase font-mono text-xs tracking-widest rounded-sm">
-                            {isGeneratingIdeas ? <Loader2 className="animate-spin w-4 h-4" /> : <Sparkles className="w-4 h-4" />} Auto-Gen
-                        </button>
-                        <button onClick={onBack} className="text-gray-600 hover:text-white border border-gray-800 px-8 py-3 uppercase font-mono text-xs tracking-widest rounded-sm">Back</button>
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-12 md:p-16">
+            
+            {/* Header */}
+            <div className="flex justify-between border-b border-amber-500/30 pb-10 mb-12">
+                <div className="flex gap-6">
+                    <Bot className="w-14 h-14 text-amber-500 animate-pulse" />
+                    <div>
+                        <h2 className="font-mono text-5xl font-bold tracking-[0.25em] text-amber-500">DIAGNOSTIC PROTOCOL</h2>
+                        <p className="text-sm font-mono text-gray-500 tracking-[0.4em] mt-2">Autonomous Narrative Execution Engine</p>
                     </div>
                 </div>
-
-                {/* Source Uploader */}
-                <SourceUploader />
-
-                {/* Main Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
-                    
-                    {/* Simulation Parameters */}
-                    <div className="col-span-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 bg-gray-900/10 p-8 border border-gray-800 rounded-sm">
-                        <div className="space-y-4">
-                            <label className="text-xs font-mono text-gray-500 uppercase tracking-[0.2em] flex items-center gap-2">
-                                <Activity className="w-4 h-4 text-amber-500" /> Cycles
-                            </label>
-                            <input 
-                                type="range" 
-                                min="5" 
-                                max="50" 
-                                step="5" 
-                                value={cycles} 
-                                onChange={(e) => setCycles(parseInt(e.target.value))}
-                                className="w-full accent-amber-500 h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer"
-                            />
-                            <div className="text-right font-mono text-amber-500 text-sm font-bold">{cycles} Turns</div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <label className="text-xs font-mono text-gray-500 uppercase tracking-[0.2em] flex items-center gap-2">
-                                <Eye className="w-4 h-4 text-amber-500" /> Perspective
-                            </label>
-                            <select value={store.perspective} onChange={(e) => store.setPerspective(e.target.value)} className="w-full bg-black border border-gray-800 p-3 text-xs font-mono text-gray-300 focus:border-amber-500 outline-none rounded-sm">
-                                <option>First Person (Direct Immersion)</option>
-                                <option>Third Person (Observational Dread)</option>
-                            </select>
-                        </div>
-
-                        <div className="space-y-4">
-                            <label className="text-xs font-mono text-gray-500 uppercase tracking-[0.2em] flex items-center gap-2">
-                                <Cpu className="w-4 h-4 text-amber-500" /> Mode
-                            </label>
-                            <select value={store.mode} onChange={(e) => store.setMode(e.target.value)} className="w-full bg-black border border-gray-800 p-3 text-xs font-mono text-gray-300 focus:border-amber-500 outline-none rounded-sm">
-                                <option>The Survivor (Prey Protocol)</option>
-                                <option>The Antagonist (Predator Protocol)</option>
-                            </select>
-                        </div>
-
-                        <div className="space-y-4">
-                            <label className="text-xs font-mono text-gray-500 uppercase tracking-[0.2em] flex items-center gap-2">
-                                <Hourglass className="w-4 h-4 text-amber-500" /> Starting Point
-                            </label>
-                            <select value={store.startingPoint} onChange={(e) => store.setStartingPoint(e.target.value)} className="w-full bg-black border border-gray-800 p-3 text-xs font-mono text-gray-300 focus:border-amber-500 outline-none rounded-sm">
-                                <option>Prologue</option>
-                                <option>In Media Res</option>
-                                <option>The Climax</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    {/* Cluster Grid */}
-                    <div className="col-span-full space-y-6">
-                        <label className="text-sm font-mono text-gray-400 flex gap-3 uppercase tracking-widest"><Settings className="text-amber-500" /> Resonance Frequency</label>
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-                            {CLUSTER_OPTIONS.map(o => (
-                                <button key={o.id} onClick={() => store.setSelectedClusters(prev => prev.includes(o.id) ? prev.filter(c => c !== o.id) : [...prev, o.id])} className={`p-4 border text-left transition-all rounded-sm ${store.selectedClusters.includes(o.id) ? `${o.color} bg-black ring-1 ring-amber-500/50` : 'border-gray-800 text-gray-600 hover:border-gray-600'}`}>
-                                    <div className="font-bold text-[10px] uppercase tracking-wider">{o.label}</div>
-                                    <div className="text-[9px] opacity-60 mt-1">{o.desc}</div>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Environment Matrix */}
-                    <div className="col-span-full bg-gray-900/10 p-8 border border-gray-800 space-y-10 rounded-sm">
-                        <div className="text-amber-500 font-mono text-sm font-bold uppercase tracking-[0.3em] border-b border-amber-500/20 pb-4 flex gap-4">
-                            <MapPin className="w-5 h-5" /> Environmental Matrix
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                            <div className="space-y-4">
-                                <div className="flex justify-between">
-                                    <label className="text-xs font-mono text-gray-400 uppercase tracking-wider">Location</label>
-                                    <button onClick={() => handleGenerate('Initial Location')} className="text-gray-500 hover:text-amber-500">
-                                        {loadingFields['Initial Location'] ? <Loader2 className="animate-spin w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
-                                    </button>
-                                </div>
-                                <textarea value={store.locationDescription} onChange={e => store.setLocationDescription(e.target.value)} className="w-full h-32 bg-black border border-gray-800 p-4 text-xs font-mono text-gray-300 focus:border-amber-500 outline-none resize-none" placeholder="Describe the starting environment..." />
-                            </div>
-                            <div className="space-y-4">
-                                <div className="flex justify-between">
-                                    <label className="text-xs font-mono text-gray-400 uppercase tracking-wider">Visual Motif</label>
-                                    <div className="flex gap-2">
-                                        <button onClick={triggerImageUpload} className="text-gray-500 hover:text-amber-500"><Upload className="w-4 h-4" /></button>
-                                        <button onClick={() => handleGenerate('Visual Motif')} className="text-gray-500 hover:text-amber-500">
-                                            {loadingFields['Visual Motif'] ? <Loader2 className="animate-spin w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
-                                        </button>
-                                    </div>
-                                </div>
-                                <textarea value={store.visualMotif} onChange={e => store.setVisualMotif(e.target.value)} className="w-full h-32 bg-black border border-gray-800 p-4 text-xs font-mono text-gray-300 focus:border-amber-500 outline-none resize-none" placeholder="e.g. Grainy 16mm, Digital Glitch..." />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Intensity */}
-                    <div className="col-span-full space-y-6">
-                        <label className="text-sm font-mono text-gray-400 flex gap-3 uppercase tracking-widest"><Zap className="text-amber-500" /> Stress Threshold</label>
-                        <div className="grid gap-1 bg-black border border-gray-800 p-1">
-                            {INTENSITY_OPTIONS.map(opt => (
-                                <button 
-                                    key={opt.id} 
-                                    onClick={() => store.setIntensity(opt.id)} 
-                                    className={`p-3 text-left border-l-2 transition-all flex justify-between items-center group ${store.intensity === opt.id ? 'bg-gray-900 border-amber-500 text-white' : 'border-transparent text-gray-500 hover:bg-gray-900/50'}`}
-                                >
-                                    <span className="font-bold text-xs font-mono uppercase">{opt.label}</span>
-                                    <span className={`text-[10px] font-mono uppercase tracking-wider transition-opacity ${store.intensity === opt.id ? 'opacity-100 text-amber-500' : 'opacity-40 group-hover:opacity-70'}`}>
-                                        {opt.desc}
-                                    </span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Full Character Section */}
-                    <ManualCharacterSection loadingFields={loadingFields} setLoadingFields={setLoadingFields} />
-
+                <div className="flex gap-4">
+                    <button onClick={handleAutoPopulate} disabled={isGeneratingIdeas} className="text-amber-500 flex items-center gap-3 border border-amber-500/50 px-6 py-4 bg-amber-500/5 hover:bg-amber-500/20 disabled:opacity-50 transition-colors uppercase font-mono text-xs tracking-widest rounded-sm">
+                        {isGeneratingIdeas ? <Loader2 className="animate-spin w-4 h-4" /> : <Sparkles className="w-4 h-4" />} Auto-Gen
+                    </button>
+                    <button onClick={onBack} className="text-gray-600 hover:text-white border border-gray-800 px-8 py-4 uppercase font-mono text-xs tracking-widest rounded-sm">Back</button>
                 </div>
             </div>
+
+            {/* Source Uploader (Compact) */}
+            <div className="mb-12">
+                <SourceUploader compact={true} />
+            </div>
+
+            {/* Parsed Character Selection */}
+            {store.parsedCharacters.length > 0 && (
+                <div className="space-y-6 animate-fadeIn mb-16">
+                    <div className="flex items-center gap-3 text-sm font-mono uppercase tracking-[0.3em] text-gray-400 border-b border-gray-800 pb-2"><Users className="w-4 h-4" /> Detected Signals (Auto-Fill)</div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {store.parsedCharacters.map((char, i) => {
+                            const isSelected = selectedCharName === char.name;
+                            return (
+                                <button 
+                                    key={i} 
+                                    onClick={() => handleCharacterSelect(char)} 
+                                    className={`text-left p-6 group transition-all duration-300 relative overflow-hidden flex flex-col justify-between h-full min-h-[140px]
+                                        ${isSelected 
+                                            ? 'bg-amber-500/10 border-2 border-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.2)]' 
+                                            : 'bg-black border border-gray-800 hover:border-gray-600'
+                                        }`}
+                                >
+                                    {isSelected && (
+                                        <div className="absolute top-0 right-0 p-2 bg-amber-500/20 rounded-bl-lg">
+                                            <Check className="w-4 h-4 text-amber-500" />
+                                        </div>
+                                    )}
+                                    <div>
+                                        <div className="flex justify-between items-start mb-2 pr-6">
+                                            <div className={`font-bold font-mono transition-colors ${isSelected ? 'text-amber-500' : 'text-gray-200 group-hover:text-white'}`}>{char.name}</div>
+                                        </div>
+                                        <span className={`text-[10px] uppercase font-mono px-2 py-0.5 rounded border inline-block mb-3
+                                            ${isSelected 
+                                                ? 'text-amber-500 border-amber-500/50 bg-amber-500/10' 
+                                                : 'text-gray-600 border-gray-800'
+                                            }`}>
+                                            {char.role}
+                                        </span>
+                                        <div className={`text-xs line-clamp-3 leading-relaxed ${isSelected ? 'text-gray-300' : 'text-gray-500'}`}>{char.description}</div>
+                                    </div>
+                                    <div className="mt-4 pt-3 border-t border-gray-800/50 flex justify-between items-center opacity-60">
+                                        <span className="text-[9px] font-mono uppercase tracking-wider text-gray-500">Neural Pattern</span>
+                                        <Cpu className={`w-3 h-3 ${isSelected ? 'text-amber-500' : 'text-gray-700'}`} />
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* Main Configuration Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
+                
+                {/* Cycles (Unique to Simulation) */}
+                <div className="space-y-4">
+                    <label className="text-sm font-mono text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-amber-500" /> Cycles
+                    </label>
+                    <div className="flex items-center gap-4 bg-black border-2 border-gray-800 p-4">
+                        <input 
+                            type="range" 
+                            min="5" 
+                            max="50" 
+                            step="5" 
+                            value={cycles} 
+                            onChange={(e) => setCycles(parseInt(e.target.value))}
+                            className="flex-1 accent-amber-500 h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer"
+                        />
+                        <span className="font-mono font-bold text-amber-500 text-lg w-8">{cycles}</span>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    <label className="text-sm font-mono text-gray-400 flex gap-3 uppercase tracking-widest"><Eye className="text-amber-500" /> Lens</label>
+                    <select value={store.perspective} onChange={(e) => store.setPerspective(e.target.value)} className="w-full bg-black border-2 border-gray-800 p-4 text-sm font-mono outline-none focus:border-amber-500 transition-colors">
+                        <option>First Person (Direct Immersion)</option>
+                        <option>Third Person (Observational Dread)</option>
+                    </select>
+                </div>
+
+                <div className="space-y-4">
+                    <label className="text-sm font-mono text-gray-400 flex gap-3 uppercase tracking-widest"><Cpu className="text-amber-500" /> Role</label>
+                    <select value={store.mode} onChange={(e) => store.setMode(e.target.value)} className="w-full bg-black border-2 border-gray-800 p-4 text-sm font-mono outline-none focus:border-amber-500 transition-colors">
+                        <option>The Survivor (Prey Protocol)</option>
+                        <option>The Antagonist (Predator Protocol)</option>
+                    </select>
+                </div>
+
+                <div className="space-y-4">
+                    <label className="text-sm font-mono text-gray-400 flex gap-3 uppercase tracking-widest"><Hourglass className="text-amber-500" /> Time</label>
+                    <select value={store.startingPoint} onChange={(e) => store.setStartingPoint(e.target.value)} className="w-full bg-black border-2 border-gray-800 p-4 text-sm font-mono outline-none focus:border-amber-500 transition-colors">
+                        <option>Prologue</option>
+                        <option>In Media Res</option>
+                        <option>The Climax</option>
+                    </select>
+                </div>
+            </div>
+
+            {/* Clusters */}
+            <div className="mb-16 space-y-6">
+                <label className="text-sm font-mono text-gray-400 flex gap-3 uppercase tracking-widest"><Settings className="text-amber-500" /> Resonance</label>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+                    {CLUSTER_OPTIONS.map(o => (
+                        <button key={o.id} onClick={() => store.setSelectedClusters(prev => prev.includes(o.id) ? prev.filter(c => c !== o.id) : [...prev, o.id])} className={`p-4 border-2 text-left transition-all rounded-sm ${store.selectedClusters.includes(o.id) ? `${o.color} bg-black ring-2 ring-amber-500/50` : 'border-gray-800 text-gray-600 hover:border-gray-600'}`}>
+                            <div className="font-bold text-[10px] uppercase tracking-wider">{o.label}</div>
+                            <div className="text-[9px] opacity-60 mt-1">{o.desc}</div>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Environmental Matrix */}
+            <div className="bg-gray-900/10 p-10 border border-gray-800 space-y-10 rounded-sm mb-16">
+                <div className="text-amber-500 font-mono text-xl font-bold uppercase tracking-[0.3em] border-b border-amber-500/20 pb-4 flex gap-4">
+                    <MapPin className="w-8 h-8" /> Environmental Matrix
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                    <div className="space-y-4">
+                        <div className="flex justify-between">
+                            <label className="text-sm font-mono text-gray-400 uppercase tracking-wider">Location</label>
+                            <button onClick={() => handleGenerate('Initial Location')} className="text-gray-500 hover:text-amber-500">
+                                {loadingFields['Initial Location'] ? <Loader2 className="animate-spin w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
+                            </button>
+                        </div>
+                        <textarea value={store.locationDescription} onChange={e => store.setLocationDescription(e.target.value)} className="w-full h-32 bg-black border-2 border-gray-800 p-4 text-xs font-mono text-gray-300 focus:border-amber-500 outline-none resize-none" placeholder="Describe the starting environment..." />
+                    </div>
+                    <div className="space-y-4">
+                        <div className="flex justify-between">
+                            <label className="text-sm font-mono text-gray-400 uppercase tracking-wider">Visual Motif</label>
+                            <div className="flex gap-2">
+                                <button onClick={triggerImageUpload} className="text-gray-500 hover:text-amber-500"><Upload className="w-4 h-4" /></button>
+                                <button onClick={() => handleGenerate('Visual Motif')} className="text-gray-500 hover:text-amber-500">
+                                    {loadingFields['Visual Motif'] ? <Loader2 className="animate-spin w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
+                                </button>
+                            </div>
+                        </div>
+                        <textarea value={store.visualMotif} onChange={e => store.setVisualMotif(e.target.value)} className="w-full h-32 bg-black border-2 border-gray-800 p-4 text-xs font-mono text-gray-300 focus:border-amber-500 outline-none resize-none" placeholder="e.g. Grainy 16mm, Digital Glitch..." />
+                    </div>
+                </div>
+            </div>
+
+            {/* Intensity */}
+            <div className="mb-16 space-y-6">
+                <label className="text-sm font-mono text-gray-400 flex gap-3 uppercase tracking-widest"><Zap className="text-amber-500" /> Stress Threshold</label>
+                <div className="grid gap-1 bg-black border border-gray-800 p-1">
+                    {INTENSITY_OPTIONS.map(opt => (
+                        <button 
+                            key={opt.id} 
+                            onClick={() => store.setIntensity(opt.id)} 
+                            className={`p-3 text-left border-l-2 transition-all flex justify-between items-center group ${store.intensity === opt.id ? 'bg-gray-900 border-amber-500 text-white' : 'border-transparent text-gray-500 hover:bg-gray-900/50'}`}
+                        >
+                            <span className="font-bold text-xs font-mono uppercase">{opt.label}</span>
+                            <span className={`text-[10px] font-mono uppercase tracking-wider transition-opacity ${store.intensity === opt.id ? 'opacity-100 text-amber-500' : 'opacity-40 group-hover:opacity-70'}`}>
+                                {opt.desc}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Full Character Section */}
+            <ManualCharacterSection loadingFields={loadingFields} setLoadingFields={setLoadingFields} />
+
         </div>
 
         {/* Footer Actions */}
-        <div className="p-8 border-t border-gray-800 bg-black/80 backdrop-blur-sm flex justify-center gap-6 relative z-20">
+        <div className="pt-16 pb-12 border-t-2 border-amber-500/10 flex flex-col items-center bg-black/20 relative z-20">
             <button 
                 onClick={handleStart}
                 disabled={isStarting}
-                className={`px-12 py-4 bg-amber-500 text-black font-mono font-bold uppercase tracking-[0.2em] hover:bg-amber-400 transition-colors rounded-sm flex items-center gap-3 shadow-[0_0_20px_rgba(245,158,11,0.3)] ${isStarting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`w-full max-w-2xl py-8 bg-amber-500 text-black font-mono font-bold uppercase tracking-[0.6em] hover:bg-amber-400 transition-colors flex items-center justify-center gap-6 shadow-[0_0_50px_rgba(245,158,11,0.3)] ${isStarting ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
                 {isStarting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5 fill-black" />}
-                {isStarting ? 'Initializing...' : 'Run Diagnostics'}
+                {isStarting ? 'INITIALIZING...' : 'RUN DIAGNOSTICS'}
             </button>
         </div>
     </div>

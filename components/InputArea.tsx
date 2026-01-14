@@ -1,14 +1,13 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  Send, Activity, Camera, Film, FastForward, Paperclip, X, 
+  Send, Activity, FastForward, Paperclip, X, 
   FileText, Terminal, ChevronRight, MessageSquare, Eye, 
   Zap, Hand
 } from 'lucide-react';
 
 interface InputAreaProps {
   onSend: (text: string, files: File[]) => void;
-  onSnapshot?: () => void;
-  onVideoCutscene?: () => void;
   onAdvance?: () => void;
   isLoading: boolean;
   inputType?: 'text' | 'choice_yes_no';
@@ -16,9 +15,20 @@ interface InputAreaProps {
   showLogic?: boolean;
   onToggleLogic?: () => void;
   options?: string[];
+  isSidebar?: boolean;
 }
 
-export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVideoCutscene, onAdvance, isLoading, inputType = 'text', externalValue, showLogic, onToggleLogic, options }) => {
+export const InputArea: React.FC<InputAreaProps> = ({ 
+  onSend, 
+  onAdvance, 
+  isLoading, 
+  inputType = 'text', 
+  externalValue, 
+  showLogic, 
+  onToggleLogic, 
+  options,
+  isSidebar = false
+}) => {
   const [text, setText] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -116,30 +126,35 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
   };
 
   return (
-    <div className="relative w-full max-w-[1600px] mx-auto flex flex-col gap-4">
+    <div className={`relative w-full mx-auto flex flex-col gap-4 ${isSidebar ? 'h-full' : 'max-w-[1600px]'}`}>
       
-      {/* Options/Suggestions Area - Horizontal Scrollable for max view */}
+      {/* Options/Suggestions Area - Pushed to bottom above input if Sidebar, or scrollable */}
       {options && options.length > 0 && !isLoading && (
-        <div className="flex flex-wrap justify-end gap-3 mb-2 animate-fadeIn pb-2">
+        <div className={`flex gap-3 mb-2 animate-fadeIn pb-2 ${isSidebar ? 'flex-col overflow-y-auto flex-1 justify-end min-h-0' : 'flex-wrap justify-end'}`}>
+          {isSidebar && <div className="text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1 border-b border-gray-800 pb-1 mt-auto">Available Vectors</div>}
           {options.map((option, idx) => {
             const { icon: Icon, style } = getActionStyle(option);
             return (
               <button
                 key={idx}
                 onClick={() => handleOptionClick(option)}
-                className={`px-6 py-3 border rounded-sm text-sm font-mono tracking-wide transition-all duration-300 flex items-center gap-3 group backdrop-blur-md shadow-lg ${style}`}
+                className={`px-4 py-3 border rounded-sm text-sm font-mono tracking-wide transition-all duration-300 flex items-center gap-3 group backdrop-blur-md shadow-lg ${style} ${isSidebar ? 'w-full justify-between text-left' : ''}`}
               >
-                <Icon className="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity group-hover:scale-110 duration-200" />
-                <span className="font-semibold text-left">{option}</span>
+                <div className="flex items-center gap-3 min-w-0">
+                    <Icon className="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity group-hover:scale-110 duration-200 flex-shrink-0" />
+                    <span className="font-semibold truncate">{option}</span>
+                </div>
+                {isSidebar && <ChevronRight className="w-3 h-3 opacity-30 group-hover:opacity-100 flex-shrink-0" />}
               </button>
             );
           })}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="relative group">
+      {/* Input Form */}
+      <form onSubmit={handleSubmit} className={`relative group ${isSidebar ? 'mt-auto' : ''}`}>
         <div className={`absolute -inset-1 bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 rounded-lg blur-md opacity-30 group-hover:opacity-70 transition duration-1000 ${isLoading ? 'animate-pulse' : ''}`}></div>
-        <div className={`relative flex flex-col bg-black/90 border-2 rounded-lg p-4 shadow-3xl transition-all duration-700 backdrop-blur-xl border-gray-800 group-hover:border-gray-700`}>
+        <div className={`relative flex flex-col bg-black/90 border-2 rounded-lg p-3 shadow-3xl transition-all duration-700 backdrop-blur-xl border-gray-800 group-hover:border-gray-700`}>
           
           {/* File Previews */}
           {files.length > 0 && (
@@ -174,7 +189,7 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
           )}
 
           <div className="flex items-end gap-2">
-            <div className="flex flex-col gap-2 pb-1">
+            <div className="flex flex-col gap-1 pb-1">
               <input 
                 type="file" 
                 ref={fileInputRef}
@@ -188,13 +203,10 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isLoading}
-                className="p-3 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed relative group/attach"
+                className="p-2 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed relative group/attach"
                 title="Attach Data"
               >
-                <Paperclip className="w-6 h-6" />
-                <span className="absolute left-full ml-4 top-1/2 -translate-y-1/2 text-xs bg-black border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg opacity-0 group-hover/attach:opacity-100 transition-opacity pointer-events-none whitespace-nowrap uppercase tracking-widest font-mono shadow-2xl z-20">
-                   Attach Data
-                </span>
+                <Paperclip className="w-5 h-5" />
               </button>
 
               {onAdvance && (
@@ -202,43 +214,10 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
                   type="button"
                   onClick={onAdvance}
                   disabled={isLoading}
-                  className="p-3 rounded-lg text-gray-500 hover:text-amber-500 hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed group/adv relative"
+                  className="p-2 rounded-lg text-gray-500 hover:text-amber-500 hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed group/adv relative"
                   title="Advance Narrative"
                 >
-                   <FastForward className="w-6 h-6" />
-                   <span className="absolute left-full ml-4 top-1/2 -translate-y-1/2 text-xs bg-black border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg opacity-0 group-hover/adv:opacity-100 transition-opacity pointer-events-none whitespace-nowrap uppercase tracking-widest font-mono shadow-2xl z-20">
-                     Yield Turn
-                   </span>
-                </button>
-              )}
-
-              {onSnapshot && (
-                <button
-                  type="button"
-                  onClick={onSnapshot}
-                  disabled={isLoading}
-                  className="p-3 rounded-lg text-gray-500 hover:text-system-cyan hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed group/cam relative"
-                  title="Visualize Neural Landscape"
-                >
-                   <Camera className="w-6 h-6" />
-                   <span className="absolute left-full ml-4 top-1/2 -translate-y-1/2 text-xs bg-black border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg opacity-0 group-hover/cam:opacity-100 transition-opacity pointer-events-none whitespace-nowrap uppercase tracking-widest font-mono shadow-2xl z-20">
-                     Project Neural Image
-                   </span>
-                </button>
-              )}
-
-              {onVideoCutscene && (
-                <button
-                  type="button"
-                  onClick={onVideoCutscene}
-                  disabled={isLoading}
-                  className="p-3 rounded-lg text-gray-500 hover:text-red-500 hover:bg-gray-800 transition-all disabled:opacity-20 disabled:cursor-not-allowed group/vid relative"
-                  title="Cinematic Cutscene"
-                >
-                   <Film className="w-6 h-6" />
-                   <span className="absolute left-full ml-4 top-1/2 -translate-y-1/2 text-xs bg-black border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg opacity-0 group-hover/vid:opacity-100 transition-opacity pointer-events-none whitespace-nowrap uppercase tracking-widest font-mono shadow-2xl z-20">
-                     Neural Video Projection
-                   </span>
+                   <FastForward className="w-5 h-5" />
                 </button>
               )}
 
@@ -246,37 +225,34 @@ export const InputArea: React.FC<InputAreaProps> = ({ onSend, onSnapshot, onVide
                 <button
                   type="button"
                   onClick={onToggleLogic}
-                  className={`p-3 rounded-lg transition-all relative group/logic ${showLogic ? 'text-green-500 bg-green-900/20' : 'text-gray-500 hover:text-green-400 hover:bg-gray-800'}`}
+                  className={`p-2 rounded-lg transition-all relative group/logic ${showLogic ? 'text-green-500 bg-green-900/20' : 'text-gray-500 hover:text-green-400 hover:bg-gray-800'}`}
                   title="Toggle Logic Visualization"
                 >
-                   <Terminal className="w-6 h-6" />
-                   <span className="absolute left-full ml-4 top-1/2 -translate-y-1/2 text-xs bg-black border border-gray-700 text-gray-300 px-3 py-1.5 rounded-lg opacity-0 group-hover/logic:opacity-100 transition-opacity pointer-events-none whitespace-nowrap uppercase tracking-widest font-mono shadow-2xl z-20">
-                     {showLogic ? 'Hide Machine Logic' : 'View Untranslated Logic'}
-                   </span>
+                   <Terminal className="w-5 h-5" />
                 </button>
               )}
             </div>
 
-            <div className="relative w-full px-4 self-center">
+            <div className="relative w-full px-2 self-center">
               <textarea
                   ref={textareaRef}
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={isLoading ? "Architect is reweaving the simulation..." : "Define your volition..."}
+                  placeholder={isLoading ? "Re-simulating..." : "Volition..."}
                   disabled={isLoading}
                   rows={1}
-                  className={`w-full bg-transparent text-gray-100 placeholder-gray-700 px-2 py-4 focus:outline-none resize-none font-serif text-2xl max-h-96 disabled:opacity-50 transition-all`}
-                  style={{ minHeight: '60px' }}
+                  className={`w-full bg-transparent text-gray-100 placeholder-gray-700 px-2 py-3 focus:outline-none resize-none font-serif text-xl max-h-96 disabled:opacity-50 transition-all`}
+                  style={{ minHeight: '50px' }}
               />
             </div>
             
             <button
               type="submit"
               disabled={(!text.trim() && files.length === 0) || isLoading}
-              className={`p-4 rounded-lg text-gray-600 hover:text-white hover:bg-gray-800 transition-all disabled:opacity-10 disabled:cursor-not-allowed self-end`}
+              className={`p-3 rounded-lg text-gray-600 hover:text-white hover:bg-gray-800 transition-all disabled:opacity-10 disabled:cursor-not-allowed self-end`}
             >
-              {isLoading ? <Activity className="w-8 h-8 animate-spin" /> : <Send className="w-8 h-8" />}
+              {isLoading ? <Activity className="w-6 h-6 animate-spin" /> : <Send className="w-6 h-6" />}
             </button>
           </div>
         </div>

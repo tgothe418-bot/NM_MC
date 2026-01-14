@@ -242,10 +242,10 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-[#050505] text-gray-200 overflow-hidden font-sans relative">
+    <div className="flex flex-col lg:flex-row h-screen bg-[#050505] text-gray-200 overflow-hidden font-sans relative">
         
-        {/* Main Narrative Log - Now Full Width */}
-        <div className="flex-1 flex flex-col relative z-10 h-full pb-12">
+        {/* LEFT COLUMN: Narrative Log */}
+        <div className="flex-1 flex flex-col relative z-10 h-full overflow-hidden">
             <StoryLog 
                 history={history} 
                 isLoading={isLoading} 
@@ -254,20 +254,22 @@ export default function App() {
                 logicStream={logicStream}
                 narrativeStream={narrativeStream}
                 streamPhase={streamPhase}
+                className="pb-24" // Bottom padding for StatusPanel which is fixed
             />
-            
-            <div className="p-6 bg-gradient-to-t from-black via-black/90 to-transparent z-20 pb-20">
-                <InputArea 
-                    onSend={(text, files) => handleSendMessage(text, files)} 
-                    isLoading={isLoading} 
-                    onAdvance={() => handleSendMessage("Wait. Observe.")}
-                    onSnapshot={() => handleSendMessage("GENERATE VISUAL ARTIFACT.")}
-                    onVideoCutscene={() => handleSendMessage("GENERATE CINEMATIC SEQUENCE.")}
-                    showLogic={showLogic}
-                    onToggleLogic={() => setShowLogic(!showLogic)}
-                    options={gameState.suggested_actions}
-                />
-            </div>
+        </div>
+
+        {/* RIGHT COLUMN: Input Sidebar */}
+        <div className="w-full lg:w-[450px] xl:w-[500px] border-t lg:border-t-0 lg:border-l border-gray-800 bg-[#080808]/95 z-20 flex flex-col p-6 shadow-2xl relative pb-24 lg:pb-24">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-gray-700 to-transparent opacity-20"></div>
+            <InputArea 
+                onSend={(text, files) => handleSendMessage(text, files)} 
+                isLoading={isLoading} 
+                onAdvance={() => handleSendMessage("Wait. Observe.")}
+                showLogic={showLogic}
+                onToggleLogic={() => setShowLogic(!showLogic)}
+                options={gameState.suggested_actions}
+                isSidebar={true}
+            />
         </div>
 
         {/* Bottom Status Panel (Fixed Overlay) */}
@@ -286,7 +288,6 @@ export default function App() {
             onClose={() => setShowSimModal(false)}
             onRunSimulation={(config) => {
                 setShowSimModal(false);
-                // If cycles provided, start auto-pilot
                 if (config.cycles > 0) {
                     setAutoMode({ active: true, remainingCycles: config.cycles });
                 }
