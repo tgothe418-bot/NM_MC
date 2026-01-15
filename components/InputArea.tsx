@@ -130,21 +130,23 @@ export const InputArea: React.FC<InputAreaProps> = ({
       
       {/* Options/Suggestions Area - Pushed to bottom above input if Sidebar, or scrollable */}
       {options && options.length > 0 && !isLoading && (
-        <div className={`flex gap-3 mb-2 animate-fadeIn pb-2 ${isSidebar ? 'flex-col overflow-y-auto flex-1 justify-end min-h-0' : 'flex-wrap justify-end'}`}>
-          {isSidebar && <div className="text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1 border-b border-gray-800 pb-1 mt-auto">Available Vectors</div>}
+        <div className={`flex gap-3 mb-2 animate-fadeIn pb-2 ${isSidebar ? 'flex-col overflow-y-auto flex-1 min-h-0 custom-scrollbar pr-2' : 'flex-wrap justify-end'}`}>
+          {isSidebar && <div className="mt-auto" />}
+          {isSidebar && <div className="text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-3 border-b border-gray-800 pb-2 shrink-0">Available Vectors</div>}
+          
           {options.map((option, idx) => {
             const { icon: Icon, style } = getActionStyle(option);
             return (
               <button
                 key={idx}
                 onClick={() => handleOptionClick(option)}
-                className={`px-4 py-3 border rounded-sm text-sm font-mono tracking-wide transition-all duration-300 flex items-center gap-3 group backdrop-blur-md shadow-lg ${style} ${isSidebar ? 'w-full justify-between text-left' : ''}`}
+                className={`px-4 py-3 border rounded-sm text-sm font-mono tracking-wide transition-all duration-300 flex items-center gap-3 group backdrop-blur-md shadow-lg ${style} ${isSidebar ? 'w-full justify-between text-left shrink-0 whitespace-normal h-auto' : ''}`}
               >
-                <div className="flex items-center gap-3 min-w-0">
-                    <Icon className="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity group-hover:scale-110 duration-200 flex-shrink-0" />
-                    <span className="font-semibold truncate">{option}</span>
+                <div className="flex items-start gap-3 min-w-0 flex-1">
+                    <Icon className="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity group-hover:scale-110 duration-200 flex-shrink-0 mt-0.5" />
+                    <span className={`font-semibold leading-relaxed ${isSidebar ? 'break-words' : 'truncate'}`}>{option}</span>
                 </div>
-                {isSidebar && <ChevronRight className="w-3 h-3 opacity-30 group-hover:opacity-100 flex-shrink-0" />}
+                {isSidebar && <ChevronRight className="w-3 h-3 opacity-30 group-hover:opacity-100 flex-shrink-0 self-center" />}
               </button>
             );
           })}
@@ -152,7 +154,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
       )}
 
       {/* Input Form */}
-      <form onSubmit={handleSubmit} className={`relative group ${isSidebar ? 'mt-auto' : ''}`}>
+      <form onSubmit={handleSubmit} className={`relative group ${isSidebar ? (!options || options.length === 0 ? 'mt-auto' : '') : ''}`}>
         <div className={`absolute -inset-1 bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 rounded-lg blur-md opacity-30 group-hover:opacity-70 transition duration-1000 ${isLoading ? 'animate-pulse' : ''}`}></div>
         <div className={`relative flex flex-col bg-black/90 border-2 rounded-lg p-3 shadow-3xl transition-all duration-700 backdrop-blur-xl border-gray-800 group-hover:border-gray-700`}>
           

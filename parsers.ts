@@ -21,6 +21,16 @@ export class ParseError extends Error {
 }
 
 /**
+ * Attempts to repair common JSON errors like trailing commas.
+ */
+function repairJson(jsonStr: string): string {
+  // 1. Remove trailing commas from objects and arrays
+  // Matches a comma followed by whitespace and then a closing brace/bracket
+  let fixed = jsonStr.replace(/,(\s*[}\]])/g, '$1');
+  return fixed;
+}
+
+/**
  * Robustly finds the end index of a JSON object/array by balancing braces/brackets.
  * Handles nested structures and ignores characters inside strings.
  */
@@ -95,41 +105,40 @@ function parseWithSchema<T>(text: string, schema: ZodSchema<T>, label: string): 
     if (start !== -1) {
         // Attempt smart extraction using brace balancing
         const end = findMatchingClose(jsonString, start);
+        let candidate = "";
         
         if (end !== -1) {
-            const candidate = jsonString.substring(start, end + 1);
-            try {
-                parsed = JSON.parse(candidate);
-            } catch (innerE) {
-                 // If smart extraction fails, try one last desperate attempt: 
-                 // LastIndexOf (Naive) - strictly for cases where balancing failed due to weird formatting
-                 try {
-                    const lastClose = jsonString[start] === '{' ? jsonString.lastIndexOf('}') : jsonString.lastIndexOf(']');
-                    if (lastClose > start && lastClose !== end) {
-                        const candidate2 = jsonString.substring(start, lastClose + 1);
-                        parsed = JSON.parse(candidate2);
-                    } else {
-                        throw innerE;
-                    }
-                 } catch (finalE) {
-                    throw new ParseError(`${label}: Invalid JSON (Retried) - ${(innerE as Error).message}`, text);
-                 }
-            }
+            candidate = jsonString.substring(start, end + 1);
         } else {
              // Balancing failed (incomplete JSON?), fall back to naive lastIndexOf
              const lastClose = jsonString[start] === '{' ? jsonString.lastIndexOf('}') : jsonString.lastIndexOf(']');
              if (lastClose > start) {
-                 const candidate = jsonString.substring(start, lastClose + 1);
-                 try {
-                    parsed = JSON.parse(candidate);
-                 } catch (innerE) {
-                    throw new ParseError(`${label}: Invalid JSON (Fallback) - ${(innerE as Error).message}`, text);
-                 }
+                 candidate = jsonString.substring(start, lastClose + 1);
              } else {
                  throw new ParseError(`${label}: Invalid JSON - Could not find closing brace`, text);
              }
         }
+
+        try {
+            parsed = JSON.parse(candidate);
+        } catch (innerE) {
+            // RETRY WITH REPAIR
+            try {
+                const repaired = repairJson(candidate);
+                parsed = JSON.parse(repaired);
+            } catch (finalE) {
+                // Last ditch: try to fix unquoted keys (dangerous but necessary for fallback)
+                // This regex puts quotes around keys that look like words followed by a colon
+                try {
+                    const quotedKeys = candidate.replace(/([{,]\s*)([a-zA-Z0-9_]+?)\s*:/g, '$1"$2":');
+                    parsed = JSON.parse(quotedKeys);
+                } catch (absoluteFinalE) {
+                    throw new ParseError(`${label}: Invalid JSON (Retried) - ${(innerE as Error).message}`, text);
+                }
+            }
+        }
     } else {
+        // Check if it's already a valid object somehow (unlikely if we are here)
         throw new ParseError(`${label}: Invalid JSON - ${(e as Error).message}`, text);
     }
   }

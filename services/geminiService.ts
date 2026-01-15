@@ -69,9 +69,37 @@ export const processGameTurn = async (
   });
 
   const simText = simResponse.text || "{}";
-  if (onStreamLogic) onStreamLogic(simText + "\n\n", 'logic');
   
-  const partialState = parseSimulatorResponse(simText) as any;
+  let partialState: any = {};
+  try {
+      partialState = parseSimulatorResponse(simText);
+  } catch (e) {
+      console.error("Simulator Parse Error", e);
+      if (onStreamLogic) onStreamLogic(`\n[ERROR]: JSON PARSE FAILURE\n${e}\n`, 'logic');
+      // Graceful fallback for malformed JSON
+      partialState = {}; 
+  }
+
+  // Extract and Log NLP Analysis (Chain of Thought)
+  if (partialState._analysis) {
+      const { intent, complexity, parsed_steps, success_probability } = partialState._analysis;
+      let log = `\n[INTENT RECOGNITION]\n`;
+      log += `> INTENT: ${intent}\n`;
+      log += `> COMPLEXITY: ${complexity}\n`;
+      if (parsed_steps && parsed_steps.length > 0) {
+          log += `> STEPS:\n  - ${parsed_steps.join('\n  - ')}\n`;
+      }
+      log += `> PROBABILITY: ${success_probability}\n`;
+      
+      if (onStreamLogic) onStreamLogic(log + "\n", 'logic');
+      
+      // Remove _analysis so it doesn't pollute GameState if we were doing a full merge,
+      // though explicitly picking fields below handles this too.
+      delete partialState._analysis;
+  } else {
+      // Fallback log if model ignored instruction
+      if (onStreamLogic) onStreamLogic(`\n[STATE UPDATE]\n${JSON.stringify(partialState, null, 2)}\n`, 'logic');
+  }
   
   const updatedState: GameState = {
       ...currentState,

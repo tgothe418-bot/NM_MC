@@ -112,7 +112,7 @@ export default function App() {
     setIsInitialized(true);
     
     // Initial Narration Trigger - MUST PASS newState to avoid stale closure state
-    handleSendMessage("BEGIN SIMULATION. ESTABLISH CONTEXT. GENERATE VISUALS.", [], newState);
+    handleSendMessage("BEGIN SIMULATION. ESTABLISH CONTEXT. ESTABLISH CHARACTERS AND MOTIVES using the provided configuration. GENERATE VISUALS.", [], newState);
   };
 
   const handleResetGame = () => {
