@@ -268,6 +268,13 @@ export const SimulationSetup: React.FC<Props> = ({ onRun, onBack }) => {
                         />
                         <span className="font-mono font-bold text-amber-500 text-lg w-8">{cycles}</span>
                     </div>
+                    {/* ADDED DESCRIPTION */}
+                    <p className="text-[10px] text-gray-500 font-mono leading-relaxed border-l-2 border-amber-500/20 pl-4 py-2 opacity-80">
+                        The "Cycles" count determines the duration of autonomous decision-making. 
+                        The Machine will simulate a User persona to stress-test the narrative logic, 
+                        making its own choices, asking questions, or breaking character until the cycle count depletes 
+                        or the system hallucinations reach critical failure.
+                    </p>
                 </div>
 
                 <div className="space-y-4">

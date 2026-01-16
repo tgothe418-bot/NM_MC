@@ -19,7 +19,10 @@ import {
   ParsedCharacterSchema,
   SourceAnalysisResultSchema,
   ScenarioConceptsSchema,
-  CharacterProfileSchema
+  CharacterProfileSchema,
+  TileTypeSchema,
+  GridCellSchema,
+  GridLayoutSchema
 } from './schemas';
 
 // Re-export Schema-Derived Types
@@ -42,6 +45,11 @@ export type ParsedCharacter = z.infer<typeof ParsedCharacterSchema>;
 export type SourceAnalysisResult = z.infer<typeof SourceAnalysisResultSchema>;
 export type ScenarioConcepts = z.infer<typeof ScenarioConceptsSchema>;
 export type CharacterProfile = z.infer<typeof CharacterProfileSchema>;
+
+// Spatial Types
+export type TileType = z.infer<typeof TileTypeSchema>;
+export type GridCell = z.infer<typeof GridCellSchema>;
+export type GridLayout = z.infer<typeof GridLayoutSchema>;
 
 // Types NOT covered by Schema (Configuration, UI, etc.)
 

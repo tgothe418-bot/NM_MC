@@ -1,5 +1,5 @@
 
-import { LocationState, RoomNode, GameState } from '../types';
+import { LocationState, RoomNode, GameState, GridLayout } from '../types';
 import { LORE_LIBRARY } from '../loreLibrary';
 
 const CLUSTER_ARCHITECTURE: Record<string, string[]> = {
@@ -68,6 +68,42 @@ const CLUSTER_ARCHITECTURE: Record<string, string[]> = {
   ]
 };
 
+const renderAsciiMap = (layout: GridLayout): string => {
+    if (!layout || !layout.cells) return "[Map Corrupted]";
+    
+    let map = "";
+    // Header (X coords)
+    map += "   ";
+    for(let x=0; x<layout.width; x++) map += `${x} `;
+    map += "\n";
+
+    for (let y = 0; y < layout.height; y++) {
+        map += `${y}  `; // Y coord
+        for (let x = 0; x < layout.width; x++) {
+            // Safety check for row existence
+            if (!layout.cells[y]) continue;
+            
+            const cell = layout.cells[y][x];
+            let symbol = ". ";
+            
+            if (cell.occupant_id === 'Player') symbol = "P ";
+            else if (cell.occupant_id) symbol = "E "; // Entity
+            else {
+                switch(cell.type) {
+                    case 'Wall': symbol = "# "; break;
+                    case 'Void': symbol = "  "; break;
+                    case 'Hazard': symbol = "! "; break;
+                    case 'Cover': symbol = "∆ "; break; // Delta for cover
+                    default: symbol = ". "; // Floor
+                }
+            }
+            map += symbol;
+        }
+        map += "\n";
+    }
+    return map;
+};
+
 export const getDefaultRoom = (id: string = "start_node", name: string = "Initial Void"): RoomNode => ({
   id,
   name,
@@ -97,7 +133,16 @@ export const constructLocationManifesto = (loc: LocationState): string => {
   const current = loc.room_map[loc.current_room_id] as RoomNode | undefined;
   if (!current) return "";
 
-  let m = `\n\n*** L. LOCATION MANIFESTO ***\nCURRENT: "${current.name}"\nCACHE: ${current.description_cache}\nEXITS:\n`;
+  let m = `\n\n*** L. LOCATION MANIFESTO ***\nCURRENT: "${current.name}"\nCACHE: ${current.description_cache}\n`;
+  
+  if (current.grid_layout) {
+      m += `\n[SPATIAL AWARENESS - CURRENT GRID]\n`;
+      m += `Legend: P=Player, E=Entity, #=Wall, .=Floor, !=Hazard, ∆=Cover\n`;
+      m += renderAsciiMap(current.grid_layout);
+      m += `\n`;
+  }
+
+  m += `EXITS:\n`;
   if (current.exits && Array.isArray(current.exits)) {
     current.exits.forEach(e => {
         let targetName = "UNEXPLORED";
@@ -108,7 +153,7 @@ export const constructLocationManifesto = (loc: LocationState): string => {
         m += ` - ${e.direction}: ${targetName}\n`;
     });
   }
-  m += `[SYSTEM]: If entering UNEXPLORED, Simulator MUST generate a NEW node.\n`;
+  m += `[SYSTEM]: If entering UNEXPLORED, Simulator MUST generate a NEW node with a NEW 'grid_layout'.\n`;
   
   if (loc.architectural_notes && loc.architectural_notes.length > 0) {
       m += `ARCHITECTURAL CONTEXT (Active Details): ${loc.architectural_notes.join(" | ")}\n`;
@@ -145,7 +190,13 @@ export const constructRoomGenerationRules = (gameState: GameState): string => {
     ARCHITECTURAL THEMES (Source Material):
       - ${archThemes.join("\n      - ")}
     INTENSITY LEVEL: ${intensity}
-    DIRECTIVE: If generating a NEW RoomNode, populate 'description_cache' with specific, high-fidelity details matching this aesthetic. The description should be 2-3 sentences long and evocative.
-    UPDATE: Populate 'location_state.architectural_notes' with 3-5 distinct, evocative phrases describing the structural environment. These should be derived from the ARCHITECTURAL THEMES but adapted to the current room context.
+    
+    [MANDATORY OUTPUTS]
+    1. 'description_cache': 2-3 evocative sentences matching the Aesthetic.
+    2. 'grid_layout': A JSON object defining the room's shape.
+       - If ${clusterKey} == 'System' or 'Flesh': Use tight, claustrophobic corridors (3x6 or 4x4).
+       - If ${clusterKey} == 'Survival' or 'Haunting': Use wider spaces with 'Void' edges (6x6 or 7x5).
+       - Populate 'cells' with Hazards relevant to the theme (e.g. Bio-waste for Flesh, Live Wires for System).
+    3. 'architectural_notes': 3-5 distinct features derived from themes.
   `;
 };

@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
 import { GameState, NpcState } from '../types';
-import { Skull, Radio, Users, Eye, Brain, ChevronUp, ChevronDown, Activity, ZapOff, Stethoscope, Cpu, FileText, Square, Target, BookOpen, Power, GripHorizontal } from 'lucide-react';
+import { Skull, Radio, Users, Eye, Brain, ChevronUp, ChevronDown, Activity, ZapOff, Stethoscope, Cpu, FileText, Square, Target, BookOpen, Power, GripHorizontal, Map } from 'lucide-react';
 import { CharacterPortrait } from './CharacterPortrait';
+import { RoomGrid } from './RoomGrid';
 
 interface StatusPanelProps {
   gameState: GameState;
@@ -21,10 +22,14 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
     onUpdateNpc,
     onReset
 }) => {
-  const { meta, villain_state, npc_states } = gameState;
+  const { meta, villain_state, npc_states, location_state } = gameState;
   const threatLevel = villain_state?.threat_scale || 0;
   const [isExpanded, setIsExpanded] = useState(false);
   const [expandedNpcs, setExpandedNpcs] = useState<Record<string, boolean>>({});
+
+  // Current Room Layout extraction
+  const currentRoom = location_state?.room_map?.[location_state.current_room_id];
+  const currentLayout = currentRoom?.grid_layout;
 
   const toggleNpc = (name: string) => {
     setExpandedNpcs(prev => ({ ...prev, [name]: !prev[name] }));
@@ -146,6 +151,19 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
                             <div className="text-[9px] text-gray-600 uppercase tracking-widest mb-1">Intensity</div>
                             <div className="text-gray-300 font-mono font-bold text-xs">{meta.intensity_level}</div>
                         </div>
+                    </div>
+                </div>
+
+                {/* Spatial Map (New) */}
+                <div className="bg-[#0c0c0c] border border-gray-800 rounded-sm overflow-hidden">
+                    <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-black/20">
+                        <div className="flex items-center gap-3 text-gray-400 font-bold text-xs uppercase tracking-[0.2em]">
+                            <Map className="w-4 h-4" /> Local Topography
+                        </div>
+                        <div className="text-[9px] text-gray-600 font-mono">{currentRoom?.name || "Unknown"}</div>
+                    </div>
+                    <div className="p-4">
+                        <RoomGrid layout={currentLayout} />
                     </div>
                 </div>
 

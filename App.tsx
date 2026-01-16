@@ -111,6 +111,11 @@ export default function App() {
     setShowSetup(false);
     setIsInitialized(true);
     
+    // Activate Auto-Pilot if cycles were requested in setup
+    if (config.cycles > 0) {
+        setAutoMode({ active: true, remainingCycles: config.cycles });
+    }
+    
     // Initial Narration Trigger - MUST PASS newState to avoid stale closure state
     handleSendMessage("BEGIN SIMULATION. ESTABLISH CONTEXT. ESTABLISH CHARACTERS AND MOTIVES using the provided configuration. GENERATE VISUALS.", [], newState);
   };
@@ -181,6 +186,8 @@ export default function App() {
             text: "CRITICAL FAILURE: The simulation has desynchronized. Please reset parameters.", 
             timestamp: Date.now() 
         }]);
+        // Halt auto-pilot on error
+        setAutoMode({ active: false, remainingCycles: 0 });
     } finally {
         setIsLoading(false);
     }
@@ -202,12 +209,17 @@ export default function App() {
     let timeoutId: ReturnType<typeof setTimeout>;
 
     const runAutoTurn = async () => {
+      // Check if we can run: Active, Cycles remaining, Not currently loading, and Game is initialized
       if (autoMode.active && autoMode.remainingCycles > 0 && !isLoading && isInitialized) {
-        // Delay slightly for realism/pacing
+        // Delay slightly for realism/pacing (3 seconds)
         timeoutId = setTimeout(async () => {
           try {
             // Generate action based on current state
             const action = await generateAutoPlayerAction(gameState);
+            
+            // Check if user cancelled during the timeout
+            if (!autoMode.active) return;
+
             if (action) {
               // Feed action into the main loop
               await handleSendMessage(action);
@@ -218,8 +230,9 @@ export default function App() {
             console.error("Auto-Pilot Failed:", e);
             setAutoMode({ active: false, remainingCycles: 0 }); // Abort on error
           }
-        }, 3000); // 3-second delay between turns
+        }, 3000); 
       } else if (autoMode.active && autoMode.remainingCycles <= 0) {
+        // Auto-disable when cycles run out
         setAutoMode({ active: false, remainingCycles: 0 });
       }
     };
@@ -288,8 +301,42 @@ export default function App() {
             onClose={() => setShowSimModal(false)}
             onRunSimulation={(config) => {
                 setShowSimModal(false);
+                // Trigger auto-pilot from the modal manually
                 if (config.cycles > 0) {
                     setAutoMode({ active: true, remainingCycles: config.cycles });
+                    // If not initialized (unlikely here but safe), the effect won't run yet
+                    // If running mid-game, loop kicks in immediately
+                    if (!isInitialized) {
+                       // Should probably re-init game if running from modal? 
+                       // Currently SimulationModal is mostly for re-configuring or running tests mid-game.
+                       // But if it's used to START a game, it might need to call handleSetupComplete logic.
+                       // Assuming for now this modal is accessed via StatusPanel (mid-game).
+                       // So we just want to start the loop.
+                       
+                       // NOTE: If we want to fully RESET and run a new simulation from here, 
+                       // we might need more logic. But usually 'Run Diagnostics' implies continuing or testing current state.
+                       // Ideally, if the user wants to RESET, they use the reset button.
+                       // Here we assume 'Execute Protocol' means 'Take over control for X cycles'.
+                       // If we want to inject new params, we'd need to update gameState.
+                       
+                       // Updating GameState with new config params if they changed:
+                       setGameState(prev => ({
+                           ...prev,
+                           meta: {
+                               ...prev.meta,
+                               mode: config.mode as any,
+                               intensity_level: config.intensity,
+                               active_cluster: config.cluster,
+                           },
+                           villain_state: {
+                               ...prev.villain_state,
+                               name: config.villain_name || prev.villain_state.name,
+                               archetype: config.villain_appearance || prev.villain_state.archetype,
+                               primary_goal: config.primary_goal || prev.villain_state.primary_goal,
+                               victim_profile: config.victim_description || prev.villain_state.victim_profile
+                           }
+                       }));
+                    }
                 }
             }}
             isTesting={autoMode.active}

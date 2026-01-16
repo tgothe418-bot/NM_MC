@@ -1,9 +1,27 @@
+
 import { z } from 'zod';
 
 // Basic Types
 export const RoomExitSchema = z.object({
   direction: z.string(),
   target_node_id: z.string().nullable(),
+});
+
+// Spatial / Grid Schemas
+export const TileTypeSchema = z.enum(['Floor', 'Wall', 'Void', 'Hazard', 'Cover']);
+
+export const GridCellSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  type: TileTypeSchema,
+  description: z.string().optional(),
+  occupant_id: z.string().optional(),
+});
+
+export const GridLayoutSchema = z.object({
+  width: z.number(),
+  height: z.number(),
+  cells: z.array(z.array(GridCellSchema)),
 });
 
 export const RoomNodeSchema = z.object({
@@ -14,6 +32,7 @@ export const RoomNodeSchema = z.object({
   exits: z.array(RoomExitSchema),
   hazards: z.array(z.string()),
   items: z.array(z.string()),
+  grid_layout: GridLayoutSchema.optional(),
 });
 
 export const LocationStateSchema = z.object({
