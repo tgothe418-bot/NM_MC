@@ -1,0 +1,229 @@
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { GameState, ChatMessage, SimulationConfig, NpcState } from '../types';
+import { getDefaultLocationState } from '../services/locationEngine';
+import { generateProceduralNpc } from '../services/npcGenerator';
+import { processGameTurn, generateAutoPlayerAction, initializeGemini } from '../services/geminiService';
+
+export const useGameEngine = (initialApiKey: string) => {
+    // --- STATE ---
+    const [apiKey, setApiKey] = useState(initialApiKey);
+    const [isInitialized, setIsInitialized] = useState(false);
+    
+    // Core Game Data
+    const [gameState, setGameState] = useState<GameState>({
+        meta: { turn: 50, perspective: 'First Person', mode: 'Survivor', intensity_level: 'Level 3', active_cluster: 'None' },
+        villain_state: { name: 'Unknown', archetype: 'Unknown', threat_scale: 0, primary_goal: 'Unknown', current_tactic: 'None' },
+        npc_states: [],
+        location_state: getDefaultLocationState(),
+        narrative: { visual_motif: '', illustration_request: null },
+        suggested_actions: []
+    });
+    const [history, setHistory] = useState<ChatMessage[]>([]);
+
+    // UI/Process State
+    const [isLoading, setIsLoading] = useState(false);
+    const [autoMode, setAutoMode] = useState({ active: false, remainingCycles: 0 });
+    
+    // Streaming State
+    const [logicStream, setLogicStream] = useState("");
+    const [narrativeStream, setNarrativeStream] = useState("");
+    const [streamPhase, setStreamPhase] = useState<'logic' | 'narrative'>('logic');
+
+    // Refs for safety (avoid stale closures in timeouts)
+    const processingRef = useRef(false);
+    const autoModeRef = useRef(autoMode);
+
+    // Sync Ref
+    useEffect(() => {
+        autoModeRef.current = autoMode;
+    }, [autoMode]);
+
+    // Initialize Service when Key Changes
+    useEffect(() => {
+        if (apiKey) {
+            initializeGemini(apiKey);
+        }
+    }, [apiKey]);
+
+    // --- ACTIONS ---
+
+    const initializeGame = useCallback((config: SimulationConfig) => {
+        // 1. DETERMINISTIC GENERATION
+        let initialNpcs: NpcState[] = [];
+        
+        if (config.pre_generated_npcs && config.pre_generated_npcs.length > 0) {
+            initialNpcs = config.pre_generated_npcs;
+        } else {
+            const victimCount = config.victim_count || 3;
+            const usedNames = new Set<string>();
+            initialNpcs = Array.from({ length: victimCount }).map(() => 
+                generateProceduralNpc(config.cluster, config.intensity, usedNames)
+            );
+        }
+
+        const isVillainMode = config.mode === 'Villain';
+        const playerProfile = isVillainMode 
+            ? {
+                name: config.villain_name || "The Entity",
+                background: `ROLE: Antagonist. ARCHETYPE: ${config.villain_appearance}. GOAL: ${config.primary_goal}.`,
+                traits: config.villain_methods || "Cruelty"
+            }
+            : {
+                name: config.survivor_name || "The Survivor",
+                background: config.survivor_background || "A survivor caught in a nightmare.",
+                traits: config.survivor_traits || "Will to live"
+            };
+
+        const newState: GameState = {
+            meta: {
+                turn: config.starting_point === 'Prologue' ? 50 : config.starting_point === 'In Media Res' ? 25 : 10,
+                perspective: config.perspective,
+                mode: config.mode as 'Survivor' | 'Villain',
+                intensity_level: config.intensity,
+                active_cluster: config.cluster,
+                player_profile: playerProfile
+            },
+            villain_state: {
+                name: config.villain_name || "The Entity",
+                archetype: config.villain_appearance || "Unknown Horror",
+                threat_scale: 1,
+                primary_goal: config.primary_goal || "Consumption",
+                current_tactic: "Stalking",
+                victim_profile: config.victim_description || "Unknown Victims"
+            },
+            npc_states: initialNpcs,
+            location_state: {
+                ...getDefaultLocationState(),
+                architectural_notes: config.location_description ? [config.location_description] : []
+            },
+            narrative: {
+                visual_motif: config.visual_motif || "Standard Cinematic",
+                illustration_request: "Establishing Shot" 
+            },
+            suggested_actions: []
+        };
+        
+        setGameState(newState);
+        setHistory([]); 
+        setIsInitialized(true);
+        
+        if (config.cycles > 0) {
+            setAutoMode({ active: true, remainingCycles: config.cycles });
+        }
+        
+        // Initial Trigger
+        handleSendMessage("BEGIN SIMULATION. ESTABLISH CONTEXT.", [], newState);
+    }, []);
+
+    const handleSendMessage = useCallback(async (text: string, files: File[] = [], overrideState?: GameState) => {
+        if (processingRef.current) return;
+        
+        processingRef.current = true;
+        setIsLoading(true);
+        setLogicStream("");
+        setNarrativeStream("");
+        setStreamPhase('logic');
+
+        if (!text.includes("BEGIN SIMULATION")) {
+            setHistory(prev => [...prev, { role: 'user', text, timestamp: Date.now() }]);
+        }
+
+        const currentState = overrideState || gameState;
+
+        try {
+            const result = await processGameTurn(currentState, text, files, (chunk, phase) => {
+                setStreamPhase(phase);
+                if (phase === 'logic') setLogicStream(prev => prev + chunk);
+                else setNarrativeStream(prev => prev + chunk);
+            });
+            
+            setGameState(result.gameState);
+            setHistory(prev => [...prev, { 
+                role: 'model', 
+                text: result.storyText, 
+                gameState: result.gameState, 
+                imageUrl: result.imageUrl,
+                timestamp: Date.now() 
+            }]);
+
+        } catch (e) {
+            console.error("Game Loop Error:", e);
+            setHistory(prev => [...prev, { 
+                role: 'model', 
+                text: "CRITICAL FAILURE: Simulation Desync.", 
+                timestamp: Date.now() 
+            }]);
+            setAutoMode({ active: false, remainingCycles: 0 });
+        } finally {
+            setIsLoading(false);
+            processingRef.current = false;
+        }
+    }, [gameState]); // Dependency on gameState is tricky, usually better to use functional updates or refs for current state
+
+    const resetGame = useCallback(() => {
+        setAutoMode({ active: false, remainingCycles: 0 });
+        setHistory([]);
+        setGameState({
+            meta: { turn: 50, perspective: 'First Person', mode: 'Survivor', intensity_level: 'Level 3', active_cluster: 'None' },
+            villain_state: { name: 'Unknown', archetype: 'Unknown', threat_scale: 0, primary_goal: 'Unknown', current_tactic: 'None' },
+            npc_states: [],
+            location_state: getDefaultLocationState(),
+            narrative: { visual_motif: '', illustration_request: null },
+            suggested_actions: []
+        });
+        setIsInitialized(false);
+    }, []);
+
+    // --- AUTO-PILOT EFFECT ---
+    useEffect(() => {
+        let timeoutId: ReturnType<typeof setTimeout>;
+
+        const runAutoTurn = async () => {
+            const currentAuto = autoModeRef.current;
+            
+            if (currentAuto.active && currentAuto.remainingCycles > 0 && !isLoading && !processingRef.current && isInitialized) {
+                
+                timeoutId = setTimeout(async () => {
+                    // Double check before firing
+                    if (!autoModeRef.current.active) return;
+                    
+                    try {
+                        const action = await generateAutoPlayerAction(gameState);
+                        if (action && autoModeRef.current.active) {
+                            await handleSendMessage(action);
+                            setAutoMode(prev => ({ ...prev, remainingCycles: prev.remainingCycles - 1 }));
+                        }
+                    } catch (e) {
+                        console.error("Auto-Pilot Failed", e);
+                        setAutoMode({ active: false, remainingCycles: 0 });
+                    }
+                }, 3000);
+            } else if (currentAuto.active && currentAuto.remainingCycles <= 0) {
+                setAutoMode({ active: false, remainingCycles: 0 });
+            }
+        };
+
+        runAutoTurn();
+        return () => clearTimeout(timeoutId);
+    }, [autoMode, isLoading, isInitialized, gameState, handleSendMessage]);
+
+    return {
+        // Data
+        apiKey,
+        gameState,
+        history,
+        isInitialized,
+        isLoading,
+        autoMode,
+        streams: { logicStream, narrativeStream, streamPhase },
+        
+        // Actions
+        setApiKey,
+        setGameState, // Exposed if components need to patch state (e.g. NPC editor)
+        initializeGame,
+        sendMessage: handleSendMessage,
+        resetGame,
+        setAutoMode,
+        toggleLogic: () => {} // Logic toggle is UI state, handled in App
+    };
+};

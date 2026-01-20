@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { 
   GameState, 
@@ -22,8 +21,24 @@ import { constructSensoryManifesto } from './sensoryEngine';
 import { constructLocationManifesto, constructRoomGenerationRules } from './locationEngine';
 import { PLAYER_SYSTEM_INSTRUCTION } from '../prompts/instructions';
 
-// --- INITIALIZATION ---
-const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
+// --- INITIALIZATION (Singleton Pattern) ---
+let aiInstance: GoogleGenAI | null = null;
+
+export const initializeGemini = (apiKey: string) => {
+    aiInstance = new GoogleGenAI({ apiKey });
+};
+
+const getAI = () => {
+    // Fallback for development/legacy env vars
+    if (!aiInstance && process.env.API_KEY) {
+        aiInstance = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    }
+    
+    if (!aiInstance) {
+        throw new Error("Gemini Client not initialized. Please set API Key.");
+    }
+    return aiInstance;
+};
 
 // --- GAME LOOP ---
 
