@@ -81,9 +81,19 @@ const renderAsciiMap = (layout: GridLayout): string => {
         map += `${y}  `; // Y coord
         for (let x = 0; x < layout.width; x++) {
             // Safety check for row existence
-            if (!layout.cells[y]) continue;
+            if (!layout.cells[y]) {
+                map += "? "; 
+                continue;
+            }
             
             const cell = layout.cells[y][x];
+            
+            // Safety check for cell existence (prevents crash on undefined access)
+            if (!cell) {
+                map += "X ";
+                continue;
+            }
+
             let symbol = ". ";
             
             if (cell.occupant_id === 'Player') symbol = "P ";

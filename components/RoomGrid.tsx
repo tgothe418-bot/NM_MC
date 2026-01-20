@@ -59,6 +59,10 @@ export const RoomGrid: React.FC<RoomGridProps> = ({ layout, className = "", show
 };
 
 const GridTile: React.FC<{ cell: GridCell }> = ({ cell }) => {
+  if (!cell) {
+      return <div className="bg-black/50 border border-red-900/10 aspect-square" />;
+  }
+
   let bgClass = "bg-gray-900/40"; 
   let content = null;
   let borderClass = "border-transparent";

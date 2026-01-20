@@ -64,17 +64,18 @@ export default function App() {
     const isVillainMode = config.mode === 'Villain';
 
     // Construct Player Profile: If Villain, the "Player" is the Entity.
+    // If Survivor, use provided info OR fall back to a generic survivor to ensure the Simulator has a persona to track.
     const playerProfile = isVillainMode 
         ? {
             name: config.villain_name || "The Entity",
             background: `ROLE: Antagonist/Monster. ARCHETYPE: ${config.villain_appearance || "Unknown Horror"}. GOAL: ${config.primary_goal || "Torment"}.`,
             traits: config.villain_methods || "Cruelty, Omniscience"
         }
-        : (config.survivor_name || config.survivor_background ? {
-            name: config.survivor_name || "Survivor",
-            background: config.survivor_background || "No history provided.",
-            traits: config.survivor_traits || "Unknown"
-        } : undefined);
+        : {
+            name: config.survivor_name || "The Survivor",
+            background: config.survivor_background || "A survivor caught in a nightmare. No other history provided.",
+            traits: config.survivor_traits || "Will to live"
+        };
 
     // Initialize Game State based on config
     const newState: GameState = {
@@ -301,25 +302,9 @@ export default function App() {
             onClose={() => setShowSimModal(false)}
             onRunSimulation={(config) => {
                 setShowSimModal(false);
-                // Trigger auto-pilot from the modal manually
                 if (config.cycles > 0) {
                     setAutoMode({ active: true, remainingCycles: config.cycles });
-                    // If not initialized (unlikely here but safe), the effect won't run yet
-                    // If running mid-game, loop kicks in immediately
                     if (!isInitialized) {
-                       // Should probably re-init game if running from modal? 
-                       // Currently SimulationModal is mostly for re-configuring or running tests mid-game.
-                       // But if it's used to START a game, it might need to call handleSetupComplete logic.
-                       // Assuming for now this modal is accessed via StatusPanel (mid-game).
-                       // So we just want to start the loop.
-                       
-                       // NOTE: If we want to fully RESET and run a new simulation from here, 
-                       // we might need more logic. But usually 'Run Diagnostics' implies continuing or testing current state.
-                       // Ideally, if the user wants to RESET, they use the reset button.
-                       // Here we assume 'Execute Protocol' means 'Take over control for X cycles'.
-                       // If we want to inject new params, we'd need to update gameState.
-                       
-                       // Updating GameState with new config params if they changed:
                        setGameState(prev => ({
                            ...prev,
                            meta: {

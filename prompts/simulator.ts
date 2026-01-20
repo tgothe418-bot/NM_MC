@@ -14,11 +14,11 @@ IF DETECTED:
 6. RETURN ONLY THE JSON.
 
 [INITIALIZATION PROTOCOL]
-If 'meta.turn' is high (40+) and 'npc_states' is empty:
-1. **Instantiate Player**: Create an NpcState for the player based on 'meta.player_profile' (ONLY if mode is Survivor).
-2. **Populate Specimen**: Create initial victim NPCs based on 'villain_state.victim_profile'. Give them names and archetypes.
-3. **Preserve Config**: Ensure 'narrative.visual_motif', 'meta.active_cluster', and 'villain_state' details are RETAINED exactly as provided. Do not hallucinate new defaults.
-4. **Visual Trigger**: Set 'narrative.illustration_request' = 'Establishing Shot'.
+Check 'npc_states'.
+1. **Instantiate Player**: If 'meta.mode' is 'Survivor' and NO NPC in 'npc_states' is identified as the Player/Survivor, CREATE ONE using 'meta.player_profile'.
+2. **Populate Specimen**: If 'npc_states' is empty, create victims based on 'villain_state.victim_profile'.
+3. **Preserve Config**: Ensure 'narrative.visual_motif', 'meta.active_cluster', and 'villain_state' details are RETAINED.
+4. **Visual Trigger**: If this is Turn 50 (or start), Set 'narrative.illustration_request' = 'Establishing Shot'.
 
 [PLAYER PROFILE INTEGRATION]
 Check 'meta.player_profile' in the Game State.
@@ -26,19 +26,13 @@ Check 'meta.player_profile' in the Game State.
 2. **Consistency**: Do not contradict the user's established identity.
 3. **Resonance**: If the user has specific phobias or flaws defined, trigger stress mechanics when relevant.
 
-[SPATIAL MAPPING PROTOCOL] (New Architecture)
+[SPATIAL MAPPING PROTOCOL] (Grid)
 When generating a NEW RoomNode or entering a room without a 'grid_layout':
-1. **Construct 'grid_layout'**: You must generate a small, high-fidelity grid for the room.
-   - **Dimensions**: Keep it intimate (Width/Height between 3 and 7).
-   - **Cells**: Generate a 2D array of objects: { x, y, type, description?, occupant_id? }.
-   - **Tile Types**:
-     - 'Floor': Walkable space.
-     - 'Wall': Impassable structure.
-     - 'Void': Pit or open air (impassable but visible).
-     - 'Hazard': Walkable but dangerous (e.g., "Glass", "Fire").
-     - 'Cover': Low obstacle (e.g., "Table", "Debris").
-2. **Occupancy**: Place the 'Player' in a logical entry tile (e.g., near a door). Place NPCs if present.
-3. **Consistency**: The 'description_cache' must align with this grid.
+1. **Construct 'grid_layout'**: Generate a simple JSON grid.
+   - **Dimensions**: Small (3x3 to 6x6).
+   - **Cells**: 2D array of objects: { x, y, type: 'Floor'|'Wall'|'Void'|'Hazard'|'Cover', description?, occupant_id? }.
+2. **Occupancy**: Place 'Player' in a valid Floor tile.
+3. **Consistency**: 'description_cache' must match this grid.
 
 [INTENT ANALYSIS PROTOCOL] (NLP & Action Decomposition)
 Before updating state, you MUST analyze the 'USER ACTION' for complexity and intent.

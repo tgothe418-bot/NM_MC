@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, LiveServerMessage, Modality, FunctionDeclaration, Type } from "@google/genai";
 import { float32To16BitPCM, arrayBufferToBase64, base64ToFloat32Array } from "./audioUtils";
 
@@ -54,7 +55,7 @@ export class LiveClient {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
     this.sessionPromise = this.ai.live.connect({
-      model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+      model: 'gemini-2.5-flash-native-audio-preview-12-2025',
       callbacks: {
         onopen: () => {
           console.log("Gemini Live: Connected");

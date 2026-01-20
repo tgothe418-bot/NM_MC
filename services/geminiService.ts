@@ -16,7 +16,6 @@ import {
   parseHydratedCharacter
 } from '../parsers';
 import { SIMULATOR_INSTRUCTION } from '../prompts/simulator';
-import { NARRATION_PROFILES } from './ttsService';
 import { NARRATOR_INSTRUCTION } from '../prompts/narrator';
 import { constructVoiceManifesto } from './dialogueEngine';
 import { constructSensoryManifesto } from './sensoryEngine';
@@ -54,51 +53,49 @@ export const processGameTurn = async (
   // 2. SIMULATOR PHASE (Logic)
   if (onStreamLogic) onStreamLogic("initializing logic engine...\n", 'logic');
 
-  const simResponse = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
-    contents: {
-        parts: [
-            { text: contextBlock },
-            { text: `USER ACTION: "${userAction}"` }
-        ]
-    },
-    config: {
-        systemInstruction: SIMULATOR_INSTRUCTION,
-        responseMimeType: 'application/json'
-    }
-  });
-
-  const simText = simResponse.text || "{}";
-  
   let partialState: any = {};
+  
   try {
-      partialState = parseSimulatorResponse(simText);
-  } catch (e) {
-      console.error("Simulator Parse Error", e);
-      if (onStreamLogic) onStreamLogic(`\n[ERROR]: JSON PARSE FAILURE\n${e}\n`, 'logic');
-      // Graceful fallback for malformed JSON
-      partialState = {}; 
-  }
+      const simResponse = await ai.models.generateContent({
+        model: 'gemini-3-pro-preview',
+        contents: {
+            parts: [
+                { text: contextBlock },
+                { text: `USER ACTION: "${userAction}"` }
+            ]
+        },
+        config: {
+            systemInstruction: SIMULATOR_INSTRUCTION,
+            responseMimeType: 'application/json'
+        }
+      });
 
-  // Extract and Log NLP Analysis (Chain of Thought)
-  if (partialState._analysis) {
-      const { intent, complexity, parsed_steps, success_probability } = partialState._analysis;
-      let log = `\n[INTENT RECOGNITION]\n`;
-      log += `> INTENT: ${intent}\n`;
-      log += `> COMPLEXITY: ${complexity}\n`;
-      if (parsed_steps && parsed_steps.length > 0) {
-          log += `> STEPS:\n  - ${parsed_steps.join('\n  - ')}\n`;
+      const simText = simResponse.text || "{}";
+      partialState = parseSimulatorResponse(simText);
+
+      // Extract and Log NLP Analysis (Chain of Thought)
+      if (partialState._analysis) {
+          const { intent, complexity, parsed_steps, success_probability } = partialState._analysis;
+          let log = `\n[INTENT RECOGNITION]\n`;
+          log += `> INTENT: ${intent}\n`;
+          log += `> COMPLEXITY: ${complexity}\n`;
+          if (parsed_steps && parsed_steps.length > 0) {
+              log += `> STEPS:\n  - ${parsed_steps.join('\n  - ')}\n`;
+          }
+          log += `> PROBABILITY: ${success_probability}\n`;
+          
+          if (onStreamLogic) onStreamLogic(log + "\n", 'logic');
+          
+          delete partialState._analysis;
+      } else {
+          if (onStreamLogic) onStreamLogic(`\n[STATE UPDATE]\n${JSON.stringify(partialState, null, 2)}\n`, 'logic');
       }
-      log += `> PROBABILITY: ${success_probability}\n`;
-      
-      if (onStreamLogic) onStreamLogic(log + "\n", 'logic');
-      
-      // Remove _analysis so it doesn't pollute GameState if we were doing a full merge,
-      // though explicitly picking fields below handles this too.
-      delete partialState._analysis;
-  } else {
-      // Fallback log if model ignored instruction
-      if (onStreamLogic) onStreamLogic(`\n[STATE UPDATE]\n${JSON.stringify(partialState, null, 2)}\n`, 'logic');
+
+  } catch (e) {
+      console.error("Simulator Error:", e);
+      if (onStreamLogic) onStreamLogic(`\n[CRITICAL ERROR]: Logic Engine Desync.\n${e}\nProceeding with previous state.\n`, 'logic');
+      // Do not crash. Proceed with empty partial state so Narrator can at least report something.
+      partialState = {};
   }
   
   const updatedState: GameState = {
@@ -112,76 +109,86 @@ export const processGameTurn = async (
   // 3. NARRATOR PHASE (Prose)
   if (onStreamLogic) onStreamLogic("rendering narrative...\n", 'narrative');
 
-  const narratorResponse = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: {
-          parts: [
-              { text: JSON.stringify(updatedState) },
-              { text: `USER ACTION: "${userAction}"` },
-              { text: `SIMULATOR OUTCOME: ${JSON.stringify(partialState)}` }
-          ]
-      },
-      config: {
-          systemInstruction: NARRATOR_INSTRUCTION,
-          responseMimeType: 'application/json'
-      }
-  });
-
-  const narrText = narratorResponse.text || "{}";
-  const narrResult = parseNarratorResponse(narrText) as { story_text: string, game_state?: GameState };
-  
-  // DETECT & STRIP VISUAL TAGS
-  let finalStoryText = narrResult.story_text;
-  let hasVisualTag = false;
-
-  if (finalStoryText.includes('[ESTABLISHING_SHOT]')) {
-      hasVisualTag = true;
-      finalStoryText = finalStoryText.replace(/\[ESTABLISHING_SHOT\]/g, '');
-  }
-  if (finalStoryText.includes('[SELF_PORTRAIT]')) {
-      hasVisualTag = true; // Use same flag for now, or distinguish if needed
-      finalStoryText = finalStoryText.replace(/\[SELF_PORTRAIT\]/g, '');
-  }
-
-  // 4. IMAGE GENERATION (If requested via State OR Tag)
+  let finalStoryText = "The simulation dissolves into static. (Narrative Engine Failure)";
   let imageUrl: string | undefined;
-  const requestFromState = updatedState.narrative.illustration_request || narrResult.game_state?.narrative.illustration_request;
-  
-  // Consolidate trigger
-  const triggerImage = requestFromState || hasVisualTag;
+  let narratorStateUpdates = {};
 
-  if (triggerImage) {
-      if (onStreamLogic) onStreamLogic("generating visual artifact...\n", 'narrative');
+  try {
+      const narratorResponse = await ai.models.generateContent({
+          model: 'gemini-3-pro-preview',
+          contents: {
+              parts: [
+                  { text: JSON.stringify(updatedState) },
+                  { text: `USER ACTION: "${userAction}"` },
+                  { text: `SIMULATOR OUTCOME: ${JSON.stringify(partialState)}` }
+              ]
+          },
+          config: {
+              systemInstruction: NARRATOR_INSTRUCTION,
+              responseMimeType: 'application/json'
+          }
+      });
+
+      const narrText = narratorResponse.text || "{}";
+      const narrResult = parseNarratorResponse(narrText) as { story_text: string, game_state?: GameState };
       
-      let prompt = typeof requestFromState === 'string' ? requestFromState : "Establishing Shot";
+      finalStoryText = narrResult.story_text;
+      narratorStateUpdates = narrResult.game_state || {};
       
-      // Override character requests to ensure atmospheric purity
-      if (prompt.toLowerCase().includes('portrait') || prompt.toLowerCase().includes('self')) {
-          prompt = "Atmospheric view of the current location. Empty and ominous.";
+      // DETECT & STRIP VISUAL TAGS
+      let hasVisualTag = false;
+      if (finalStoryText.includes('[ESTABLISHING_SHOT]')) {
+          hasVisualTag = true;
+          finalStoryText = finalStoryText.replace(/\[ESTABLISHING_SHOT\]/g, '');
       }
-      
-      imageUrl = await generateImage(
-          prompt, 
-          updatedState.narrative.visual_motif,
-          updatedState.location_state.room_map[updatedState.location_state.current_room_id]?.description_cache,
-          false // Force Environment Mode (No characters)
-      );
-      
-      // Clear request from state so it doesn't loop
-      updatedState.narrative.illustration_request = null;
-      if (narrResult.game_state?.narrative) {
-          narrResult.game_state.narrative.illustration_request = null;
+      if (finalStoryText.includes('[SELF_PORTRAIT]')) {
+          hasVisualTag = true; 
+          finalStoryText = finalStoryText.replace(/\[SELF_PORTRAIT\]/g, '');
       }
+
+      // 4. IMAGE GENERATION (If requested via State OR Tag)
+      const requestFromState = updatedState.narrative.illustration_request || narrResult.game_state?.narrative?.illustration_request;
+      const triggerImage = requestFromState || hasVisualTag;
+
+      if (triggerImage) {
+          if (onStreamLogic) onStreamLogic("generating visual artifact...\n", 'narrative');
+          
+          let prompt = typeof requestFromState === 'string' ? requestFromState : "Establishing Shot";
+          if (prompt.toLowerCase().includes('portrait') || prompt.toLowerCase().includes('self')) {
+              prompt = "Atmospheric view of the current location. Empty and ominous.";
+          }
+          
+          try {
+              imageUrl = await generateImage(
+                  prompt, 
+                  updatedState.narrative.visual_motif,
+                  updatedState.location_state.room_map[updatedState.location_state.current_room_id]?.description_cache,
+                  false 
+              );
+          } catch (imgErr) {
+              console.error("Image Gen Error", imgErr);
+          }
+          
+          // Clear request
+          updatedState.narrative.illustration_request = null;
+          if (narrResult.game_state?.narrative) {
+              narrResult.game_state.narrative.illustration_request = null;
+          }
+      }
+
+  } catch (e) {
+      console.error("Narrator Error:", e);
+      finalStoryText = `The Machine screeches. (Narrator Desync: ${e}). You are still alive, but the world is unrendered.`;
   }
 
   const finalState = {
       ...updatedState,
-      ...(narrResult.game_state || {})
+      ...narratorStateUpdates
   };
 
   return {
       gameState: finalState,
-      storyText: finalStoryText, // Return cleaned text
+      storyText: finalStoryText, 
       imageUrl
   };
 };
@@ -190,13 +197,17 @@ export const processGameTurn = async (
 
 export const generateAutoPlayerAction = async (state: GameState): Promise<string> => {
     const ai = getAI();
-    const prompt = `Current Situation: ${state.narrative.illustration_request || "Survival situation"}\nLast Narrative: (Implicit)\nGenerate a single sentence action for the player.`;
-    const res = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: { parts: [{ text: JSON.stringify(state) }, { text: prompt }] },
-        config: { systemInstruction: PLAYER_SYSTEM_INSTRUCTION }
-    });
-    return res.text || "Wait and watch.";
+    try {
+        const prompt = `Current Situation: ${state.narrative.illustration_request || "Survival situation"}\nLast Narrative: (Implicit)\nGenerate a single sentence action for the player.`;
+        const res = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: { parts: [{ text: JSON.stringify(state) }, { text: prompt }] },
+            config: { systemInstruction: PLAYER_SYSTEM_INSTRUCTION }
+        });
+        return res.text || "Wait and watch.";
+    } catch (e) {
+        return "Wait.";
+    }
 };
 
 export const generateImage = async (
@@ -206,7 +217,6 @@ export const generateImage = async (
     allowCharacters: boolean = true
 ): Promise<string | undefined> => {
     const ai = getAI();
-    // Optimize prompt for the model
     let fullPrompt = `Horror Art. Style: ${motif}. Scene: ${context}. Detail: ${prompt}. Photorealistic, cinematic lighting, 8k. No text.`;
     
     if (!allowCharacters) {
