@@ -9,20 +9,36 @@ import { GameState } from './types';
 import { z } from 'zod';
 
 // --- HELPER: CLEAN & PARSE ---
-// Strips Markdown code blocks (```json ... ```) which Gemini often includes
 const cleanAndParse = <T>(text: string, schema: z.ZodSchema<T>, fallback: T): T => {
     try {
         let cleanText = text.trim();
-        // Remove markdown code blocks if present
-        if (cleanText.startsWith('```')) {
-            cleanText = cleanText.replace(/^```(json)?/, '').replace(/```$/, '');
-        }
         
-        // Remove any leading/trailing non-JSON text if necessary (basic heuristic)
+        // 1. Remove markdown code blocks if present
+        if (cleanText.includes('```')) {
+            cleanText = cleanText.replace(/```(?:json)?/g, '').replace(/```/g, '');
+        }
+
+        // 2. Scan for JSON bounds (Object OR Array)
         const firstBrace = cleanText.indexOf('{');
-        const lastBrace = cleanText.lastIndexOf('}');
-        if (firstBrace !== -1 && lastBrace !== -1) {
-            cleanText = cleanText.substring(firstBrace, lastBrace + 1);
+        const firstBracket = cleanText.indexOf('[');
+        
+        let start = -1;
+        let end = -1;
+
+        // Determine which opens first: { or [
+        if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+            // It's an Object
+            start = firstBrace;
+            end = cleanText.lastIndexOf('}');
+        } else if (firstBracket !== -1) {
+            // It's an Array
+            start = firstBracket;
+            end = cleanText.lastIndexOf(']');
+        }
+
+        // Only slice if we found valid bounds
+        if (start !== -1 && end !== -1 && end > start) {
+            cleanText = cleanText.substring(start, end + 1);
         }
 
         const json = JSON.parse(cleanText);
@@ -32,8 +48,15 @@ const cleanAndParse = <T>(text: string, schema: z.ZodSchema<T>, fallback: T): T 
             return result.data;
         } else {
             console.warn("Schema Validation Failed (using partial/fallback):", result.error);
-            // Attempt to merge fallback with partial data if possible
-            return { ...fallback, ...json }; 
+            // Handle Array vs Object fallback merging
+            if (Array.isArray(fallback)) {
+                return Array.isArray(json) ? [...fallback, ...json] as unknown as T : fallback;
+            }
+            // Ensure json is an object before spreading
+            if (typeof json === 'object' && json !== null && !Array.isArray(json)) {
+                 return { ...fallback, ...json };
+            }
+            return fallback;
         }
     } catch (e) {
         console.error("JSON Parse Error:", e, text);
