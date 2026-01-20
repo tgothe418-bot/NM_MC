@@ -1,8 +1,10 @@
+
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { GameState, ChatMessage, SimulationConfig, NpcState } from '../types';
 import { getDefaultLocationState } from '../services/locationEngine';
 import { generateProceduralNpc } from '../services/npcGenerator';
 import { processGameTurn, generateAutoPlayerAction, initializeGemini } from '../services/geminiService';
+import { useAutoPilot } from './useAutoPilot';
 
 export const useGameEngine = (initialApiKey: string) => {
     // --- STATE ---
@@ -31,12 +33,6 @@ export const useGameEngine = (initialApiKey: string) => {
 
     // Refs for safety (avoid stale closures in timeouts)
     const processingRef = useRef(false);
-    const autoModeRef = useRef(autoMode);
-
-    // Sync Ref
-    useEffect(() => {
-        autoModeRef.current = autoMode;
-    }, [autoMode]);
 
     // Initialize Service when Key Changes
     useEffect(() => {
@@ -158,7 +154,7 @@ export const useGameEngine = (initialApiKey: string) => {
             setIsLoading(false);
             processingRef.current = false;
         }
-    }, [gameState]); // Dependency on gameState is tricky, usually better to use functional updates or refs for current state
+    }, [gameState]); 
 
     const resetGame = useCallback(() => {
         setAutoMode({ active: false, remainingCycles: 0 });
@@ -174,38 +170,22 @@ export const useGameEngine = (initialApiKey: string) => {
         setIsInitialized(false);
     }, []);
 
-    // --- AUTO-PILOT EFFECT ---
-    useEffect(() => {
-        let timeoutId: ReturnType<typeof setTimeout>;
-
-        const runAutoTurn = async () => {
-            const currentAuto = autoModeRef.current;
-            
-            if (currentAuto.active && currentAuto.remainingCycles > 0 && !isLoading && !processingRef.current && isInitialized) {
-                
-                timeoutId = setTimeout(async () => {
-                    // Double check before firing
-                    if (!autoModeRef.current.active) return;
-                    
-                    try {
-                        const action = await generateAutoPlayerAction(gameState);
-                        if (action && autoModeRef.current.active) {
-                            await handleSendMessage(action);
-                            setAutoMode(prev => ({ ...prev, remainingCycles: prev.remainingCycles - 1 }));
-                        }
-                    } catch (e) {
-                        console.error("Auto-Pilot Failed", e);
-                        setAutoMode({ active: false, remainingCycles: 0 });
-                    }
-                }, 3000);
-            } else if (currentAuto.active && currentAuto.remainingCycles <= 0) {
-                setAutoMode({ active: false, remainingCycles: 0 });
+    // --- AUTO-PILOT SYSTEM ---
+    useAutoPilot({
+        config: autoMode,
+        gameState,
+        isLoading,
+        isInitialized,
+        onTrigger: async () => {
+            // Generate action only if we are still clear to proceed
+            const action = await generateAutoPlayerAction(gameState);
+            if (action) {
+                await handleSendMessage(action);
             }
-        };
-
-        runAutoTurn();
-        return () => clearTimeout(timeoutId);
-    }, [autoMode, isLoading, isInitialized, gameState, handleSendMessage]);
+        },
+        onStop: () => setAutoMode({ active: false, remainingCycles: 0 }),
+        onDecrement: () => setAutoMode(prev => ({ ...prev, remainingCycles: prev.remainingCycles - 1 }))
+    });
 
     return {
         // Data

@@ -1,212 +1,92 @@
-
-import { z, ZodSchema, ZodError } from 'zod';
-import {
-  SimulatorResponseSchema,
-  NarratorResponseSchema,
+import { 
+  GameStateSchema, 
+  SourceAnalysisResultSchema,
   ScenarioConceptsSchema,
   CharacterProfileSchema,
-  SourceAnalysisResultSchema,
-  HydratedCharacterSchema,
+  NpcStateSchema,
 } from './schemas';
+import { GameState } from './types';
+import { z } from 'zod';
 
-export class ParseError extends Error {
-  constructor(
-    message: string,
-    public readonly rawResponse: string,
-    public readonly zodError?: ZodError
-  ) {
-    super(message);
-    this.name = 'ParseError';
-  }
-}
-
-/**
- * Attempts to repair common JSON errors like trailing commas.
- */
-function repairJson(jsonStr: string): string {
-  // 1. Remove trailing commas from objects and arrays
-  // Matches a comma followed by whitespace and then a closing brace/bracket
-  let fixed = jsonStr.replace(/,(\s*[}\]])/g, '$1');
-  return fixed;
-}
-
-/**
- * Robustly finds the end index of a JSON object/array by balancing braces/brackets.
- * Handles nested structures and ignores characters inside strings.
- */
-function findMatchingClose(text: string, openPos: number): number {
-  const openChar = text[openPos];
-  const closeChar = openChar === '{' ? '}' : ']';
-  let balance = 1;
-  let inString = false;
-  let escaped = false;
-
-  for (let i = openPos + 1; i < text.length; i++) {
-    const char = text[i];
-
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-
-    if (char === '\\') {
-      escaped = true;
-      continue;
-    }
-
-    if (char === '"') {
-      inString = !inString;
-      continue;
-    }
-
-    if (!inString) {
-      if (char === openChar) {
-        balance++;
-      } else if (char === closeChar) {
-        balance--;
-        if (balance === 0) {
-          return i;
+// --- HELPER: CLEAN & PARSE ---
+// Strips Markdown code blocks (```json ... ```) which Gemini often includes
+const cleanAndParse = <T>(text: string, schema: z.ZodSchema<T>, fallback: T): T => {
+    try {
+        let cleanText = text.trim();
+        // Remove markdown code blocks if present
+        if (cleanText.startsWith('```')) {
+            cleanText = cleanText.replace(/^```(json)?/, '').replace(/```$/, '');
         }
-      }
-    }
-  }
-  return -1;
-}
-
-/**
- * Generic parser that handles markdown fences and validates with Zod
- */
-function parseWithSchema<T>(text: string, schema: ZodSchema<T>, label: string): T {
-  let jsonString = text.trim();
-
-  // 1. Extract from Markdown code fences if present
-  const fenceMatch = jsonString.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fenceMatch) {
-    jsonString = fenceMatch[1].trim();
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(jsonString);
-  } catch (e) {
-    // 2. Fallback: Aggressive extraction of JSON object/array
-    
-    // Determine start based on first occurrence of { or [
-    const firstObj = jsonString.indexOf('{');
-    const firstArr = jsonString.indexOf('[');
-    
-    let start = -1;
-    if (firstObj !== -1 && (firstArr === -1 || firstObj < firstArr)) {
-        start = firstObj;
-    } else if (firstArr !== -1) {
-        start = firstArr;
-    }
-
-    if (start !== -1) {
-        // Attempt smart extraction using brace balancing
-        const end = findMatchingClose(jsonString, start);
-        let candidate = "";
         
-        if (end !== -1) {
-            candidate = jsonString.substring(start, end + 1);
+        // Remove any leading/trailing non-JSON text if necessary (basic heuristic)
+        const firstBrace = cleanText.indexOf('{');
+        const lastBrace = cleanText.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1) {
+            cleanText = cleanText.substring(firstBrace, lastBrace + 1);
+        }
+
+        const json = JSON.parse(cleanText);
+        const result = schema.safeParse(json);
+
+        if (result.success) {
+            return result.data;
         } else {
-             // Balancing failed (incomplete JSON?), fall back to naive lastIndexOf
-             const lastClose = jsonString[start] === '{' ? jsonString.lastIndexOf('}') : jsonString.lastIndexOf(']');
-             if (lastClose > start) {
-                 candidate = jsonString.substring(start, lastClose + 1);
-             } else {
-                 throw new ParseError(`${label}: Invalid JSON - Could not find closing brace`, text);
-             }
+            console.warn("Schema Validation Failed (using partial/fallback):", result.error);
+            // Attempt to merge fallback with partial data if possible
+            return { ...fallback, ...json }; 
         }
-
-        try {
-            parsed = JSON.parse(candidate);
-        } catch (innerE) {
-            // RETRY WITH REPAIR
-            try {
-                const repaired = repairJson(candidate);
-                parsed = JSON.parse(repaired);
-            } catch (finalE) {
-                // Last ditch: try to fix unquoted keys (dangerous but necessary for fallback)
-                // This regex puts quotes around keys that look like words followed by a colon
-                try {
-                    const quotedKeys = candidate.replace(/([{,]\s*)([a-zA-Z0-9_]+?)\s*:/g, '$1"$2":');
-                    parsed = JSON.parse(quotedKeys);
-                } catch (absoluteFinalE) {
-                    throw new ParseError(`${label}: Invalid JSON (Retried) - ${(innerE as Error).message}`, text);
-                }
-            }
-        }
-    } else {
-        // Check if it's already a valid object somehow (unlikely if we are here)
-        throw new ParseError(`${label}: Invalid JSON - ${(e as Error).message}`, text);
+    } catch (e) {
+        console.error("JSON Parse Error:", e, text);
+        return fallback;
     }
-  }
+};
 
-  // Handle array wrapping - common LLM behavior where it wraps a single object in an array
-  if (Array.isArray(parsed)) {
-      // First, check if the schema actually expects an array.
-      const arrayResult = schema.safeParse(parsed);
-      
-      // If the schema did NOT expect an array (validation failed), but we got one...
-      if (!arrayResult.success && parsed.length > 0) {
-          // Attempt to unwrap the first element and see if THAT matches the schema.
-          const itemResult = schema.safeParse(parsed[0]);
-          if (itemResult.success) {
-              parsed = parsed[0];
-          }
-      }
-  }
+// --- EXPORTED PARSERS ---
 
-  const result = schema.safeParse(parsed);
-  if (!result.success) {
-    const issues = result.error.issues
-      .map(i => `${i.path.join('.') || 'root'}: ${i.message}`)
-      .join('; ');
-    throw new ParseError(`${label}: Schema validation failed - ${issues}`, text, result.error);
-  }
+export const parseSimulatorResponse = (text: string): Partial<GameState> => {
+    // We allow Partial GameState because the Simulator might only return updates
+    return cleanAndParse(
+        text, 
+        GameStateSchema.deepPartial(), 
+        {}
+    );
+};
 
-  return result.data;
-}
+export const parseNarratorResponse = (text: string): { story_text: string, game_state?: Partial<GameState> } => {
+    const Schema = z.object({
+        story_text: z.string(),
+        game_state: GameStateSchema.deepPartial().optional()
+    });
 
-/**
- * Parse SIMULATOR response (returns partial GameState)
- */
-export function parseSimulatorResponse(text: string) {
-  return parseWithSchema(text, SimulatorResponseSchema, 'Simulator');
-}
+    return cleanAndParse(text, Schema, { 
+        story_text: "The transmission is garbled. (Data corruption detected)." 
+    });
+};
 
-/**
- * Parse NARRATOR response (returns { gameState?, storyText })
- */
-export function parseNarratorResponse(text: string) {
-  return parseWithSchema(text, NarratorResponseSchema, 'Narrator');
-}
+export const parseSourceAnalysis = (text: string) => {
+    const fallback = {
+        characters: [],
+        location: "Unknown",
+        visual_motif: "Dark",
+        theme_cluster: "Survival",
+        intensity: "Level 1",
+        plot_hook: "Unknown"
+    };
+    return cleanAndParse(text, SourceAnalysisResultSchema, fallback);
+};
 
-/**
- * Parse scenario concepts from guided setup
- */
-export function parseScenarioConcepts(text: string) {
-  return parseWithSchema(text, ScenarioConceptsSchema, 'ScenarioConcepts');
-}
+export const parseScenarioConcepts = (text: string) => {
+    return cleanAndParse(text, ScenarioConceptsSchema, {});
+};
 
-/**
- * Parse character profile with safe defaults
- */
-export function parseCharacterProfile(text: string) {
-  return parseWithSchema(text, CharacterProfileSchema, 'CharacterProfile');
-}
+export const parseCharacterProfile = (text: string) => {
+    return cleanAndParse(text, CharacterProfileSchema, { 
+        name: "Unknown", 
+        background: "N/A", 
+        traits: "N/A" 
+    });
+};
 
-/**
- * Parse source material analysis
- */
-export function parseSourceAnalysis(text: string) {
-  return parseWithSchema(text, SourceAnalysisResultSchema, 'SourceAnalysis');
-}
-
-/**
- * Parse hydrated character (partial NpcState)
- */
-export function parseHydratedCharacter(text: string) {
-  return parseWithSchema(text, HydratedCharacterSchema, 'HydratedCharacter');
-}
+export const parseHydratedCharacter = (text: string) => {
+    return cleanAndParse(text, NpcStateSchema.partial(), {});
+};
