@@ -37,7 +37,7 @@ const cleanAndParse = <T>(text: string, schema: z.ZodSchema<T>, fallback: T): T 
         }
 
         // Only slice if we found valid bounds
-        if (start !== -1 && end !== -1 && end > start) {
+        if (start !== -1 && end !== -1) {
             cleanText = cleanText.substring(start, end + 1);
         }
 
@@ -52,11 +52,7 @@ const cleanAndParse = <T>(text: string, schema: z.ZodSchema<T>, fallback: T): T 
             if (Array.isArray(fallback)) {
                 return Array.isArray(json) ? [...fallback, ...json] as unknown as T : fallback;
             }
-            // Ensure json is an object before spreading
-            if (typeof json === 'object' && json !== null && !Array.isArray(json)) {
-                 return { ...fallback, ...json };
-            }
-            return fallback;
+            return { ...fallback, ...json }; 
         }
     } catch (e) {
         console.error("JSON Parse Error:", e, text);

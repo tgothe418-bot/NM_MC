@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { GameState, ChatMessage, SimulationConfig, NpcState } from '../types';
 import { getDefaultLocationState } from '../services/locationEngine';

@@ -15,6 +15,7 @@ export default function App() {
   const [showLogic, setShowLogic] = useState(false);
 
   // Initialize Engine
+  // This hook now manages the Game Loop, Auto-Pilot, and Gemini Connection
   const {
       apiKey,
       setApiKey,
@@ -29,7 +30,7 @@ export default function App() {
       initializeGame,
       sendMessage,
       resetGame
-  } = useGameEngine(process.env.API_KEY || ""); // Still accepts env if built with it, but doesn't mutate it
+  } = useGameEngine(process.env.API_KEY || ""); 
 
   // --- HANDLERS ---
   
