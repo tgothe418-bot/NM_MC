@@ -123,20 +123,20 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
                 <div className="bg-[#0c0c0c] p-6 border border-gray-800 rounded-sm space-y-6">
                     <div className="flex justify-between items-center border-b border-gray-800 pb-4">
                         <span className="text-xs font-mono text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                            <Radio className="w-4 h-4" /> System Control
+                            <Radio className="w-4 h-4" /> SYSTEM CONTROL
                         </span>
                         <div className="flex gap-2">
                             {onReset && (
-                                <button onClick={onReset} className="p-2 border border-gray-700 hover:border-red-500 text-gray-500 hover:text-red-500 rounded-sm transition-colors" title="Reset Session">
+                                <button onClick={onReset} className="p-2 border border-gray-700 hover:border-red-500 text-gray-500 hover:text-red-500 rounded-sm transition-colors" title="Restart / Reset Session">
                                     <Power className="w-4 h-4" />
                                 </button>
                             )}
                             {isTesting ? (
-                                <button onClick={onAbortTest} className="p-2 border border-red-900 bg-red-900/20 text-red-500 hover:bg-red-900 hover:text-white rounded-sm transition-colors animate-pulse">
+                                <button onClick={onAbortTest} className="p-2 border border-red-900 bg-red-900/20 text-red-500 hover:bg-red-900 hover:text-white rounded-sm transition-colors animate-pulse" title="Stop Automation">
                                     <Square className="w-4 h-4 fill-current" />
                                 </button>
                             ) : (
-                                <button onClick={onOpenSimulation} className="p-2 border border-gray-700 hover:border-system-green text-gray-500 hover:text-system-green rounded-sm transition-colors">
+                                <button onClick={onOpenSimulation} className="p-2 border border-gray-700 hover:border-system-green text-gray-500 hover:text-system-green rounded-sm transition-colors" title="Give TNM Control (Auto-Pilot)">
                                     <Cpu className="w-4 h-4" />
                                 </button>
                             )}
@@ -158,7 +158,7 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
                 <div className="bg-[#0c0c0c] border border-gray-800 rounded-sm overflow-hidden">
                     <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-black/20">
                         <div className="flex items-center gap-3 text-gray-400 font-bold text-xs uppercase tracking-[0.2em]">
-                            <Map className="w-4 h-4" /> Local Topography
+                            <Map className="w-4 h-4" /> LOCAL MAP
                         </div>
                         <div className="text-[9px] text-gray-600 font-mono">{currentRoom?.name || "Unknown"}</div>
                     </div>
@@ -174,7 +174,7 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
                      </div>
                      <div className="relative z-10 space-y-6">
                          <div className="flex items-center gap-2 text-red-600 font-bold text-xs uppercase tracking-[0.2em] border-b border-red-900/20 pb-4">
-                             <Eye className="w-4 h-4" /> Antagonist State
+                             <Eye className="w-4 h-4" /> ANTAGONIST STATE
                          </div>
                          <div>
                              <div className="text-[9px] text-gray-600 uppercase tracking-widest mb-1">Entity Name</div>
@@ -198,7 +198,7 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
             <div className="lg:col-span-2 bg-[#0c0c0c] border border-gray-800 rounded-sm flex flex-col">
                 <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-black/20">
                      <div className="flex items-center gap-3 text-gray-400 font-bold text-xs uppercase tracking-[0.2em]">
-                         <Users className="w-4 h-4" /> Active Subjects ({npc_states?.length || 0})
+                         <Users className="w-4 h-4" /> ACTIVE CHARACTERS ({npc_states?.length || 0})
                      </div>
                      <button onClick={handleExportNpcData} className="text-gray-600 hover:text-white transition-colors" title="Export Data">
                         <FileText className="w-4 h-4" />

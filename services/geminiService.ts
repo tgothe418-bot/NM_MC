@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { 
   GameState, 
@@ -29,14 +30,7 @@ export const initializeGemini = (apiKey: string) => {
 };
 
 const getAI = () => {
-    // Fallback for development/legacy env vars
-    if (!aiInstance && process.env.API_KEY) {
-        aiInstance = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    }
-    
-    if (!aiInstance) {
-        throw new Error("Gemini Client not initialized. Please set API Key.");
-    }
+    if (!aiInstance) throw new Error("Gemini Client not initialized.");
     return aiInstance;
 };
 
@@ -124,7 +118,7 @@ export const processGameTurn = async (
   // 3. NARRATOR PHASE (Prose)
   if (onStreamLogic) onStreamLogic("rendering narrative...\n", 'narrative');
 
-  let finalStoryText = "The simulation dissolves into static. (Narrative Engine Failure)";
+  let finalStoryText = "*The vision blurs momentarily.* (The simulation is recalibrating...)";
   let imageUrl: string | undefined;
   let narratorStateUpdates = {};
 
@@ -193,7 +187,7 @@ export const processGameTurn = async (
 
   } catch (e) {
       console.error("Narrator Error:", e);
-      finalStoryText = `The Machine screeches. (Narrator Desync: ${e}). You are still alive, but the world is unrendered.`;
+      finalStoryText = `*The vision blurs momentarily.* (The simulation is recalibrating...)`;
   }
 
   const finalState = {

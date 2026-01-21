@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Target, Skull, Wand2, Users, UserCheck, StickyNote, Fingerprint, Loader2, UserPlus } from 'lucide-react';
 import { useSetupStore } from './store';
@@ -7,6 +8,47 @@ interface Props {
   loadingFields: Record<string, boolean>;
   setLoadingFields: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }
+
+// Extracted component to prevent re-renders losing focus
+interface CharacterFieldProps {
+    label: string;
+    icon: any;
+    value: string;
+    onChange: (val: string) => void;
+    fieldKey: string;
+    loading: boolean;
+    onGenerate: (key: string) => void;
+    isTextarea?: boolean;
+}
+
+const CharacterField: React.FC<CharacterFieldProps> = ({ 
+    label, 
+    icon: Icon, 
+    value, 
+    onChange, 
+    fieldKey, 
+    loading, 
+    onGenerate, 
+    isTextarea = false 
+}) => (
+    <div className="space-y-4 group relative">
+        <div className="flex items-center justify-between">
+            <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
+                <Icon className="w-5 h-5" /> {label}
+            </label>
+            <div className="flex gap-2">
+                <button onClick={() => onGenerate(fieldKey)} disabled={loading} className="p-1 hover:text-white transition-colors text-gray-500">
+                    {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+                </button>
+            </div>
+        </div>
+        {isTextarea ? (
+            <textarea value={value} onChange={e => onChange(e.target.value)} className="w-full h-32 bg-black border-2 border-gray-800 text-gray-200 p-4 font-mono text-sm focus:border-red-600 outline-none resize-none" />
+        ) : (
+            <input type="text" value={value} onChange={e => onChange(e.target.value)} className="w-full bg-black border-2 border-gray-800 text-gray-200 p-4 font-mono text-sm focus:border-red-600 outline-none" />
+        )}
+    </div>
+);
 
 export const ManualCharacterSection: React.FC<Props> = ({ loadingFields, setLoadingFields }) => {
   const store = useSetupStore();
@@ -64,38 +106,18 @@ export const ManualCharacterSection: React.FC<Props> = ({ loadingFields, setLoad
       }
   };
 
-  const Field = ({ label, icon: Icon, value, onChange, fieldKey, isTextarea = false }: any) => (
-      <div className="space-y-4 group relative">
-          <div className="flex items-center justify-between">
-              <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">
-                  <Icon className="w-5 h-5" /> {label}
-              </label>
-              <div className="flex gap-2">
-                  <button onClick={() => handleGenerate(fieldKey)} disabled={loadingFields[fieldKey]} className="p-1 hover:text-white transition-colors text-gray-500">
-                      {loadingFields[fieldKey] ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
-                  </button>
-              </div>
-          </div>
-          {isTextarea ? (
-              <textarea value={value} onChange={e => onChange(e.target.value)} className="w-full h-32 bg-black border-2 border-gray-800 text-gray-200 p-4 font-mono text-sm focus:border-red-600 outline-none resize-none" />
-          ) : (
-              <input type="text" value={value} onChange={e => onChange(e.target.value)} className="w-full bg-black border-2 border-gray-800 text-gray-200 p-4 font-mono text-sm focus:border-red-600 outline-none" />
-          )}
-      </div>
-  );
-
   if (isVillain) {
       return (
         <div className="col-span-1 md:col-span-2 lg:col-span-3 space-y-12 border-y-2 border-fresh-blood/20 py-16 animate-fadeIn bg-red-950/5 px-8">
             <div className="text-red-500 font-mono text-2xl font-bold uppercase tracking-[0.5em] flex items-center gap-6">
-                <Target className="w-10 h-10 animate-pulse" /> Antagonist Specifications
+                <Target className="w-10 h-10 animate-pulse" /> The Villain
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
-                <Field label="Entity Name" icon={Skull} value={villainName} onChange={setVillainName} fieldKey="Entity Name" />
-                <Field label="Form & Appearance" icon={Skull} value={villainAppearance} onChange={setVillainAppearance} fieldKey="Form & Appearance" isTextarea />
-                <Field label="Modus Operandi" icon={Wand2} value={villainMethods} onChange={setVillainMethods} fieldKey="Modus Operandi" isTextarea />
-                <Field label="Specimen Targets" icon={Users} value={victimDescription} onChange={setVictimDescription} fieldKey="Specimen Targets" isTextarea />
-                <Field label="Primary Objective" icon={Target} value={primaryGoal} onChange={setPrimaryGoal} fieldKey="Primary Objective" />
+                <CharacterField label="Entity Name" icon={Skull} value={villainName} onChange={setVillainName} fieldKey="Entity Name" loading={loadingFields['Entity Name']} onGenerate={handleGenerate} />
+                <CharacterField label="Form & Appearance" icon={Skull} value={villainAppearance} onChange={setVillainAppearance} fieldKey="Form & Appearance" isTextarea loading={loadingFields['Form & Appearance']} onGenerate={handleGenerate} />
+                <CharacterField label="Modus Operandi" icon={Wand2} value={villainMethods} onChange={setVillainMethods} fieldKey="Modus Operandi" isTextarea loading={loadingFields['Modus Operandi']} onGenerate={handleGenerate} />
+                <CharacterField label="Victims" icon={Users} value={victimDescription} onChange={setVictimDescription} fieldKey="Specimen Targets" isTextarea loading={loadingFields['Specimen Targets']} onGenerate={handleGenerate} />
+                <CharacterField label="Primary Objective" icon={Target} value={primaryGoal} onChange={setPrimaryGoal} fieldKey="Primary Objective" loading={loadingFields['Primary Objective']} onGenerate={handleGenerate} />
                 <div className="space-y-4 group relative">
                   <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">Population Count</label>
                   <div className="flex items-center gap-6 bg-black border-2 border-gray-800 p-6 rounded-sm">
@@ -113,16 +135,16 @@ export const ManualCharacterSection: React.FC<Props> = ({ loadingFields, setLoad
     <div className="col-span-1 md:col-span-2 lg:col-span-3 space-y-12 border-y-2 border-system-green/20 py-16 animate-fadeIn bg-green-950/5 px-8">
         <div className="flex justify-between items-center border-b border-system-green/20 pb-6 mb-6">
             <div className="text-system-green font-mono text-2xl font-bold uppercase tracking-[0.5em] flex items-center gap-6">
-                <UserCheck className="w-10 h-10 animate-pulse" /> Protagonist Identity
+                <UserCheck className="w-10 h-10 animate-pulse" /> The Survivor
             </div>
             <button onClick={handleFullProfile} disabled={loadingFields['char_build']} className="flex items-center gap-3 px-6 py-3 border border-system-green/50 hover:bg-system-green/10 text-system-green transition-all rounded-sm uppercase font-mono text-xs tracking-widest disabled:opacity-50">
                 {loadingFields['char_build'] ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />} Help Me Build Them
             </button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-            <Field label="Identity Name" icon={Users} value={survivorName} onChange={setSurvivorName} fieldKey="Identity Name" />
-            <div className="md:col-span-2"><Field label="Backstory" icon={StickyNote} value={survivorBackground} onChange={setSurvivorBackground} fieldKey="Backstory" isTextarea /></div>
-            <div className="md:col-span-2"><Field label="Traits & Flaws" icon={Fingerprint} value={survivorTraits} onChange={setSurvivorTraits} fieldKey="Traits & Flaws" isTextarea /></div>
+            <CharacterField label="Identity Name" icon={Users} value={survivorName} onChange={setSurvivorName} fieldKey="Identity Name" loading={loadingFields['Identity Name']} onGenerate={handleGenerate} />
+            <div className="md:col-span-2"><CharacterField label="Backstory" icon={StickyNote} value={survivorBackground} onChange={setSurvivorBackground} fieldKey="Backstory" isTextarea loading={loadingFields['Backstory']} onGenerate={handleGenerate} /></div>
+            <div className="md:col-span-2"><CharacterField label="Traits & Flaws" icon={Fingerprint} value={survivorTraits} onChange={setSurvivorTraits} fieldKey="Traits & Flaws" isTextarea loading={loadingFields['Traits & Flaws']} onGenerate={handleGenerate} /></div>
             
             {/* NEW SECTION FOR OTHERS */}
             <div className="md:col-span-2 border-t border-system-green/20 pt-8 mt-4">
@@ -130,7 +152,7 @@ export const ManualCharacterSection: React.FC<Props> = ({ loadingFields, setLoad
                     <Users className="w-4 h-4" /> Additional Survivors
                  </div>
                  <div className="grid grid-cols-1 gap-8">
-                    <Field label="Companion Profiles" icon={Users} value={victimDescription} onChange={setVictimDescription} fieldKey="Companion Profiles" isTextarea />
+                    <CharacterField label="Companion Profiles" icon={Users} value={victimDescription} onChange={setVictimDescription} fieldKey="Companion Profiles" isTextarea loading={loadingFields['Companion Profiles']} onGenerate={handleGenerate} />
                     
                     <div className="space-y-4 group relative">
                       <label className="text-xs font-mono text-gray-500 uppercase flex items-center gap-3 tracking-[0.2em]">Group Size</label>

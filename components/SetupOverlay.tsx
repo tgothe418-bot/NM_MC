@@ -6,6 +6,7 @@ import { ChoiceModeSelector } from './setup/ChoiceModeSelector';
 import { GuidedSetup } from './setup/GuidedSetup';
 import { ManualSetup } from './setup/ManualSetup';
 import { SimulationSetup } from './setup/SimulationSetup';
+import { ChatSetup } from './setup/ChatSetup';
 import { NpcSelector } from './setup/NpcSelector';
 
 interface SetupOverlayProps {
@@ -38,6 +39,13 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
             <ManualSetup 
                 onComplete={handleInitialSetupComplete} 
                 onBack={() => setSetupMode('choice')} 
+            />
+        )}
+
+        {setupMode === 'chat' && (
+            <ChatSetup
+                onComplete={handleInitialSetupComplete}
+                onBack={() => setSetupMode('choice')}
             />
         )}
 

@@ -49,10 +49,11 @@ export const SourceUploader: React.FC<SourceUploaderProps> = ({ compact = false 
                  setLocationDescription(prev => prev ? `${prev}\n\n[Location Context from ${file.name}]:\n${result.location}` : result.location);
             }
             if (result.visual_motif && !visualMotif) {
-                 setVisualMotif(result.visual_motif);
+                 setVisualMotif(String(result.visual_motif));
             }
             if (result.theme_cluster) {
-                 const match = KNOWN_CLUSTERS.find(c => result.theme_cluster.toLowerCase().includes(c.toLowerCase()));
+                 const clusterStr = String(result.theme_cluster);
+                 const match = KNOWN_CLUSTERS.find(c => clusterStr.toLowerCase().includes(c.toLowerCase()));
                  if (match) {
                      setSelectedClusters(prev => {
                          if (!prev.includes(match)) return [...prev, match];
@@ -61,7 +62,8 @@ export const SourceUploader: React.FC<SourceUploaderProps> = ({ compact = false 
                  }
             }
             if (result.intensity) {
-                 const levelMatch = result.intensity.match(/[1-5]/);
+                 const intensityStr = String(result.intensity);
+                 const levelMatch = intensityStr.match(/[1-5]/);
                  if (levelMatch) {
                      setIntensity(`Level ${levelMatch[0]}`);
                  }
@@ -70,7 +72,8 @@ export const SourceUploader: React.FC<SourceUploaderProps> = ({ compact = false 
                 setParsedCharacters(prev => [...prev, ...result.characters]);
             }
             if (result.plot_hook) {
-                setSurvivorBackground(prev => prev ? `${prev}\n\n[SCENARIO CONTEXT / PLOT HOOK]: ${result.plot_hook}` : `[SCENARIO CONTEXT / PLOT HOOK]: ${result.plot_hook}`);
+                const hookStr = typeof result.plot_hook === 'string' ? result.plot_hook : JSON.stringify(result.plot_hook);
+                setSurvivorBackground(prev => prev ? `${prev}\n\n[SCENARIO CONTEXT / PLOT HOOK]: ${hookStr}` : `[SCENARIO CONTEXT / PLOT HOOK]: ${hookStr}`);
             }
         }
       } catch (err) {

@@ -1,3 +1,4 @@
+
 import { 
   GameStateSchema, 
   SourceAnalysisResultSchema,
@@ -5,7 +6,7 @@ import {
   CharacterProfileSchema,
   NpcStateSchema,
 } from './schemas';
-import { GameState } from './types';
+import { GameState, SourceAnalysisResult, ScenarioConcepts, CharacterProfile, NpcState } from './types';
 import { z } from 'zod';
 
 // --- HELPER: CLEAN & PARSE ---
@@ -47,10 +48,10 @@ const cleanAndParse = <T>(text: string, schema: z.ZodSchema<T>, fallback: T): T 
         if (result.success) {
             return result.data;
         } else {
-            console.warn("Schema Validation Failed (using partial/fallback):", result.error);
+            console.warn("Schema Validation Failed:", result.error);
             // Handle Array vs Object fallback merging
-            if (Array.isArray(fallback)) {
-                return Array.isArray(json) ? [...fallback, ...json] as unknown as T : fallback;
+            if (Array.isArray(fallback) && Array.isArray(json)) {
+                return [...fallback, ...json] as unknown as T;
             }
             return { ...fallback, ...json }; 
         }
@@ -82,8 +83,8 @@ export const parseNarratorResponse = (text: string): { story_text: string, game_
     });
 };
 
-export const parseSourceAnalysis = (text: string) => {
-    const fallback = {
+export const parseSourceAnalysis = (text: string): SourceAnalysisResult => {
+    const fallback: SourceAnalysisResult = {
         characters: [],
         location: "Unknown",
         visual_motif: "Dark",
@@ -94,11 +95,11 @@ export const parseSourceAnalysis = (text: string) => {
     return cleanAndParse(text, SourceAnalysisResultSchema, fallback);
 };
 
-export const parseScenarioConcepts = (text: string) => {
+export const parseScenarioConcepts = (text: string): ScenarioConcepts => {
     return cleanAndParse(text, ScenarioConceptsSchema, {});
 };
 
-export const parseCharacterProfile = (text: string) => {
+export const parseCharacterProfile = (text: string): CharacterProfile => {
     return cleanAndParse(text, CharacterProfileSchema, { 
         name: "Unknown", 
         background: "N/A", 
@@ -106,6 +107,6 @@ export const parseCharacterProfile = (text: string) => {
     });
 };
 
-export const parseHydratedCharacter = (text: string) => {
+export const parseHydratedCharacter = (text: string): Partial<NpcState> => {
     return cleanAndParse(text, NpcStateSchema.partial(), {});
 };

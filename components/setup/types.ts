@@ -2,7 +2,7 @@
 import React from 'react';
 import { ParsedCharacter } from '../../types';
 
-export type SetupMode = 'choice' | 'manual' | 'guided' | 'simulation' | 'npc-selection';
+export type SetupMode = 'choice' | 'manual' | 'guided' | 'simulation' | 'npc-selection' | 'chat';
 
 export interface GuidedOption {
   id: string;
