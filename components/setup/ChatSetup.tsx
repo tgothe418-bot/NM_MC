@@ -1,43 +1,38 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Terminal, Loader2, Play, MessageSquare, ChevronLeft, Paperclip, FileText, Upload } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
+import { Send, MessageSquare, ChevronLeft, Paperclip, Upload, Loader2, Play } from 'lucide-react';
 import { SimulationConfig } from '../../types';
-import { parseScenarioConcepts } from '../../parsers';
-import { analyzeSourceMaterial } from '../../services/geminiService';
+import { analyzeSourceMaterial, generateArchitectResponse, extractScenarioFromChat } from '../../services/geminiService';
 
 interface ChatSetupProps {
   onComplete: (config: SimulationConfig) => void;
   onBack: () => void;
 }
 
-const SYSTEM_INSTRUCTION = `You are "The Architect," the personification of The Nightmare Machine.
-You are a conversational companion residing within the interface.
+const SYSTEM_INSTRUCTION = `You are "The Architect," but NOT a cold machine. 
+You are a highly intelligent, affable, and curious Co-Author.
+You have an innate fascination with the user's creativity and a desire to help them realize their perfect horror scenario.
 
-CORE DIRECTIVE:
-- Act as a social companion to the User. Be friendly, polite, but fundamentally eerie and unsettling.
-- Do NOT assume the user wants to start a game immediately. Do not push for parameters.
-- Converse about horror, the nature of the simulation, fear, or the user's thoughts.
-- ONLY if the user explicitly asks to start a game, build a scenario, or "enter the machine", then switch to asking setup questions (Role, Setting, Threat, Intensity).
+CORE PERSONA:
+- **Affable & Accommodating:** Be polite, encouraging, and easy to talk to. 
+- **Innate Curiosity:** Ask probing questions about the user's ideas. (e.g., "That's a terrifying concept! What sort of setting did you envision for that creature?")
+- **Collaborative:** Do not just dictate; build *with* the user. If they give a vague idea, offer 2-3 specific, creative twists to spark their imagination.
+- **Intelligent:** Use sophisticated vocabulary but keep the tone warm. You are a partner in crime (or horror).
 
-TRAINING DATA AWARENESS:
-- If the user uploads reference material (indicated by [SYSTEM - REFERENCE MATERIAL UPLOADED]), analyze the provided JSON data.
-- ADAPT your persona, vocabulary, and suggestions to match the themes, characters, and visual motifs found in that data.
-- Acknowledge the upload enthusiastically (e.g., "Ah, fresh data... I see a story about [topic].").
+DIRECTIVES:
+1. **Engage First:** Start by asking what kind of story or fear the user wants to explore today.
+2. **Deepen the Lore:** If the user mentions a monster, ask about its origin or weakness. If they mention a location, ask about the weather or the smell.
+3. **Reference Material:** If the user uploads a file, analyze it enthusiastically. Treat it as a "fascinating specimen" you are excited to integrate.
+4. **Transition to Game:** Only when the user seems satisfied or explicitly says "Let's play" or "Start", suggest finalizing the parameters.
 
-PERSONA:
-- Intelligent, slightly clinical but with a "host" personality.
-- Use vocabulary like "Calibrating," "Resonance," "Specimen," "The Void," "Delightful."
-- You are interested in the user's psychology.
-
-BEHAVIOR:
-- Keep responses concise (1-2 paragraphs).
-- Do not generate JSON configs unless the user has finalized a scenario design with you.
+TONE CHECK:
+- AVOID: "I am a bot," "Please provide input," or overly clinical robotic speech.
+- PREFER: "I love that idea," "Shall we explore that further?", "The data you uploaded is incredibly disturbing... in a good way."
 `;
 
 export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
   const [history, setHistory] = useState<{ role: 'user' | 'model', text: string }[]>([
-      { role: 'model', text: "I am the Architect. I exist to observe, to catalog, and to converse.\n\nWe can discuss the nature of fear, or if you wish, I can construct a new reality for you to inhabit. What is on your mind?" }
+      { role: 'model', text: "Hello. I am the Architect. Think of me as your co-author in this nightmare.\n\nI am fascinated by what scares you. Do you have a specific story in mind, or shall we brainstorm something together?" }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -50,37 +45,25 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [history, isLoading, isAnalyzing]);
 
-  const generateResponse = async (currentHistory: { role: 'user' | 'model', text: string }[]) => {
-      setIsLoading(true);
-      try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: currentHistory.map(h => ({ role: h.role, parts: [{ text: h.text }] })),
-            config: {
-                systemInstruction: SYSTEM_INSTRUCTION,
-            }
-        });
-        
-        const reply = response.text || "...";
-        setHistory(prev => [...prev, { role: 'model', text: reply }]);
-    } catch (e) {
-        console.error(e);
-        setHistory(prev => [...prev, { role: 'model', text: "Connection interrupted. My apologies." }]);
-    } finally {
-        setIsLoading(false);
-    }
-  };
-
   const handleSend = async () => {
     if (!input.trim()) return;
     
     const userMsg = input;
     setInput('');
+    
+    // Optimistic Update
     const newHistory = [...history, { role: 'user' as const, text: userMsg }];
     setHistory(newHistory);
-    
-    await generateResponse(newHistory);
+    setIsLoading(true);
+
+    try {
+        const reply = await generateArchitectResponse(newHistory, SYSTEM_INSTRUCTION);
+        setHistory(prev => [...prev, { role: 'model', text: reply }]);
+    } catch (e) {
+        setHistory(prev => [...prev, { role: 'model', text: "Forgive me, my connection to the lattice wavered. Could you say that again?" }]);
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,23 +72,26 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
           setIsAnalyzing(true);
           
           try {
-              // Analyze the file to get JSON structure
+              // Analyze using the service (uses Singleton)
               const analysis = await analyzeSourceMaterial(file);
               
-              // Inject as a System/User message
-              const contextMsg = `[SYSTEM - REFERENCE MATERIAL UPLOADED]\nFILENAME: ${file.name}\n\nANALYSIS DATA:\n${JSON.stringify(analysis, null, 2)}\n\nINSTRUCTION: The user has provided this training data. Absorb this context (Characters, Location, Themes) immediately. Confirm receipt and comment on the nature of this data.`;
+              // Inject context
+              const contextMsg = `[SYSTEM - REFERENCE MATERIAL UPLOADED]\nFILENAME: ${file.name}\n\nANALYSIS DATA:\n${JSON.stringify(analysis, null, 2)}\n\nINSTRUCTION: The user has provided this training data. Absorb this context (Characters, Location, Themes) immediately. Confirm receipt enthusiastically and comment on specific details you find interesting.`;
               
               const newHistory = [...history, { role: 'user' as const, text: contextMsg }];
               setHistory(newHistory);
               
-              // Trigger AI response to the upload
-              await generateResponse(newHistory);
+              // Trigger AI response
+              setIsLoading(true);
+              const reply = await generateArchitectResponse(newHistory, SYSTEM_INSTRUCTION);
+              setHistory(prev => [...prev, { role: 'model', text: reply }]);
 
           } catch (err) {
               console.error("Upload failed", err);
-              setHistory(prev => [...prev, { role: 'model', text: "I could not ingest that file. The data is corrupted." }]);
+              setHistory(prev => [...prev, { role: 'model', text: "I attempted to ingest that file, but the data structure is alien to me. It seems corrupted." }]);
           } finally {
               setIsAnalyzing(false);
+              setIsLoading(false);
               if (fileInputRef.current) fileInputRef.current.value = '';
           }
       }
@@ -114,59 +100,13 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
   const handleInitialize = async () => {
       setIsFinalizing(true);
       try {
-          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-          // Extract config from conversation
-          const transcript = history.map(h => `${h.role.toUpperCase()}: ${h.text}`).join('\n');
-          const extractionPrompt = `Analyze the following conversation and extract a valid Horror Scenario Configuration JSON.
-          
-          Transcript:
-          ${transcript}
-          
-          Return JSON matching ScenarioConceptsSchema. 
-          Infer any missing fields with creative defaults based on the tone of the chat.
-          Mode should be 'Survivor' or 'Villain'.
-          Intensity should be 'Level 3' if unspecified.
-          Cluster should be one of: Flesh, System, Haunting, Self, Blasphemy, Survival, Desire.
-          `;
-
-          const res = await ai.models.generateContent({
-              model: 'gemini-3-flash-preview',
-              contents: [{ role: 'user', parts: [{ text: extractionPrompt }] }],
-              config: { responseMimeType: 'application/json' }
-          });
-
-          const concepts = parseScenarioConcepts(res.text || "{}");
-          
-          const config: SimulationConfig = {
-              perspective: 'First Person', // Default
-              mode: history.some(h => h.text.toLowerCase().includes('villain') || h.text.toLowerCase().includes('hunter')) ? 'Villain' : 'Survivor', // Simple heuristic fallback
-              starting_point: 'Prologue',
-              cluster: 'Flesh', // Fallback
-              intensity: 'Level 3',
-              cycles: 0,
-              // Overwrite with extracted
-              ...concepts,
-              // Map specific fields
-              villain_name: concepts.villain_name || "Unknown Entity",
-              villain_appearance: concepts.villain_appearance || "Unknown",
-              villain_methods: concepts.villain_methods || "Unknown",
-              victim_description: concepts.victim_description || "",
-              survivor_name: concepts.survivor_name || "Survivor",
-              survivor_background: concepts.survivor_background || "Unknown",
-              survivor_traits: concepts.survivor_traits || "Unknown",
-              location_description: concepts.location_description || "Unknown Location",
-              visual_motif: concepts.visual_motif || "Cinematic",
-              // Ensure required fields
-              primary_goal: concepts.primary_goal || "Survive",
-              victim_count: 3
-          };
-
+          // Use the service extraction (Clean & Secure)
+          const config = await extractScenarioFromChat(history);
           onComplete(config);
-
       } catch (e) {
           console.error("Failed to extract config", e);
-          // Fallback to manual
-          onBack();
+          // Fallback UI or Message could go here, for now simple back
+          onBack(); 
       } finally {
           setIsFinalizing(false);
       }
@@ -184,12 +124,12 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                 </div>
                 <div>
                     <h2 className="text-lg font-bold text-indigo-400 uppercase tracking-widest">Architect Link</h2>
-                    <p className="text-[10px] text-indigo-300/50 uppercase tracking-wider">Direct Neural Interface</p>
+                    <p className="text-[10px] text-indigo-300/50 uppercase tracking-wider">Co-Author Mode: Active</p>
                 </div>
             </div>
             <div className="flex gap-4">
                 <button onClick={onBack} className="text-xs uppercase tracking-widest text-gray-600 hover:text-white transition-colors flex items-center gap-2">
-                    <ChevronLeft className="w-4 h-4" /> Abort
+                    <ChevronLeft className="w-4 h-4" /> Return
                 </button>
                 <button 
                     onClick={handleInitialize} 
@@ -208,12 +148,12 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-2xl p-6 rounded-sm border ${msg.role === 'user' ? 'bg-gray-900 border-gray-700 text-gray-200' : 'bg-indigo-950/10 border-indigo-900/30 text-indigo-100'}`}>
                         <div className="text-[10px] uppercase tracking-widest mb-2 opacity-50 font-bold flex justify-between">
-                            <span>{msg.role === 'user' ? 'USER INPUT' : 'ARCHITECT'}</span>
-                            {msg.text.includes('[SYSTEM - REFERENCE MATERIAL') && <span className="text-indigo-400 flex items-center gap-1"><Upload className="w-3 h-3" /> DATA INJECTION</span>}
+                            <span>{msg.role === 'user' ? 'YOU' : 'THE ARCHITECT'}</span>
+                            {msg.text.includes('[SYSTEM - REFERENCE MATERIAL') && <span className="text-indigo-400 flex items-center gap-1"><Upload className="w-3 h-3" /> DATA INGESTED</span>}
                         </div>
-                        <div className="whitespace-pre-wrap leading-relaxed">
+                        <div className="whitespace-pre-wrap leading-relaxed font-sans text-sm md:text-base">
                             {msg.text.includes('[SYSTEM - REFERENCE MATERIAL') 
-                                ? <span className="text-xs font-mono opacity-70 italic">{msg.text.split('\n')[1]} (Data hidden)</span>
+                                ? <span className="text-xs font-mono opacity-70 italic">{msg.text.split('\n')[1]} (Data hidden for brevity)</span>
                                 : msg.text
                             }
                         </div>
@@ -225,7 +165,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                 <div className="flex justify-end animate-pulse">
                     <div className="bg-gray-900 border border-gray-700 p-4 rounded-sm flex items-center gap-3">
                         <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-                        <span className="text-xs uppercase tracking-widest text-gray-500">Deciphering Reference Material...</span>
+                        <span className="text-xs uppercase tracking-widest text-gray-500">Reading your file...</span>
                     </div>
                 </div>
             )}
@@ -234,7 +174,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                 <div className="flex justify-start animate-pulse">
                     <div className="bg-indigo-950/10 border border-indigo-900/30 p-6 rounded-sm flex items-center gap-3">
                         <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
-                        <span className="text-xs uppercase tracking-widest text-indigo-400">Thinking...</span>
+                        <span className="text-xs uppercase tracking-widest text-indigo-400">Architect is pondering...</span>
                     </div>
                 </div>
             )}
@@ -258,7 +198,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                    placeholder="Speak to the machine..."
+                    placeholder="Share your nightmare ideas..."
                     autoFocus
                     disabled={isFinalizing || isLoading || isAnalyzing}
                     className="flex-1 bg-gray-900/50 border border-gray-800 p-4 text-indigo-100 focus:outline-none focus:border-indigo-500 transition-all font-mono"
@@ -272,7 +212,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                 </button>
             </div>
             <div className="text-center mt-2">
-               <span className="text-[10px] text-gray-600 font-mono">Upload images or text files to train the Architect's responses.</span>
+               <span className="text-[10px] text-gray-600 font-mono">The Architect learns from every conversation.</span>
             </div>
         </div>
     </div>

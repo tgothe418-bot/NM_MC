@@ -6,6 +6,7 @@ import {
   SourceAnalysisResult,
   ScenarioConcepts,
   CharacterProfile, 
+  SimulationConfig 
 } from '../types';
 import { 
   parseSimulatorResponse, 
@@ -32,6 +33,81 @@ export const initializeGemini = (apiKey: string) => {
 const getAI = () => {
     if (!aiInstance) throw new Error("Gemini Client not initialized.");
     return aiInstance;
+};
+
+// --- ARCHITECT (Chat Companion) FUNCTIONS ---
+
+export const generateArchitectResponse = async (
+    history: { role: 'user' | 'model', text: string }[], 
+    systemInstruction: string
+): Promise<string> => {
+    const ai = getAI();
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-pro-preview', // High intelligence for conversation
+            contents: history.map(h => ({ role: h.role, parts: [{ text: h.text }] })),
+            config: {
+                systemInstruction: systemInstruction,
+            }
+        });
+        return response.text || "...";
+    } catch (e) {
+        console.error("Architect Error:", e);
+        return "I am having trouble connecting to the neural lattice. Please repeat that.";
+    }
+};
+
+export const extractScenarioFromChat = async (history: { role: 'user' | 'model', text: string }[]): Promise<SimulationConfig> => {
+    const ai = getAI();
+    const transcript = history.map(h => `${h.role.toUpperCase()}: ${h.text}`).join('\n');
+    const extractionPrompt = `Analyze the following creative conversation and extract a valid Horror Scenario Configuration JSON.
+    
+    Transcript:
+    ${transcript}
+    
+    Return JSON matching ScenarioConceptsSchema. 
+    Infer any missing fields with creative defaults based on the tone of the chat.
+    Mode should be 'Survivor' or 'Villain'.
+    Intensity should be 'Level 3' if unspecified.
+    Cluster should be one of: Flesh, System, Haunting, Self, Blasphemy, Survival, Desire.
+    `;
+
+    try {
+        const res = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview', // Flash is sufficient for extraction
+            contents: [{ role: 'user', parts: [{ text: extractionPrompt }] }],
+            config: { responseMimeType: 'application/json' }
+        });
+
+        const concepts = parseScenarioConcepts(res.text || "{}");
+        
+        // Map concepts to SimulationConfig
+        return {
+            perspective: 'First Person',
+            mode: history.some(h => h.text.toLowerCase().includes('villain') || h.text.toLowerCase().includes('hunter')) ? 'Villain' : 'Survivor',
+            starting_point: 'Prologue',
+            cluster: concepts.theme_cluster || 'Flesh', // Use extracted cluster or fallback
+            intensity: concepts.intensity || 'Level 3',
+            cycles: 0,
+            ...concepts,
+            // Ensure fallbacks for critical fields
+            villain_name: concepts.villain_name || "Unknown Entity",
+            villain_appearance: concepts.villain_appearance || "Unknown",
+            villain_methods: concepts.villain_methods || "Unknown",
+            victim_description: concepts.victim_description || "",
+            survivor_name: concepts.survivor_name || "Survivor",
+            survivor_background: concepts.survivor_background || "Unknown",
+            survivor_traits: concepts.survivor_traits || "Unknown",
+            location_description: concepts.location_description || "Unknown Location",
+            visual_motif: concepts.visual_motif || "Cinematic",
+            primary_goal: concepts.primary_goal || "Survive",
+            victim_count: 3
+        } as SimulationConfig;
+
+    } catch (e) {
+        console.error("Extraction Error:", e);
+        throw e;
+    }
 };
 
 // --- GAME LOOP ---
@@ -66,7 +142,7 @@ export const processGameTurn = async (
   
   try {
       const simResponse = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-3-pro-preview', // Using Pro for Logic
         contents: {
             parts: [
                 { text: contextBlock },
@@ -124,7 +200,7 @@ export const processGameTurn = async (
 
   try {
       const narratorResponse = await ai.models.generateContent({
-          model: 'gemini-3-pro-preview',
+          model: 'gemini-3-pro-preview', // Using Pro for Creative Prose
           contents: {
               parts: [
                   { text: JSON.stringify(updatedState) },
@@ -234,7 +310,7 @@ export const generateImage = async (
     
     try {
         const res = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
+            model: 'gemini-2.5-flash-image', // Optimized for image gen
             contents: { parts: [{ text: fullPrompt }] },
             config: {}
         });
@@ -252,67 +328,94 @@ export const generateImage = async (
     return undefined;
 };
 
+// Robust Helper for MIME types (Fallback if file.type is empty or generic)
+const getMimeType = (file: File): string => {
+    if (file.type && file.type !== 'application/octet-stream') return file.type;
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    switch (ext) {
+        case 'jpg': case 'jpeg': return 'image/jpeg';
+        case 'png': return 'image/png';
+        case 'webp': return 'image/webp';
+        case 'heic': return 'image/heic';
+        case 'heif': return 'image/heif';
+        case 'pdf': return 'application/pdf';
+        case 'txt': return 'text/plain';
+        case 'md': return 'text/markdown';
+        case 'json': return 'application/json';
+        case 'csv': return 'text/csv';
+        default: return 'text/plain';
+    }
+}
+
 export const analyzeSourceMaterial = async (file: File): Promise<SourceAnalysisResult> => {
   const ai = getAI();
-  const isText = file.type.startsWith('text/') || 
-                 file.name.endsWith('.txt') || 
-                 file.name.endsWith('.md') || 
-                 file.name.endsWith('.csv') || 
-                 file.name.endsWith('.json');
+  const mime = getMimeType(file);
+  const isText = mime.startsWith('text/') || 
+                 mime === 'application/json' ||
+                 mime.includes('csv') || 
+                 mime.includes('markdown') ||
+                 file.name.endsWith('.md');
 
   let parts: any[] = [];
 
-  if (isText) {
-      const textContent = await fileToText(file);
-      parts = [{ text: `[SOURCE MATERIAL: ${file.name}]\n${textContent}` }];
-  } else {
-      const base64Data = await fileToBase64(file);
-      const base64Content = base64Data.split(',')[1];
-      parts = [{ inlineData: { mimeType: file.type, data: base64Content } }];
-  }
-
-  const prompt = `Analyze this source material for a horror simulation setup.
-  
-  CRITICAL INSTRUCTION: Extract ALL characters, including:
-  1. The Protagonists/Survivors.
-  2. The ANTAGONIST (Villain, Monster, AI, Mastercomputer). Even if it is a machine or abstract entity (like AM), it MUST be listed as a character with the role 'Antagonist' or 'Villain'.
-  
-  ALSO EXTRACT:
-  - Aesthetics (Visual Motif)
-  - Intensity Level (1-5)
-  - Core Themes
-  - Plot Elements (Hooks)
-
-  Return a valid JSON object matching this structure exactly:
-  {
-    "characters": [
-      { 
-        "name": "Name", 
-        "role": "Archetype/Job (e.g. 'Survivor', 'Antagonist', 'AI')", 
-        "description": "Detailed bio. For Antagonists, describe their form and origin.", 
-        "traits": "Personality traits.",
-        "goal": "Primary objective (e.g. 'Torture forever', 'Escape'). Essential for Antagonists.",
-        "methodology": "Methods of torment/attack. Essential for Antagonists."
+  try {
+      if (isText) {
+          const textContent = await fileToText(file);
+          parts = [{ text: `[SOURCE MATERIAL: ${file.name}]\n${textContent}` }];
+      } else {
+          const base64Data = await fileToBase64(file);
+          const base64Content = base64Data.split(',')[1];
+          // Use the robust mime type detection
+          parts = [{ inlineData: { mimeType: mime, data: base64Content } }];
       }
-    ],
-    "location": "Detailed description of the setting/environment found in the source",
-    "visual_motif": "Cinematic visual style description (e.g. Grainy 16mm, Digital Glitch)",
-    "theme_cluster": "One of: Flesh, System, Haunting, Self, Blasphemy, Survival, Desire",
-    "intensity": "Level 1 to 5",
-    "plot_hook": "The immediate situation, conflict, or inciting incident present in the source."
-  }`;
 
-  parts.push({ text: prompt });
+      const prompt = `Analyze this source material for a horror simulation setup.
+      
+      CRITICAL INSTRUCTION: Extract ALL characters, including:
+      1. The Protagonists/Survivors.
+      2. The ANTAGONIST (Villain, Monster, AI, Mastercomputer). Even if it is a machine or abstract entity (like AM), it MUST be listed as a character with the role 'Antagonist' or 'Villain'.
+      
+      ALSO EXTRACT:
+      - Aesthetics (Visual Motif)
+      - Intensity Level (1-5)
+      - Core Themes
+      - Plot Elements (Hooks)
 
-  const res = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
-    contents: { parts: parts },
-    config: { 
-        responseMimeType: 'application/json'
-    }
-  });
+      Return a valid JSON object matching this structure exactly:
+      {
+        "characters": [
+          { 
+            "name": "Name", 
+            "role": "Archetype/Job (e.g. 'Survivor', 'Antagonist', 'AI')", 
+            "description": "Detailed bio. For Antagonists, describe their form and origin.", 
+            "traits": "Personality traits.",
+            "goal": "Primary objective (e.g. 'Torture forever', 'Escape'). Essential for Antagonists.",
+            "methodology": "Methods of torment/attack. Essential for Antagonists."
+          }
+        ],
+        "location": "Detailed description of the setting/environment found in the source",
+        "visual_motif": "Cinematic visual style description (e.g. Grainy 16mm, Digital Glitch)",
+        "theme_cluster": "One of: Flesh, System, Haunting, Self, Blasphemy, Survival, Desire",
+        "intensity": "Level 1 to 5",
+        "plot_hook": "The immediate situation, conflict, or inciting incident present in the source."
+      }`;
 
-  return parseSourceAnalysis(res.text || "{}");
+      // Correctly format parts for multimodal input
+      parts.push({ text: prompt });
+
+      const res = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview', // Supports Image/PDF input
+        contents: [{ role: 'user', parts: parts }],
+        config: { 
+            responseMimeType: 'application/json'
+        }
+      });
+
+      return parseSourceAnalysis(res.text || "{}");
+  } catch (e) {
+      console.error("Analysis Failed:", e);
+      throw e;
+  }
 };
 
 export const generateCalibrationField = async (
@@ -393,12 +496,19 @@ export const generateNpcPortrait = async (npc: NpcState): Promise<string | undef
 
 export const analyzeImageContext = async (file: File, aspect: string): Promise<string> => {
     const ai = getAI();
+    const mime = getMimeType(file);
     const base64Data = await fileToBase64(file);
+    
+    // Check if it's actually an image supported for multimodal
+    if (!mime.startsWith('image/')) {
+        return "Analysis not supported for this file type.";
+    }
+
     const res = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
         contents: {
             parts: [
-                { inlineData: { mimeType: file.type, data: base64Data.split(',')[1] } },
+                { inlineData: { mimeType: mime, data: base64Data.split(',')[1] } },
                 { text: `Analyze this image and describe the ${aspect} in 1-2 evocative sentences.` }
             ]
         }
