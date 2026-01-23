@@ -44,7 +44,7 @@ export const generateArchitectResponse = async (
     const ai = getAI();
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview', // High intelligence for conversation
+            model: 'gemini-3-pro-preview', 
             contents: history.map(h => ({ role: h.role, parts: [{ text: h.text }] })),
             config: {
                 systemInstruction: systemInstruction,
@@ -74,23 +74,21 @@ export const extractScenarioFromChat = async (history: { role: 'user' | 'model',
 
     try {
         const res = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview', // Flash is sufficient for extraction
+            model: 'gemini-3-pro-preview', 
             contents: [{ role: 'user', parts: [{ text: extractionPrompt }] }],
             config: { responseMimeType: 'application/json' }
         });
 
         const concepts = parseScenarioConcepts(res.text || "{}");
         
-        // Map concepts to SimulationConfig
         return {
             perspective: 'First Person',
             mode: history.some(h => h.text.toLowerCase().includes('villain') || h.text.toLowerCase().includes('hunter')) ? 'Villain' : 'Survivor',
             starting_point: 'Prologue',
-            cluster: concepts.theme_cluster || 'Flesh', // Use extracted cluster or fallback
+            cluster: concepts.theme_cluster || 'Flesh',
             intensity: concepts.intensity || 'Level 3',
             cycles: 0,
             ...concepts,
-            // Ensure fallbacks for critical fields
             villain_name: concepts.villain_name || "Unknown Entity",
             villain_appearance: concepts.villain_appearance || "Unknown",
             villain_methods: concepts.villain_methods || "Unknown",
@@ -142,7 +140,7 @@ export const processGameTurn = async (
   
   try {
       const simResponse = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview', // Using Pro for Logic
+        model: 'gemini-3-pro-preview',
         contents: {
             parts: [
                 { text: contextBlock },
@@ -158,7 +156,6 @@ export const processGameTurn = async (
       const simText = simResponse.text || "{}";
       partialState = parseSimulatorResponse(simText);
 
-      // Extract and Log NLP Analysis (Chain of Thought)
       if (partialState._analysis) {
           const { intent, complexity, parsed_steps, success_probability } = partialState._analysis;
           let log = `\n[INTENT RECOGNITION]\n`;
@@ -179,7 +176,6 @@ export const processGameTurn = async (
   } catch (e) {
       console.error("Simulator Error:", e);
       if (onStreamLogic) onStreamLogic(`\n[CRITICAL ERROR]: Logic Engine Desync.\n${e}\nProceeding with previous state.\n`, 'logic');
-      // Do not crash. Proceed with empty partial state so Narrator can at least report something.
       partialState = {};
   }
   
@@ -200,7 +196,7 @@ export const processGameTurn = async (
 
   try {
       const narratorResponse = await ai.models.generateContent({
-          model: 'gemini-3-pro-preview', // Using Pro for Creative Prose
+          model: 'gemini-3-pro-preview',
           contents: {
               parts: [
                   { text: JSON.stringify(updatedState) },
@@ -220,7 +216,6 @@ export const processGameTurn = async (
       finalStoryText = narrResult.story_text;
       narratorStateUpdates = narrResult.game_state || {};
       
-      // DETECT & STRIP VISUAL TAGS
       let hasVisualTag = false;
       if (finalStoryText.includes('[ESTABLISHING_SHOT]')) {
           hasVisualTag = true;
@@ -231,7 +226,7 @@ export const processGameTurn = async (
           finalStoryText = finalStoryText.replace(/\[SELF_PORTRAIT\]/g, '');
       }
 
-      // 4. IMAGE GENERATION (If requested via State OR Tag)
+      // 4. IMAGE GENERATION
       const requestFromState = updatedState.narrative.illustration_request || narrResult.game_state?.narrative?.illustration_request;
       const triggerImage = requestFromState || hasVisualTag;
 
@@ -254,7 +249,6 @@ export const processGameTurn = async (
               console.error("Image Gen Error", imgErr);
           }
           
-          // Clear request
           updatedState.narrative.illustration_request = null;
           if (narrResult.game_state?.narrative) {
               narrResult.game_state.narrative.illustration_request = null;
@@ -285,7 +279,7 @@ export const generateAutoPlayerAction = async (state: GameState): Promise<string
     try {
         const prompt = `Current Situation: ${state.narrative.illustration_request || "Survival situation"}\nLast Narrative: (Implicit)\nGenerate a single sentence action for the player.`;
         const res = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
+            model: 'gemini-3-pro-preview',
             contents: { parts: [{ text: JSON.stringify(state) }, { text: prompt }] },
             config: { systemInstruction: PLAYER_SYSTEM_INSTRUCTION }
         });
@@ -310,9 +304,14 @@ export const generateImage = async (
     
     try {
         const res = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image', // Optimized for image gen
+            model: 'gemini-3-pro-image-preview', // Upgraded to Pro Image
             contents: { parts: [{ text: fullPrompt }] },
-            config: {}
+            config: {
+                imageConfig: {
+                    aspectRatio: "16:9",
+                    imageSize: "1K"
+                }
+            }
         });
         
         if (res.candidates?.[0]?.content?.parts) {
@@ -328,7 +327,7 @@ export const generateImage = async (
     return undefined;
 };
 
-// Robust Helper for MIME types (Fallback if file.type is empty or generic)
+// Robust Helper for MIME types
 const getMimeType = (file: File): string => {
     if (file.type && file.type !== 'application/octet-stream') return file.type;
     const ext = file.name.split('.').pop()?.toLowerCase();
@@ -365,7 +364,6 @@ export const analyzeSourceMaterial = async (file: File): Promise<SourceAnalysisR
       } else {
           const base64Data = await fileToBase64(file);
           const base64Content = base64Data.split(',')[1];
-          // Use the robust mime type detection
           parts = [{ inlineData: { mimeType: mime, data: base64Content } }];
       }
 
@@ -400,11 +398,10 @@ export const analyzeSourceMaterial = async (file: File): Promise<SourceAnalysisR
         "plot_hook": "The immediate situation, conflict, or inciting incident present in the source."
       }`;
 
-      // Correctly format parts for multimodal input
       parts.push({ text: prompt });
 
       const res = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview', // Supports Image/PDF input
+        model: 'gemini-3-pro-preview', // Upgraded to Pro
         contents: [{ role: 'user', parts: parts }],
         config: { 
             responseMimeType: 'application/json'
@@ -433,7 +430,7 @@ export const generateCalibrationField = async (
     if (refinementInput) prompt += `\nRefine this existing value: "${refinementInput}"`;
     
     const res = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3-pro-preview', // Upgraded to Pro
         contents: { parts: [{ text: prompt }] },
     });
     return res.text?.trim() || "";
@@ -443,7 +440,7 @@ export const hydrateUserCharacter = async (description: string, cluster: string)
     const ai = getAI();
     const prompt = `Hydrate this character description into a partial JSON state. Cluster: ${cluster}. Input: "${description}"`;
     const res = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3-pro-preview', // Upgraded to Pro
         contents: { parts: [{ text: prompt }] },
         config: { responseMimeType: 'application/json' }
     });
@@ -471,7 +468,7 @@ export const extractCharactersFromText = async (text: string, cluster: string): 
 
   try {
       const res = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3-pro-preview', // Upgraded to Pro
         contents: { parts: [{ text: prompt }] },
         config: { responseMimeType: 'application/json' }
       });
@@ -499,7 +496,6 @@ export const analyzeImageContext = async (file: File, aspect: string): Promise<s
     const mime = getMimeType(file);
     const base64Data = await fileToBase64(file);
     
-    // Check if it's actually an image supported for multimodal
     if (!mime.startsWith('image/')) {
         return "Analysis not supported for this file type.";
     }
@@ -519,7 +515,7 @@ export const analyzeImageContext = async (file: File, aspect: string): Promise<s
 export const generateCharacterProfile = async (cluster: string, intensity: string, role: string): Promise<CharacterProfile> => {
     const ai = getAI();
     const res = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3-pro-preview', // Upgraded to Pro
         contents: { parts: [{ text: `Generate a horror character profile. Role: ${role}. Cluster: ${cluster}. Intensity: ${intensity}.` }] },
         config: { 
             responseMimeType: 'application/json',
@@ -539,7 +535,7 @@ export const generateCharacterProfile = async (cluster: string, intensity: strin
 export const generateScenarioConcepts = async (cluster: string, intensity: string, mode: string): Promise<ScenarioConcepts> => {
     const ai = getAI();
     const res = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3-pro-preview', // Upgraded to Pro
         contents: { parts: [{ text: `Generate a full scenario concept JSON object. Cluster: ${cluster}, Mode: ${mode}, Intensity: ${intensity}.` }] },
         config: {
              responseMimeType: 'application/json',
