@@ -1,9 +1,19 @@
+
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { GameState, ChatMessage, SimulationConfig, NpcState } from '../types';
 import { getDefaultLocationState } from '../services/locationEngine';
 import { generateProceduralNpc } from '../services/npcGenerator';
 import { processGameTurn, generateAutoPlayerAction, initializeGemini } from '../services/geminiService';
 import { useAutoPilot } from './useAutoPilot';
+
+export interface SaveSlot {
+    id: string;
+    timestamp: number;
+    name: string;
+    summary: string;
+    gameState: GameState;
+    history: ChatMessage[];
+}
 
 export const useGameEngine = (initialApiKey: string) => {
     // --- STATE ---
@@ -169,6 +179,56 @@ export const useGameEngine = (initialApiKey: string) => {
         setIsInitialized(false);
     }, []);
 
+    // --- SAVE / LOAD SYSTEM ---
+
+    const getSaves = (): SaveSlot[] => {
+        try {
+            const data = localStorage.getItem('nightmare_machine_saves');
+            return data ? JSON.parse(data) : [];
+        } catch (e) {
+            console.error("Failed to read saves", e);
+            return [];
+        }
+    };
+
+    const saveSession = (name: string) => {
+        try {
+            const saves = getSaves();
+            const newSlot: SaveSlot = {
+                id: crypto.randomUUID(),
+                timestamp: Date.now(),
+                name: name || `Session ${saves.length + 1}`,
+                summary: `Turn ${gameState.meta.turn} - ${gameState.meta.active_cluster}`,
+                gameState: gameState,
+                history: history
+            };
+            const updatedSaves = [newSlot, ...saves];
+            localStorage.setItem('nightmare_machine_saves', JSON.stringify(updatedSaves));
+            return true;
+        } catch (e) {
+            console.error("Save failed", e);
+            return false;
+        }
+    };
+
+    const loadSession = (slotId: string) => {
+        const saves = getSaves();
+        const slot = saves.find(s => s.id === slotId);
+        if (slot) {
+            setGameState(slot.gameState);
+            setHistory(slot.history);
+            setIsInitialized(true);
+            return true;
+        }
+        return false;
+    };
+
+    const deleteSave = (slotId: string) => {
+        const saves = getSaves();
+        const updated = saves.filter(s => s.id !== slotId);
+        localStorage.setItem('nightmare_machine_saves', JSON.stringify(updated));
+    };
+
     // --- AUTO-PILOT SYSTEM ---
     useAutoPilot({
         config: autoMode,
@@ -203,6 +263,12 @@ export const useGameEngine = (initialApiKey: string) => {
         sendMessage: handleSendMessage,
         resetGame,
         setAutoMode,
-        toggleLogic: () => {} // Logic toggle is UI state, handled in App
+        toggleLogic: () => {}, // Logic toggle is UI state, handled in App
+        
+        // Persistence
+        saveSession,
+        loadSession,
+        deleteSave,
+        getSaves
     };
 };

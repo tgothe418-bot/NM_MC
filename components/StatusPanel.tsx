@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { GameState, NpcState } from '../types';
-import { Skull, Radio, Users, Eye, Brain, ChevronUp, ChevronDown, Activity, ZapOff, Stethoscope, Cpu, FileText, Square, Target, BookOpen, Power, GripHorizontal, Map } from 'lucide-react';
+import { Skull, Radio, Users, Eye, Brain, ChevronUp, ChevronDown, Activity, ZapOff, Stethoscope, Cpu, FileText, Square, Target, BookOpen, Power, GripHorizontal, Map, Save } from 'lucide-react';
 import { CharacterPortrait } from './CharacterPortrait';
 import { RoomGrid } from './RoomGrid';
 
@@ -12,6 +12,7 @@ interface StatusPanelProps {
   onAbortTest: () => void;
   onUpdateNpc?: (index: number, updates: Partial<NpcState>) => void;
   onReset?: () => void;
+  onOpenSaveLoad?: () => void;
 }
 
 export const StatusPanel: React.FC<StatusPanelProps> = ({ 
@@ -20,7 +21,8 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
     isTesting, 
     onAbortTest,
     onUpdateNpc,
-    onReset
+    onReset,
+    onOpenSaveLoad
 }) => {
   const { meta, villain_state, npc_states, location_state } = gameState;
   const threatLevel = villain_state?.threat_scale || 0;
@@ -126,6 +128,11 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
                             <Radio className="w-4 h-4" /> SYSTEM CONTROL
                         </span>
                         <div className="flex gap-2">
+                            {onOpenSaveLoad && (
+                                <button onClick={onOpenSaveLoad} className="p-2 border border-gray-700 hover:border-gray-500 text-gray-500 hover:text-white rounded-sm transition-colors" title="Save / Load Game">
+                                    <Save className="w-4 h-4" />
+                                </button>
+                            )}
                             {onReset && (
                                 <button onClick={onReset} className="p-2 border border-gray-700 hover:border-red-500 text-gray-500 hover:text-red-500 rounded-sm transition-colors" title="Restart / Reset Session">
                                     <Power className="w-4 h-4" />

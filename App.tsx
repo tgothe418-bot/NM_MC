@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { SetupOverlay } from './components/SetupOverlay';
@@ -6,6 +7,7 @@ import { StoryLog } from './components/StoryLog';
 import { InputArea } from './components/InputArea';
 import { SimulationModal } from './components/SimulationModal';
 import { ApiKeyModal } from './components/ApiKeyModal';
+import { SaveLoadModal } from './components/SaveLoadModal';
 import { useGameEngine } from './hooks/useGameEngine';
 import { NpcState } from './types';
 
@@ -13,9 +15,10 @@ export default function App() {
   const [showSetup, setShowSetup] = useState(false);
   const [showSimModal, setShowSimModal] = useState(false);
   const [showLogic, setShowLogic] = useState(false);
+  const [showSaveLoad, setShowSaveLoad] = useState(false);
 
   // Initialize Engine
-  // This hook now manages the Game Loop, Auto-Pilot, and Gemini Connection
+  // This hook now manages the Game Loop, Auto-Pilot, Gemini Connection, and Save/Load logic
   const {
       apiKey,
       setApiKey,
@@ -29,7 +32,11 @@ export default function App() {
       streams,
       initializeGame,
       sendMessage,
-      resetGame
+      resetGame,
+      saveSession,
+      loadSession,
+      deleteSave,
+      getSaves
   } = useGameEngine(process.env.API_KEY || ""); 
 
   // --- HANDLERS ---
@@ -105,6 +112,7 @@ export default function App() {
             onAbortTest={() => setAutoMode({ active: false, remainingCycles: 0 })}
             onUpdateNpc={handleUpdateNpc}
             onReset={handleReset}
+            onOpenSaveLoad={() => setShowSaveLoad(true)}
         />
 
         {/* Simulation Modal */}
@@ -143,6 +151,20 @@ export default function App() {
             simulationReport={null}
             initialCluster={gameState.meta.active_cluster}
             currentVillainState={gameState.villain_state}
+        />
+
+        {/* Save/Load Modal */}
+        <SaveLoadModal 
+            isOpen={showSaveLoad}
+            onClose={() => setShowSaveLoad(false)}
+            onSave={saveSession}
+            onLoad={(id) => {
+                const success = loadSession(id);
+                if (success) setShowSaveLoad(false);
+                return success;
+            }}
+            onDelete={deleteSave}
+            getSaves={getSaves}
         />
     </div>
   );

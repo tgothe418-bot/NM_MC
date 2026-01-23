@@ -9,6 +9,72 @@ import {
 import { GameState, SourceAnalysisResult, ScenarioConcepts, CharacterProfile, NpcState } from './types';
 import { z } from 'zod';
 
+// --- HELPER: ROBUST JSON EXTRACTION ---
+// Scans for the first valid JSON object or array by balancing braces/brackets.
+// Ignores characters inside strings.
+const extractJson = (str: string): string | null => {
+    // Find the first possible JSON start
+    const firstBrace = str.indexOf('{');
+    const firstBracket = str.indexOf('[');
+    
+    if (firstBrace === -1 && firstBracket === -1) return null;
+
+    let start = -1;
+    let isObject = false;
+
+    // Determine type based on which appears first
+    if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+        start = firstBrace;
+        isObject = true;
+    } else {
+        start = firstBracket;
+        isObject = false;
+    }
+
+    const open = isObject ? '{' : '[';
+    const close = isObject ? '}' : ']';
+    
+    let balance = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let i = start; i < str.length; i++) {
+        const c = str[i];
+
+        if (escaped) {
+            escaped = false;
+            continue;
+        }
+
+        if (c === '\\') {
+            escaped = true;
+            continue;
+        }
+
+        if (c === '"') {
+            inString = !inString;
+            continue;
+        }
+
+        if (!inString) {
+            if (c === open) {
+                balance++;
+            } else if (c === close) {
+                balance--;
+                if (balance === 0) {
+                    // Found the matching closing brace
+                    return str.substring(start, i + 1);
+                }
+            }
+        }
+    }
+    
+    // If we get here, brackets were unbalanced or EOF reached without closure.
+    // Return null to allow fallback strategies or return what we have? 
+    // Returning null allows the caller to try a simpler slice if strict balancing fails.
+    return null;
+};
+
 // --- HELPER: CLEAN & PARSE ---
 const cleanAndParse = <T>(text: string, schema: z.ZodSchema<T>, fallback: T): T => {
     try {
@@ -19,27 +85,29 @@ const cleanAndParse = <T>(text: string, schema: z.ZodSchema<T>, fallback: T): T 
             cleanText = cleanText.replace(/```(?:json)?/g, '').replace(/```/g, '');
         }
 
-        // 2. Scan for JSON bounds (Object OR Array)
-        const firstBrace = cleanText.indexOf('{');
-        const firstBracket = cleanText.indexOf('[');
-        
-        let start = -1;
-        let end = -1;
+        // 2. Attempt robust extraction
+        const extracted = extractJson(cleanText);
+        if (extracted) {
+            cleanText = extracted;
+        } else {
+            // Fallback: Crude extraction if the robust one failed (e.g. malformed)
+            // This catches cases where balancing might fail due to weird escaping but simple slice might work
+            const firstBrace = cleanText.indexOf('{');
+            const firstBracket = cleanText.indexOf('[');
+            let start = -1;
+            let end = -1;
 
-        // Determine which opens first: { or [
-        if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
-            // It's an Object
-            start = firstBrace;
-            end = cleanText.lastIndexOf('}');
-        } else if (firstBracket !== -1) {
-            // It's an Array
-            start = firstBracket;
-            end = cleanText.lastIndexOf(']');
-        }
+            if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+                start = firstBrace;
+                end = cleanText.lastIndexOf('}');
+            } else if (firstBracket !== -1) {
+                start = firstBracket;
+                end = cleanText.lastIndexOf(']');
+            }
 
-        // Only slice if we found valid bounds
-        if (start !== -1 && end !== -1) {
-            cleanText = cleanText.substring(start, end + 1);
+            if (start !== -1 && end !== -1) {
+                cleanText = cleanText.substring(start, end + 1);
+            }
         }
 
         const json = JSON.parse(cleanText);
@@ -56,7 +124,7 @@ const cleanAndParse = <T>(text: string, schema: z.ZodSchema<T>, fallback: T): T 
             return { ...fallback, ...json }; 
         }
     } catch (e) {
-        console.error("JSON Parse Error:", e, text);
+        console.error("JSON Parse Error:", e);
         return fallback;
     }
 };
