@@ -13,65 +13,64 @@ import { z } from 'zod';
 // Scans for the first valid JSON object or array by balancing braces/brackets.
 // Ignores characters inside strings.
 const extractJson = (str: string): string | null => {
-    // Find the first possible JSON start
-    const firstBrace = str.indexOf('{');
-    const firstBracket = str.indexOf('[');
-    
-    if (firstBrace === -1 && firstBracket === -1) return null;
-
-    let start = -1;
-    let isObject = false;
-
-    // Determine type based on which appears first
-    if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
-        start = firstBrace;
-        isObject = true;
-    } else {
-        start = firstBracket;
-        isObject = false;
+    // 1. Collect all possible start indices
+    const starts: { index: number, char: string }[] = [];
+    for (let i = 0; i < str.length; i++) {
+        if (str[i] === '{' || str[i] === '[') {
+            starts.push({ index: i, char: str[i] });
+        }
     }
 
-    const open = isObject ? '{' : '[';
-    const close = isObject ? '}' : ']';
-    
-    let balance = 0;
-    let inString = false;
-    let escaped = false;
+    // 2. Iterate through potential starts
+    for (const startObj of starts) {
+        const { index: start, char: open } = startObj;
+        const close = open === '{' ? '}' : ']';
+        
+        let balance = 0;
+        let inString = false;
+        let escaped = false;
 
-    for (let i = start; i < str.length; i++) {
-        const c = str[i];
+        for (let i = start; i < str.length; i++) {
+            const c = str[i];
 
-        if (escaped) {
-            escaped = false;
-            continue;
-        }
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
 
-        if (c === '\\') {
-            escaped = true;
-            continue;
-        }
+            if (c === '\\') {
+                escaped = true;
+                continue;
+            }
 
-        if (c === '"') {
-            inString = !inString;
-            continue;
-        }
+            if (c === '"') {
+                inString = !inString;
+                continue;
+            }
 
-        if (!inString) {
-            if (c === open) {
-                balance++;
-            } else if (c === close) {
-                balance--;
-                if (balance === 0) {
-                    // Found the matching closing brace
-                    return str.substring(start, i + 1);
+            if (!inString) {
+                if (c === open) {
+                    balance++;
+                } else if (c === close) {
+                    balance--;
+                    if (balance === 0) {
+                        // Found a matching closing brace.
+                        // Attempt to parse this substring to verify validity.
+                        const candidate = str.substring(start, i + 1);
+                        try {
+                            JSON.parse(candidate);
+                            // If parse succeeds, we found our JSON.
+                            return candidate;
+                        } catch (e) {
+                            // If parse fails (e.g. { key: "value" } garbage inside?), keep searching.
+                            break; // Stop extending this candidate, try next start position.
+                        }
+                    }
                 }
             }
         }
     }
     
-    // If we get here, brackets were unbalanced or EOF reached without closure.
-    // Return null to allow fallback strategies or return what we have? 
-    // Returning null allows the caller to try a simpler slice if strict balancing fails.
     return null;
 };
 
@@ -81,35 +80,18 @@ const cleanAndParse = <T>(text: string, schema: z.ZodSchema<T>, fallback: T): T 
         let cleanText = text.trim();
         
         // 1. Remove markdown code blocks if present
-        if (cleanText.includes('```')) {
-            cleanText = cleanText.replace(/```(?:json)?/g, '').replace(/```/g, '');
+        const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/i;
+        const match = cleanText.match(codeBlockRegex);
+        if (match) {
+            cleanText = match[1];
         }
 
         // 2. Attempt robust extraction
         const extracted = extractJson(cleanText);
         if (extracted) {
             cleanText = extracted;
-        } else {
-            // Fallback: Crude extraction if the robust one failed (e.g. malformed)
-            // This catches cases where balancing might fail due to weird escaping but simple slice might work
-            const firstBrace = cleanText.indexOf('{');
-            const firstBracket = cleanText.indexOf('[');
-            let start = -1;
-            let end = -1;
-
-            if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
-                start = firstBrace;
-                end = cleanText.lastIndexOf('}');
-            } else if (firstBracket !== -1) {
-                start = firstBracket;
-                end = cleanText.lastIndexOf(']');
-            }
-
-            if (start !== -1 && end !== -1) {
-                cleanText = cleanText.substring(start, end + 1);
-            }
-        }
-
+        } 
+        
         const json = JSON.parse(cleanText);
         const result = schema.safeParse(json);
 

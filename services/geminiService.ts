@@ -1,5 +1,6 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
+import { zodToJsonSchema } from "zod-to-json-schema";
 import { 
   GameState, 
   NpcState, 
@@ -8,6 +9,10 @@ import {
   CharacterProfile, 
   SimulationConfig 
 } from '../types';
+import {
+  ScenarioConceptsSchema,
+  CharacterProfileSchema
+} from '../schemas';
 import { 
   parseSimulatorResponse, 
   parseNarratorResponse, 
@@ -530,19 +535,14 @@ export const analyzeImageContext = async (file: File, aspect: string): Promise<s
 
 export const generateCharacterProfile = async (cluster: string, intensity: string, role: string): Promise<CharacterProfile> => {
     const ai = getAI();
+    const jsonSchema = zodToJsonSchema(CharacterProfileSchema, "profile");
+
     const res = await ai.models.generateContent({
         model: 'gemini-3-pro-preview', // Upgraded to Pro
         contents: { parts: [{ text: `Generate a horror character profile. Role: ${role}. Cluster: ${cluster}. Intensity: ${intensity}.` }] },
         config: { 
             responseMimeType: 'application/json',
-            responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                    name: { type: Type.STRING },
-                    background: { type: Type.STRING },
-                    traits: { type: Type.STRING }
-                }
-            }
+            responseSchema: jsonSchema.definitions?.profile as any
         }
     });
     return parseCharacterProfile(res.text || "{}");
@@ -550,26 +550,14 @@ export const generateCharacterProfile = async (cluster: string, intensity: strin
 
 export const generateScenarioConcepts = async (cluster: string, intensity: string, mode: string): Promise<ScenarioConcepts> => {
     const ai = getAI();
+    const jsonSchema = zodToJsonSchema(ScenarioConceptsSchema, "concepts");
+
     const res = await ai.models.generateContent({
         model: 'gemini-3-pro-preview', // Upgraded to Pro
         contents: { parts: [{ text: `Generate a full scenario concept JSON object. Cluster: ${cluster}, Mode: ${mode}, Intensity: ${intensity}.` }] },
         config: {
              responseMimeType: 'application/json',
-             responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                    villain_name: { type: Type.STRING },
-                    villain_appearance: { type: Type.STRING },
-                    villain_methods: { type: Type.STRING },
-                    primary_goal: { type: Type.STRING },
-                    victim_description: { type: Type.STRING },
-                    survivor_name: { type: Type.STRING },
-                    survivor_background: { type: Type.STRING },
-                    survivor_traits: { type: Type.STRING },
-                    location_description: { type: Type.STRING },
-                    visual_motif: { type: Type.STRING }
-                }
-             }
+             responseSchema: jsonSchema.definitions?.concepts as any
         }
     });
     return parseScenarioConcepts(res.text || "{}");

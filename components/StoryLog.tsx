@@ -3,6 +3,7 @@ import React, { useEffect, useRef } from 'react';
 import { ChatMessage } from '../types';
 import { Image, FileText, Terminal, Feather } from 'lucide-react';
 import { SigilLoader } from './SigilLoader';
+import { ThinkingExpander } from './ThinkingExpander';
 
 interface StoryLogProps {
   history: ChatMessage[];
@@ -193,24 +194,24 @@ export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, activeCl
       if (showLogic && narrativeRef.current) narrativeRef.current.scrollTop = narrativeRef.current.scrollHeight;
   }, [logicStream, narrativeStream, showLogic]);
 
-  const latestModelMsg = [...history].reverse().find(m => m.role === 'model');
-  const footnotes: string[] = [];
-  if (latestModelMsg) {
-      const regex = /\[\^(\d+)\]:\s*(.*)/g;
-      let match;
-      while ((match = regex.exec(latestModelMsg.text)) !== null) footnotes.push(`${match[1]}. ${match[2]}`);
-  }
-
   // Derived loading state text
   const loadingText = streamPhase === 'logic' ? 'Calculating Consequences...' : 'Rendering Narrative...';
+  const combinedStream = (logicStream || "") + (narrativeStream || "");
 
   return (
     <div className={`flex-1 overflow-y-auto p-10 lg:p-20 custom-scrollbar bg-transparent relative z-10 ${className}`}>
       <div className="max-w-4xl mx-auto space-y-16 min-h-full">
-        {/* If history is empty and loading, show a centered initialization screen */}
+        {/* INITIAL LOAD SCREEN */}
         {history.length === 0 && isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-auto px-4">
                 <SigilLoader cluster={activeCluster} text={loadingText} />
+                <div className="w-full max-w-xl mt-8 animate-fadeIn">
+                    <ThinkingExpander 
+                        stream={combinedStream} 
+                        phase={streamPhase || 'logic'} 
+                        defaultExpanded={true} 
+                    />
+                </div>
             </div>
         )}
 
@@ -254,7 +255,18 @@ export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, activeCl
           </div>
         ))}
         
-        {/* Logic Stream Overlay (Hacker Mode) */}
+        {/* SUBSEQUENT TURN LOADING INDICATOR (Thoughts) */}
+        {isLoading && history.length > 0 && (
+            <div className="animate-fadeIn mt-8">
+                <ThinkingExpander 
+                    stream={combinedStream} 
+                    phase={streamPhase || 'logic'} 
+                    defaultExpanded={false}
+                />
+            </div>
+        )}
+        
+        {/* Logic Stream Overlay (Legacy Hacker Mode) */}
         {showLogic && (
             <div className="fixed top-20 right-10 w-96 bg-black/90 border border-green-900/50 p-4 font-mono text-[10px] text-green-500 h-[60vh] overflow-hidden flex flex-col z-50 shadow-[0_0_30px_rgba(0,255,0,0.1)] rounded-sm pointer-events-none">
                 <div className="border-b border-green-900/50 pb-2 mb-2 flex justify-between items-center">
