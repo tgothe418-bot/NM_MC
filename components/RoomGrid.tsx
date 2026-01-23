@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { GridLayout, GridCell } from '../types';
-import { User, Skull, AlertTriangle, Box, Ghost } from 'lucide-react';
+import { User, Skull, AlertTriangle, Box, Ghost, Zap } from 'lucide-react';
 
 interface RoomGridProps {
   layout?: GridLayout;
@@ -39,10 +39,10 @@ export const RoomGrid: React.FC<RoomGridProps> = ({ layout, className = "", show
         style={{
             display: 'grid',
             gridTemplateColumns: `repeat(${width}, minmax(0, 1fr))`,
-            gap: '2px',
+            gap: '1px',
             aspectRatio: `${width}/${height}`
         }} 
-        className="w-full relative z-10"
+        className="w-full relative z-10 border border-gray-800 bg-gray-900"
       >
         {cells.map((row, y) => {
           if (!Array.isArray(row)) {
@@ -60,69 +60,71 @@ export const RoomGrid: React.FC<RoomGridProps> = ({ layout, className = "", show
 
 const GridTile: React.FC<{ cell: GridCell }> = ({ cell }) => {
   if (!cell) {
-      return <div className="bg-black/50 border border-red-900/10 aspect-square" />;
+      return <div className="bg-black/50 aspect-square" />;
   }
 
-  let bgClass = "bg-gray-900/40"; 
+  let bgClass = "bg-gray-900"; 
   let content = null;
-  let borderClass = "border-transparent";
+  let borderClass = "";
+  const typeLower = cell.type.toLowerCase();
 
   // 1. Terrain Styling
-  switch (cell.type) {
-    case 'Wall':
-      bgClass = "bg-gray-800 shadow-inner";
-      borderClass = "border-gray-700/50";
-      // Diagonal hatch pattern for walls using CSS gradient simulation logic (simplified here)
-      break;
-    case 'Void':
-      bgClass = "bg-black"; 
-      break;
-    case 'Hazard':
-      bgClass = "bg-red-900/10";
-      borderClass = "border-red-900/30";
-      content = <AlertTriangle className="w-3 h-3 text-red-600 opacity-60" />;
-      break;
-    case 'Cover':
-      bgClass = "bg-amber-900/10";
-      borderClass = "border-amber-900/30";
-      content = <Box className="w-3 h-3 text-amber-600 opacity-60" />;
-      break;
-    case 'Floor':
-    default:
-        // Minimal dot for floor
-        content = <div className="w-0.5 h-0.5 rounded-full bg-gray-700/50" />;
-        break;
+  if (typeLower === 'wall') {
+      bgClass = "bg-gray-700 shadow-inner";
+      // Diagonal stripe pattern for walls
+      content = <div className="w-full h-full opacity-10 bg-[repeating-linear-gradient(45deg,transparent,transparent_2px,#000_2px,#000_4px)]" />;
+  } else if (typeLower === 'void') {
+      bgClass = "bg-black";
+  } else if (typeLower === 'hazard') {
+      bgClass = "bg-red-900/20";
+      borderClass = "border border-red-900/30";
+      content = <AlertTriangle className="w-3 h-3 text-red-600 opacity-80" />;
+  } else if (typeLower === 'cover') {
+      bgClass = "bg-amber-900/20";
+      borderClass = "border border-amber-900/30";
+      content = <Box className="w-3 h-3 text-amber-600 opacity-80" />;
+  } else {
+      // Floor (Default)
+      bgClass = "bg-gray-800 hover:bg-gray-700 transition-colors";
+      content = <div className="w-0.5 h-0.5 rounded-full bg-gray-600/50" />;
   }
 
   // 2. Occupant Layer (Overrides Terrain visual if present)
   if (cell.occupant_id) {
-    if (cell.occupant_id === 'Player') {
-        content = <User className="w-4 h-4 text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]" />;
-        borderClass = "border-cyan-500/30";
-        bgClass = "bg-cyan-900/20";
-    } else if (cell.occupant_id.toLowerCase().includes('entity') || cell.occupant_id.toLowerCase().includes('killer') || cell.occupant_id.toLowerCase().includes('horror')) {
-        content = <Skull className="w-4 h-4 text-red-500 animate-pulse drop-shadow-[0_0_8px_rgba(239,68,68,0.6)]" />;
-        borderClass = "border-red-500/30";
-        bgClass = "bg-red-900/20";
+    const occLower = cell.occupant_id.toLowerCase();
+    
+    // Clear background to emphasize entity
+    content = null;
+
+    if (occLower === 'player' || occLower === 'you') {
+        content = <User className="w-4 h-4 text-cyan-400 drop-shadow-[0_0_5px_rgba(34,211,238,0.8)] animate-pulse" />;
+        bgClass = "bg-cyan-900/30";
+        borderClass = "border border-cyan-500/50";
+    } else if (occLower.includes('entity') || occLower.includes('killer') || occLower.includes('horror') || occLower.includes('villain')) {
+        content = <Skull className="w-4 h-4 text-red-500 animate-pulse drop-shadow-[0_0_5px_rgba(239,68,68,0.8)]" />;
+        bgClass = "bg-red-900/30";
+        borderClass = "border border-red-500/50";
+    } else if (occLower.includes('anomaly') || occLower.includes('glitch')) {
+        content = <Zap className="w-3.5 h-3.5 text-yellow-400 animate-spin" />;
+        bgClass = "bg-yellow-900/30";
     } else {
         // NPC / Other
-        content = <Ghost className="w-3.5 h-3.5 text-gray-400" />;
-        borderClass = "border-gray-600/30";
+        content = <Ghost className="w-3.5 h-3.5 text-gray-300" />;
+        bgClass = "bg-indigo-900/30";
+        borderClass = "border border-indigo-500/30";
     }
   }
 
   return (
     <div 
-        className={`relative flex items-center justify-center rounded-[1px] transition-all duration-300 hover:z-20 border ${bgClass} ${borderClass} aspect-square group`}
+        className={`relative flex items-center justify-center aspect-square transition-all duration-300 group overflow-hidden ${bgClass} ${borderClass}`}
+        title={cell.occupant_id || cell.description || cell.type}
     >
       {content}
       
-      {/* Hover Info */}
+      {/* Tooltip Overlay */}
       {(cell.description || cell.occupant_id) && (
-          <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black border border-gray-700 text-white text-[8px] px-2 py-1 opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-30 shadow-xl font-mono tracking-wide">
-              {cell.occupant_id ? <span className="text-cyan-400 font-bold block">{cell.occupant_id}</span> : null}
-              {cell.description}
-          </div>
+          <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 pointer-events-none" />
       )}
     </div>
   );

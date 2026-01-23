@@ -179,12 +179,28 @@ export const processGameTurn = async (
       partialState = {};
   }
   
+  // DEEP MERGE LOCATION STATE
+  // Critical for preserving the room_map when LLM sends partial updates (e.g. only current_room_id or weather)
+  let newLocationState = { ...currentState.location_state };
+  if (partialState.location_state) {
+      newLocationState = { ...newLocationState, ...partialState.location_state };
+      if (partialState.location_state.room_map) {
+          // If the LLM returns a new room_map, we assume it wants to ADD/UPDATE rooms, not replace everything.
+          // However, typically LLMs output the *changes*. We should merge the dictionaries.
+          newLocationState.room_map = {
+              ...currentState.location_state.room_map,
+              ...partialState.location_state.room_map
+          };
+      }
+  }
+
   const updatedState: GameState = {
       ...currentState,
       ...partialState,
-      meta: { ...currentState.meta, ...partialState.meta },
-      villain_state: { ...currentState.villain_state, ...partialState.villain_state },
-      narrative: { ...currentState.narrative, ...partialState.narrative },
+      meta: { ...currentState.meta, ...(partialState.meta || {}) },
+      villain_state: { ...currentState.villain_state, ...(partialState.villain_state || {}) },
+      narrative: { ...currentState.narrative, ...(partialState.narrative || {}) },
+      location_state: newLocationState, 
   };
 
   // 3. NARRATOR PHASE (Prose)
