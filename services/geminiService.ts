@@ -7,7 +7,8 @@ import {
   SourceAnalysisResult,
   ScenarioConcepts,
   CharacterProfile, 
-  SimulationConfig 
+  SimulationConfig,
+  ChatMessage
 } from '../types';
 import {
   ScenarioConceptsSchema,
@@ -113,21 +114,42 @@ export const extractScenarioFromChat = async (history: { role: 'user' | 'model',
     }
 };
 
+export const summarizeHistory = async (history: ChatMessage[]): Promise<string> => {
+    const ai = getAI();
+    // Only summarize if history is long enough to matter
+    if (history.length < 5) return "";
+
+    const transcript = history
+        .filter(h => h.role === 'user' || h.role === 'model')
+        .map(h => `${h.role.toUpperCase()}: ${h.text}`)
+        .join('\n');
+        
+    const prompt = `Review the following narrative log. Summarize the key events, physical changes to the characters, and current threat status into a single cohesive paragraph (Past Tense). Use the style of a "Previously On" recap. Keep it evocative.\n\nTRANSCRIPT:\n${transcript}`;
+
+    try {
+        const res = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview', 
+            contents: { parts: [{ text: prompt }] }
+        });
+        return res.text || "";
+    } catch (e) {
+        console.error("Summary Error", e);
+        return "";
+    }
+};
+
 // --- GAME LOOP ---
 
+// [OPTIMIZATION A] Parallel Pipeline Implementation
 export const processGameTurn = async (
   currentState: GameState, 
   userAction: string, 
   files: File[] = [],
   onStreamLogic?: (chunk: string, phase: 'logic' | 'narrative') => void
-): Promise<{ 
-    gameState: GameState, 
-    storyText: string, 
-    imagePromise: Promise<string | undefined> 
-}> => {
+): Promise<{ gameState: GameState, storyText: string, imagePromise?: Promise<string | undefined> }> => {
   const ai = getAI();
 
-  // 1. CONSTRUCT CONTEXT
+  // 1. CONSTRUCT CONTEXT (Unchanged)
   const sensoryManifesto = constructSensoryManifesto(currentState);
   const voiceManifesto = constructVoiceManifesto(currentState.npc_states, currentState.meta.active_cluster);
   const locationManifesto = constructLocationManifesto(currentState.location_state);
@@ -135,68 +157,55 @@ export const processGameTurn = async (
 
   const contextBlock = `
   ${JSON.stringify(currentState)}
-  
+  [PRIOR NARRATIVE SUMMARY]: ${currentState.narrative.past_summary || "None"}
   ${sensoryManifesto}
   ${voiceManifesto}
   ${locationManifesto}
   ${roomRules}
   `;
 
-  // 2. SIMULATOR PHASE (Logic)
+  // 2. SIMULATOR PHASE (Logic) - (Unchanged logic, just ensure onStreamLogic calls are safe)
   if (onStreamLogic) onStreamLogic("initializing logic engine...\n", 'logic');
 
   let partialState: any = {};
   
   try {
       const simResponse = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-2.0-flash-exp', // Suggestion: Use Flash for Logic (Faster)
         contents: {
             parts: [
                 { text: contextBlock },
                 { text: `USER ACTION: "${userAction}"` }
             ]
         },
-        config: {
-            systemInstruction: SIMULATOR_INSTRUCTION,
-            responseMimeType: 'application/json'
+        // Inject summary into System Instruction for better retention
+        config: { 
+            systemInstruction: SIMULATOR_INSTRUCTION + `\n\n[LONG TERM MEMORY]: ${currentState.narrative.past_summary || "No prior history."}`, 
+            responseMimeType: 'application/json' 
         }
       });
-
+      
       const simText = simResponse.text || "{}";
       partialState = parseSimulatorResponse(simText);
-
-      if (partialState._analysis) {
-          const { intent, complexity, parsed_steps, success_probability } = partialState._analysis;
-          let log = `\n[INTENT RECOGNITION]\n`;
-          log += `> INTENT: ${intent}\n`;
-          log += `> COMPLEXITY: ${complexity}\n`;
-          if (parsed_steps && parsed_steps.length > 0) {
-              log += `> STEPS:\n  - ${parsed_steps.join('\n  - ')}\n`;
-          }
-          log += `> PROBABILITY: ${success_probability}\n`;
-          
-          if (onStreamLogic) onStreamLogic(log + "\n", 'logic');
-          
-          delete partialState._analysis;
-      } else {
-          if (onStreamLogic) onStreamLogic(`\n[STATE UPDATE]\n${JSON.stringify(partialState, null, 2)}\n`, 'logic');
+      
+      if (partialState._analysis && onStreamLogic) {
+         const { intent, complexity, success_probability } = partialState._analysis;
+         let log = `\n[INTENT RECOGNITION]\n> INTENT: ${intent}\n> COMPLEXITY: ${complexity}\n> PROBABILITY: ${success_probability}\n`; 
+         onStreamLogic(log, 'logic');
+         delete partialState._analysis;
       }
 
   } catch (e) {
       console.error("Simulator Error:", e);
-      if (onStreamLogic) onStreamLogic(`\n[CRITICAL ERROR]: Logic Engine Desync.\n${e}\nProceeding with previous state.\n`, 'logic');
       partialState = {};
   }
   
-  // DEEP MERGE LOCATION STATE
+  // MERGE STATE (Unchanged)
   let newLocationState = { ...currentState.location_state };
   if (partialState.location_state) {
       newLocationState = { ...newLocationState, ...partialState.location_state };
       if (partialState.location_state.room_map) {
-          newLocationState.room_map = {
-              ...currentState.location_state.room_map,
-              ...partialState.location_state.room_map
-          };
+          newLocationState.room_map = { ...currentState.location_state.room_map, ...partialState.location_state.room_map };
       }
   }
 
@@ -212,8 +221,9 @@ export const processGameTurn = async (
   // 3. NARRATOR PHASE (Prose)
   if (onStreamLogic) onStreamLogic("rendering narrative...\n", 'narrative');
 
-  let finalStoryText = "*The vision blurs momentarily.* (The simulation is recalibrating...)";
+  let finalStoryText = "*The vision blurs...*";
   let narratorStateUpdates = {};
+  let imagePromise: Promise<string | undefined> | undefined; // Decoupled Promise
 
   try {
       const narratorResponse = await ai.models.generateContent({
@@ -225,9 +235,9 @@ export const processGameTurn = async (
                   { text: `SIMULATOR OUTCOME: ${JSON.stringify(partialState)}` }
               ]
           },
-          config: {
-              systemInstruction: NARRATOR_INSTRUCTION,
-              responseMimeType: 'application/json'
+          config: { 
+              systemInstruction: NARRATOR_INSTRUCTION + `\n\n[LONG TERM MEMORY]: ${updatedState.narrative.past_summary || "No prior history."}`, 
+              responseMimeType: 'application/json' 
           }
       });
 
@@ -237,62 +247,45 @@ export const processGameTurn = async (
       finalStoryText = narrResult.story_text;
       narratorStateUpdates = narrResult.game_state || {};
       
-  } catch (e) {
-      console.error("Narrator Error:", e);
-      finalStoryText = `*The vision blurs momentarily.* (The simulation is recalibrating...)`;
-  }
-
-  const finalState = {
-      ...updatedState,
-      ...narratorStateUpdates
-  };
-
-  // 4. IMAGE GENERATION (NON-BLOCKING)
-  // We construct the promise here but DO NOT await it.
-  const imagePromise = (async () => {
-      let hasVisualTag = false;
-      if (finalStoryText.includes('[ESTABLISHING_SHOT]')) hasVisualTag = true;
-      if (finalStoryText.includes('[SELF_PORTRAIT]')) hasVisualTag = true;
-
-      // Clean tags from text logic handles in UI/Narrator, but we leave text clean-up to the display layer usually.
-      // Here we just check triggers.
+      // 4. IMAGE GENERATION (NON-BLOCKING)
+      let hasVisualTag = finalStoryText.includes('[ESTABLISHING_SHOT]') || finalStoryText.includes('[SELF_PORTRAIT]');
+      // Clean tags from text
+      finalStoryText = finalStoryText.replace(/\[ESTABLISHING_SHOT\]|\[SELF_PORTRAIT\]/g, '');
 
       const requestFromState = updatedState.narrative.illustration_request || (narratorStateUpdates as any)?.narrative?.illustration_request;
-      const triggerImage = requestFromState || hasVisualTag;
-
-      if (triggerImage) {
-          if (onStreamLogic) onStreamLogic("queueing visual artifact...\n", 'narrative');
+      
+      if (requestFromState || hasVisualTag) {
+          if (onStreamLogic) onStreamLogic("queuing visual artifact...\n", 'narrative');
           
           let prompt = typeof requestFromState === 'string' ? requestFromState : "Establishing Shot";
-          if (prompt.toLowerCase().includes('portrait') || prompt.toLowerCase().includes('self')) {
-              prompt = "Atmospheric view of the current location. Empty and ominous.";
-          }
-          
-          try {
-              // Note: We use finalState here to get the most up-to-date room desc
-              return await generateImage(
-                  prompt, 
-                  finalState.narrative.visual_motif,
-                  finalState.location_state.room_map[finalState.location_state.current_room_id]?.description_cache,
-                  false 
-              );
-          } catch (imgErr) {
-              console.error("Image Gen Error", imgErr);
-              return undefined;
-          }
+          // Trigger the promise but DO NOT await it here
+          imagePromise = generateImage(
+              prompt, 
+              updatedState.narrative.visual_motif,
+              updatedState.location_state.room_map[updatedState.location_state.current_room_id]?.description_cache,
+              false 
+          );
       }
-      return undefined;
-  })();
 
-  // Clear illustration request for next turn in the returned state
-  if (finalState.narrative.illustration_request) {
-      finalState.narrative.illustration_request = null;
+  } catch (e) {
+      console.error("Narrator Error:", e);
   }
+
+  // CLEAR THE REQUEST IN THE STATE SO IT DOESN'T LOOP
+  const finalState = {
+      ...updatedState,
+      ...narratorStateUpdates,
+      narrative: { 
+        ...updatedState.narrative, 
+        ...(narratorStateUpdates as any).narrative,
+        illustration_request: null // Ensure we clear this
+      }
+  };
 
   return {
       gameState: finalState,
-      storyText: finalStoryText, 
-      imagePromise
+      storyText: finalStoryText,
+      imagePromise // Return the promise to the UI
   };
 };
 

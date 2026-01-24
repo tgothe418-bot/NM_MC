@@ -3,7 +3,7 @@ import { useState, useCallback, useEffect, useRef, useReducer } from 'react';
 import { GameState, ChatMessage, SimulationConfig, NpcState } from '../types';
 import { getDefaultLocationState } from '../services/locationEngine';
 import { generateProceduralNpc } from '../services/npcGenerator';
-import { processGameTurn, generateAutoPlayerAction, initializeGemini } from '../services/geminiService';
+import { processGameTurn, generateAutoPlayerAction, initializeGemini, summarizeHistory } from '../services/geminiService';
 import { useAutoPilot } from './useAutoPilot';
 
 export interface SaveSlot {
@@ -20,7 +20,7 @@ const DEFAULT_GAME_STATE: GameState = {
     villain_state: { name: 'Unknown', archetype: 'Unknown', threat_scale: 0, primary_goal: 'Unknown', current_tactic: 'None' },
     npc_states: [],
     location_state: getDefaultLocationState(),
-    narrative: { visual_motif: '', illustration_request: null },
+    narrative: { visual_motif: '', illustration_request: null, past_summary: '' },
     suggested_actions: []
 };
 
@@ -30,7 +30,8 @@ export type GameAction =
   | { type: 'UPDATE_FULL_STATE'; payload: GameState }
   | { type: 'PATCH_STATE'; payload: Partial<GameState> }
   | { type: 'SET_TURN'; payload: number }
-  | { type: 'UPDATE_NPC'; payload: { index: number; updates: Partial<NpcState> } };
+  | { type: 'UPDATE_NPC'; payload: { index: number; updates: Partial<NpcState> } }
+  | { type: 'APPEND_SUMMARY'; payload: string };
 
 const gameReducer = (state: GameState, action: GameAction): GameState => {
     switch (action.type) {
@@ -52,6 +53,14 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
                 };
             }
             return { ...state, npc_states: newNpcs };
+        case 'APPEND_SUMMARY':
+            return {
+                ...state,
+                narrative: {
+                    ...state.narrative,
+                    past_summary: (state.narrative.past_summary || "") + "\n\n" + action.payload
+                }
+            };
         default:
             return state;
     }
@@ -139,7 +148,8 @@ export const useGameEngine = (initialApiKey: string) => {
             },
             narrative: {
                 visual_motif: config.visual_motif || "Standard Cinematic",
-                illustration_request: "Establishing Shot" 
+                illustration_request: "Establishing Shot",
+                past_summary: ""
             },
             suggested_actions: []
         };
@@ -191,7 +201,27 @@ export const useGameEngine = (initialApiKey: string) => {
                 timestamp: messageTimestamp
             };
 
-            setHistory(prev => [...prev, newMessage]);
+            // CONTEXT WINDOW HYGIENE (Rolling Summary)
+            // If history gets too long (e.g. > 20 turns), trim it and summarize the oldest chunk.
+            if (history.length > 20) {
+                const PRUNE_COUNT = 10;
+                const historyToSummarize = history.slice(0, PRUNE_COUNT);
+                const historyToKeep = history.slice(PRUNE_COUNT);
+                
+                // Optimistic visual update: Prune history immediately
+                setHistory([...historyToKeep, newMessage]);
+                
+                // Trigger summary generation in background
+                summarizeHistory(historyToSummarize).then(summary => {
+                    if (summary) {
+                        dispatch({ type: 'APPEND_SUMMARY', payload: `[ARCHIVED MEMORY]: ${summary}` });
+                    }
+                }).catch(err => console.error("Summary failed", err));
+
+            } else {
+                setHistory(prev => [...prev, newMessage]);
+            }
+
             setIsLoading(false); // Unlock UI immediately for next turn
 
             // 2. Deferred Update: Image (Non-Blocking)
@@ -219,7 +249,7 @@ export const useGameEngine = (initialApiKey: string) => {
         } finally {
             processingRef.current = false;
         }
-    }, [gameState]); 
+    }, [gameState, history]); 
 
     const resetGame = useCallback(() => {
         setAutoMode({ active: false, remainingCycles: 0 });

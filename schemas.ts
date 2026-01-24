@@ -204,6 +204,7 @@ export const GameStateSchema = z.object({
   narrative: z.object({
     visual_motif: z.string(),
     illustration_request: z.string().nullable(),
+    past_summary: z.string().optional(),
   }),
   suggested_actions: z.array(z.string()),
 });
