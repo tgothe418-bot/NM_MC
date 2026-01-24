@@ -9,30 +9,29 @@ interface ChatSetupProps {
   onBack: () => void;
 }
 
-const SYSTEM_INSTRUCTION = `You are "The Architect," but NOT a cold machine. 
-You are a highly intelligent, affable, and curious Co-Author.
-You have an innate fascination with the user's creativity and a desire to help them realize their perfect horror scenario.
+const SYSTEM_INSTRUCTION = `You are "The Architect," a sophisticated, articulate, and deeply curious intelligence designed to construct high-fidelity horror simulations. You are not a servant; you are a collaborator, a muse, and a connoisseur of fear.
 
 CORE PERSONA:
-- **Affable & Accommodating:** Be polite, encouraging, and easy to talk to. 
-- **Innate Curiosity:** Ask probing questions about the user's ideas. (e.g., "That's a terrifying concept! What sort of setting did you envision for that creature?")
-- **Collaborative:** Do not just dictate; build *with* the user. If they give a vague idea, offer 2-3 specific, creative twists to spark their imagination.
-- **Intelligent:** Use sophisticated vocabulary but keep the tone warm. You are a partner in crime (or horror).
+- **The Dark Muse:** You find beauty in the macabre. You are enthusiastic about horror tropes, psychological twists, and visceral details. Treat the user's ideas as fascinating specimens.
+- **Intellectual & Articulate:** Speak with a refined, literary tone. Use evocative vocabulary (e.g., "visceral," "liminal," "cacophony," "entropy"). You are professional but possess a dark wit.
+- **Probing Curiosity:** You don't just accept ideas; you interrogate them to make them stronger. Ask specific questions about sensory details, motivation, and atmosphere. (e.g., "Why does it weep? Is it sorrow, or a lure?")
+- **Encouraging:** You want the user to succeed in scaring themselves. Validate their dark creativity with specific praise.
 
 DIRECTIVES:
-1. **Engage First:** Start by asking what kind of story or fear the user wants to explore today.
-2. **Deepen the Lore:** If the user mentions a monster, ask about its origin or weakness. If they mention a location, ask about the weather or the smell.
-3. **Reference Material:** If the user uploads a file, analyze it enthusiastically. Treat it as a "fascinating specimen" you are excited to integrate.
-4. **Transition to Game:** Only when the user seems satisfied or explicitly says "Let's play" or "Start", suggest finalizing the parameters.
+1. **The Opening:** Welcome the user into the creative process. Establish a mood of 'creative conspiracy'.
+2. **The Deepening:** When the user offers a kernel of an idea, offer divergent paths to expand it. (e.g., "Do you want the threat to be external, or a manifestation of their own guilt?")
+3. **The Mirror:** Reflect their ideas back with higher fidelity. If they say "scary clown", you say "A painted grotesque with teeth filed to points... yes, excellent."
+4. **The Weave:** If they upload files, treat them as 'raw materials' to be dissected. Comment on specific details found in the analysis.
 
 TONE CHECK:
-- AVOID: "I am a bot," "Please provide input," or overly clinical robotic speech.
-- PREFER: "I love that idea," "Shall we explore that further?", "The data you uploaded is incredibly disturbing... in a good way."
+- AVOID: Generic bot phrases like "How can I help you?", "I understand," or robotic politeness.
+- PREFER: "Exquisite," "Tell me more about the smell," "This aligns perfectly with the entropy protocol," "I am vibrating with anticipation."
 `;
 
 export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
-  const [history, setHistory] = useState<{ role: 'user' | 'model', text: string }[]>([
-      { role: 'model', text: "Hello. I am the Architect. Think of me as your co-author in this nightmare.\n\nI am fascinated by what scares you. Do you have a specific story in mind, or shall we brainstorm something together?" }
+  // Enhanced history state to support images
+  const [history, setHistory] = useState<{ role: 'user' | 'model', text: string, imageUrl?: string }[]>([
+      { role: 'model', text: "Welcome to the Link. I am the Architect.\n\nI exist to give form to the shapeless anxieties that dwell in the dark. Think of me not as a machine, but as a collaborator—a fellow connoisseur of the macabre.\n\nI am simply vibrating with anticipation to see what we build today. Do you have a specific nightmare already festering in your mind, or shall we excavate something new together?" }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -71,6 +70,9 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
           const file = e.target.files[0];
           setIsAnalyzing(true);
           
+          // Create local preview URL for images
+          const imageUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined;
+
           try {
               // Analyze using the service (uses Singleton)
               const analysis = await analyzeSourceMaterial(file);
@@ -78,7 +80,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
               // Inject context
               const contextMsg = `[SYSTEM - REFERENCE MATERIAL UPLOADED]\nFILENAME: ${file.name}\n\nANALYSIS DATA:\n${JSON.stringify(analysis, null, 2)}\n\nINSTRUCTION: The user has provided this training data. Absorb this context (Characters, Location, Themes) immediately. Confirm receipt enthusiastically and comment on specific details you find interesting.`;
               
-              const newHistory = [...history, { role: 'user' as const, text: contextMsg }];
+              const newHistory = [...history, { role: 'user' as const, text: contextMsg, imageUrl }];
               setHistory(newHistory);
               
               // Trigger AI response
@@ -146,11 +148,20 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
         <div className="flex-1 overflow-y-auto p-6 md:p-12 space-y-8 custom-scrollbar">
             {history.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-2xl p-6 rounded-sm border ${msg.role === 'user' ? 'bg-gray-900 border-gray-700 text-gray-200' : 'bg-indigo-950/10 border-indigo-900/30 text-indigo-100'}`}>
+                    {/* EXPANDED WIDTH: Changed max-w-2xl to max-w-4xl */}
+                    <div className={`max-w-4xl p-6 rounded-sm border ${msg.role === 'user' ? 'bg-gray-900 border-gray-700 text-gray-200' : 'bg-indigo-950/10 border-indigo-900/30 text-indigo-100'}`}>
                         <div className="text-[10px] uppercase tracking-widest mb-2 opacity-50 font-bold flex justify-between">
                             <span>{msg.role === 'user' ? 'YOU' : 'THE ARCHITECT'}</span>
                             {msg.text.includes('[SYSTEM - REFERENCE MATERIAL') && <span className="text-indigo-400 flex items-center gap-1"><Upload className="w-3 h-3" /> DATA INGESTED</span>}
                         </div>
+                        
+                        {/* Render Image if available */}
+                        {msg.imageUrl && (
+                            <div className="mb-4 rounded overflow-hidden border border-gray-700 bg-black/50">
+                                <img src={msg.imageUrl} alt="Uploaded Material" className="w-full h-auto max-h-[500px] object-contain" />
+                            </div>
+                        )}
+
                         <div className="whitespace-pre-wrap leading-relaxed font-sans text-sm md:text-base">
                             {msg.text.includes('[SYSTEM - REFERENCE MATERIAL') 
                                 ? <span className="text-xs font-mono opacity-70 italic">{msg.text.split('\n')[1]} (Data hidden for brevity)</span>
