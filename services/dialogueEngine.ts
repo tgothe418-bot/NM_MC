@@ -2,6 +2,7 @@
 import { NpcState, DialogueEntry, KnowledgeNode, SocialManeuver, DialogueMemory, DialogueState } from '../types';
 import { LORE_LIBRARY } from '../loreLibrary';
 import { STYLE_GUIDE } from './styleGuide';
+import { constructMemoryContext } from './memorySystem';
 
 /**
  * THE DIALOGUE ENGINE V5.0 (MOSAIC AWARE)
@@ -138,72 +139,7 @@ const calculatePsychologicalStance = (npc: NpcState): { intent: SocialManeuver, 
     return { intent: 'BARGAIN', directive: "You are wary but pragmatic. Exchange information only if you get something in return." };
 };
 
-// --- 4. MEMORY SYNTHESIS (CONTEXT OPTIMIZATION) ---
-
-const synthesizeContextWindow = (npc: NpcState): string => {
-    const { name } = npc;
-    // DEFENSIVE: Handle malformed NPC state where dialogue_state might be missing from LLM response
-    const dialogue_state = npc.dialogue_state;
-    
-    if (!dialogue_state || !dialogue_state.memory) return "";
-    
-    const { memory } = dialogue_state;
-    
-    let context = `\n[MEMORY MATRIX for ${name}]\n`;
-    
-    // 1. ACTIVE THREATS & PHYSICAL STATE (Highest Priority)
-    // The LLM must know immediately if the character is dying or terrified.
-    const stress = npc.psychology?.stress_level || 0;
-    const injuries = npc.active_injuries || [];
-    
-    if (stress > 60 || injuries.length > 0) {
-        context += `!!! CRITICAL PHYSIOLOGICAL STATUS !!!\n`;
-        context += ` - STRESS LEVEL: ${stress}% (Impacts speech stability)\n`;
-        if (injuries.length > 0) {
-            context += ` - ACTIVE INJURIES: ${injuries.map(i => `${i.location} (${i.type})`).join(", ")}\n`;
-        }
-        context += ` - DOMINANT INSTINCT: ${npc.psychology?.dominant_instinct}\n`;
-    }
-
-    // 2. IMMEDIATE CONVERSATION HISTORY (Recency Bias)
-    // formatted strictly for the model to follow the flow.
-    if (memory.short_term_buffer && memory.short_term_buffer.length > 0) {
-        context += `IMMEDIATE DIALOGUE LOG (Last 8 Turns):\n`;
-        memory.short_term_buffer.slice(-8).forEach(entry => {
-            // DEFENSIVE: Ensure speaker exists and force string conversion to prevent undefined.toUpperCase() crash
-            const speakerName = entry.speaker || "UNKNOWN";
-            const speaker = speakerName === name ? "YOU" : String(speakerName).toUpperCase();
-            
-            // Sanitize text
-            const txt = typeof entry.text === 'string' ? entry.text.replace(/[\n\r]+/g, ' ').trim() : "...";
-            context += `   [${speaker}]: "${txt}"\n`;
-        });
-    }
-
-    // 3. CORE TRUTH & HIGH IMPACT MEMORIES
-    context += `CORE IDENTITY: ${memory.long_term_summary}\n`;
-
-    // Sort episodic logs by absolute impact magnitude (Trauma OR Salvation)
-    const significantMemories = [...(memory.episodic_logs || [])]
-        .sort((a, b) => Math.abs(b.emotional_impact) - Math.abs(a.emotional_impact))
-        .slice(0, 3);
-
-    if (significantMemories.length > 0) {
-        context += `DEFINING MEMORIES (These filter your perception):\n`;
-        significantMemories.forEach(m => {
-            context += ` - [Impact ${m.emotional_impact}]: "${m.description}"\n`;
-        });
-    }
-
-    // 4. RECENTLY LEARNED FACTS
-    if (memory.known_facts && memory.known_facts.length > 0) {
-        context += `KNOWN FACTS: ${memory.known_facts.slice(-3).join(" | ")}\n`;
-    }
-
-    return context;
-};
-
-// --- 5. THE MANIFESTO GENERATOR (MAIN EXPORT) ---
+// --- 4. THE MANIFESTO GENERATOR (MAIN EXPORT) ---
 
 export const constructVoiceManifesto = (npcs: NpcState[], activeCluster: string = "None"): string => {
     if (!npcs || npcs.length === 0) return "";
@@ -247,8 +183,23 @@ export const constructVoiceManifesto = (npcs: NpcState[], activeCluster: string 
         manifesto += `[DIRECTIVE: ${intent}]\n`;
         manifesto += ` - ${directive}\n`;
         
-        // D. Context & Resonance (Optimized Context Window)
-        manifesto += synthesizeContextWindow(npc);
+        // D. Memory & Context (Using new Memory System)
+        manifesto += constructMemoryContext(npc);
+        
+        // Manual Physiological Context (Previously in synthesizeContextWindow)
+        const stress = npc.psychology?.stress_level || 0;
+        const injuries = npc.active_injuries || [];
+        if (stress > 60 || injuries.length > 0) {
+            manifesto += `\n[PHYSIOLOGICAL STATUS]\n`;
+            manifesto += ` - STRESS LEVEL: ${stress}% (Impacts speech stability)\n`;
+            if (injuries.length > 0) {
+                manifesto += ` - ACTIVE INJURIES: ${injuries.map(i => `${i.location} (${i.type})`).join(", ")}\n`;
+            }
+        }
+
+        // Specific Memory Instruction
+        manifesto += `\nINSTRUCTION: Use the [MEMORY MODULE] to reference past events. If the player mentioned a specific topic in "RECENT EVENTS", refer to it explicitly.\n`;
+
         manifesto += clusterResonance;
 
         // E. Knowledge Leaks

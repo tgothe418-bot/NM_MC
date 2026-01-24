@@ -28,6 +28,7 @@ import { constructVoiceManifesto } from './dialogueEngine';
 import { constructSensoryManifesto } from './sensoryEngine';
 import { constructLocationManifesto, constructRoomGenerationRules } from './locationEngine';
 import { PLAYER_SYSTEM_INSTRUCTION } from '../prompts/instructions';
+import { updateNpcMemories } from './memorySystem';
 
 // --- INITIALIZATION (Singleton Pattern) ---
 let aiInstance: GoogleGenAI | null = null;
@@ -114,17 +115,14 @@ export const extractScenarioFromChat = async (history: { role: 'user' | 'model',
     }
 };
 
-export const summarizeHistory = async (history: ChatMessage[]): Promise<string> => {
+// [OPTIMIZATION C] Context Summarization
+export const summarizeHistory = async (history: { role: 'user' | 'model', text: string }[]): Promise<string> => {
     const ai = getAI();
-    // Only summarize if history is long enough to matter
-    if (history.length < 5) return "";
+    // Only summarize if history is long
+    if (history.length < 10) return "";
 
-    const transcript = history
-        .filter(h => h.role === 'user' || h.role === 'model')
-        .map(h => `${h.role.toUpperCase()}: ${h.text}`)
-        .join('\n');
-        
-    const prompt = `Review the following narrative log. Summarize the key events, physical changes to the characters, and current threat status into a single cohesive paragraph (Past Tense). Use the style of a "Previously On" recap. Keep it evocative.\n\nTRANSCRIPT:\n${transcript}`;
+    const transcript = history.map(h => `${h.role}: ${h.text}`).join('\n');
+    const prompt = `Summarize the following narrative arc into a single detailed paragraph. Preserve key facts, injuries, and current objectives.\n\n${transcript}`;
 
     try {
         const res = await ai.models.generateContent({
@@ -133,7 +131,6 @@ export const summarizeHistory = async (history: ChatMessage[]): Promise<string> 
         });
         return res.text || "";
     } catch (e) {
-        console.error("Summary Error", e);
         return "";
     }
 };
@@ -271,13 +268,31 @@ export const processGameTurn = async (
       console.error("Narrator Error:", e);
   }
 
-  // CLEAR THE REQUEST IN THE STATE SO IT DOESN'T LOOP
-  const finalState = {
+  // 5. MEMORY CONSOLIDATION (New Step)
+  // Create a temporary history object for the current turn to update memory immediately
+  const turnHistory = [
+      { role: 'user', text: userAction, timestamp: Date.now() },
+      { role: 'model', text: finalStoryText, timestamp: Date.now() }
+  ] as ChatMessage[];
+
+  // Combine simulator and narrator updates
+  const stateForMemory = {
       ...updatedState,
       ...narratorStateUpdates,
+      narrative: {
+          ...updatedState.narrative,
+          ...(narratorStateUpdates as any).narrative,
+      }
+  };
+
+  // Run the memory update on the full state
+  const stateWithMemory = updateNpcMemories(stateForMemory, turnHistory);
+
+  // CLEAR THE REQUEST IN THE STATE SO IT DOESN'T LOOP
+  const finalState = {
+      ...stateWithMemory,
       narrative: { 
-        ...updatedState.narrative, 
-        ...(narratorStateUpdates as any).narrative,
+        ...stateWithMemory.narrative, 
         illustration_request: null // Ensure we clear this
       }
   };
