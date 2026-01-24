@@ -23,7 +23,7 @@ export default function App() {
       apiKey,
       setApiKey,
       gameState,
-      setGameState,
+      dispatch,
       history,
       isInitialized,
       isLoading,
@@ -42,12 +42,9 @@ export default function App() {
   // --- HANDLERS ---
   
   const handleUpdateNpc = (npcIndex: number, updates: Partial<NpcState>) => {
-    setGameState(prev => {
-      const newNpcs = [...prev.npc_states];
-      if (newNpcs[npcIndex]) {
-          newNpcs[npcIndex] = { ...newNpcs[npcIndex], ...updates };
-      }
-      return { ...prev, npc_states: newNpcs };
+    dispatch({ 
+        type: 'UPDATE_NPC', 
+        payload: { index: npcIndex, updates } 
     });
   };
 
@@ -128,22 +125,24 @@ export default function App() {
                        initializeGame(config); // If not started, full init
                     } else {
                         // If started, just update meta params
-                       setGameState(prev => ({
-                           ...prev,
-                           meta: {
-                               ...prev.meta,
-                               mode: config.mode as any,
-                               intensity_level: config.intensity,
-                               active_cluster: config.cluster,
-                           },
-                           villain_state: {
-                               ...prev.villain_state,
-                               name: config.villain_name || prev.villain_state.name,
-                               archetype: config.villain_appearance || prev.villain_state.archetype,
-                               primary_goal: config.primary_goal || prev.villain_state.primary_goal,
-                               victim_profile: config.victim_description || prev.villain_state.victim_profile
-                           }
-                       }));
+                       const newMeta = {
+                           ...gameState.meta,
+                           mode: config.mode as any,
+                           intensity_level: config.intensity,
+                           active_cluster: config.cluster,
+                       };
+                       const newVillain = {
+                           ...gameState.villain_state,
+                           name: config.villain_name || gameState.villain_state.name,
+                           archetype: config.villain_appearance || gameState.villain_state.archetype,
+                           primary_goal: config.primary_goal || gameState.villain_state.primary_goal,
+                           victim_profile: config.victim_description || gameState.villain_state.victim_profile
+                       };
+                       
+                       dispatch({ 
+                           type: 'PATCH_STATE', 
+                           payload: { meta: newMeta, villain_state: newVillain } 
+                       });
                     }
                 }
             }}

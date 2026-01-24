@@ -120,7 +120,11 @@ export const processGameTurn = async (
   userAction: string, 
   files: File[] = [],
   onStreamLogic?: (chunk: string, phase: 'logic' | 'narrative') => void
-): Promise<{ gameState: GameState, storyText: string, imageUrl?: string }> => {
+): Promise<{ 
+    gameState: GameState, 
+    storyText: string, 
+    imagePromise: Promise<string | undefined> 
+}> => {
   const ai = getAI();
 
   // 1. CONSTRUCT CONTEXT
@@ -185,13 +189,10 @@ export const processGameTurn = async (
   }
   
   // DEEP MERGE LOCATION STATE
-  // Critical for preserving the room_map when LLM sends partial updates (e.g. only current_room_id or weather)
   let newLocationState = { ...currentState.location_state };
   if (partialState.location_state) {
       newLocationState = { ...newLocationState, ...partialState.location_state };
       if (partialState.location_state.room_map) {
-          // If the LLM returns a new room_map, we assume it wants to ADD/UPDATE rooms, not replace everything.
-          // However, typically LLMs output the *changes*. We should merge the dictionaries.
           newLocationState.room_map = {
               ...currentState.location_state.room_map,
               ...partialState.location_state.room_map
@@ -212,7 +213,6 @@ export const processGameTurn = async (
   if (onStreamLogic) onStreamLogic("rendering narrative...\n", 'narrative');
 
   let finalStoryText = "*The vision blurs momentarily.* (The simulation is recalibrating...)";
-  let imageUrl: string | undefined;
   let narratorStateUpdates = {};
 
   try {
@@ -237,45 +237,6 @@ export const processGameTurn = async (
       finalStoryText = narrResult.story_text;
       narratorStateUpdates = narrResult.game_state || {};
       
-      let hasVisualTag = false;
-      if (finalStoryText.includes('[ESTABLISHING_SHOT]')) {
-          hasVisualTag = true;
-          finalStoryText = finalStoryText.replace(/\[ESTABLISHING_SHOT\]/g, '');
-      }
-      if (finalStoryText.includes('[SELF_PORTRAIT]')) {
-          hasVisualTag = true; 
-          finalStoryText = finalStoryText.replace(/\[SELF_PORTRAIT\]/g, '');
-      }
-
-      // 4. IMAGE GENERATION
-      const requestFromState = updatedState.narrative.illustration_request || narrResult.game_state?.narrative?.illustration_request;
-      const triggerImage = requestFromState || hasVisualTag;
-
-      if (triggerImage) {
-          if (onStreamLogic) onStreamLogic("generating visual artifact...\n", 'narrative');
-          
-          let prompt = typeof requestFromState === 'string' ? requestFromState : "Establishing Shot";
-          if (prompt.toLowerCase().includes('portrait') || prompt.toLowerCase().includes('self')) {
-              prompt = "Atmospheric view of the current location. Empty and ominous.";
-          }
-          
-          try {
-              imageUrl = await generateImage(
-                  prompt, 
-                  updatedState.narrative.visual_motif,
-                  updatedState.location_state.room_map[updatedState.location_state.current_room_id]?.description_cache,
-                  false 
-              );
-          } catch (imgErr) {
-              console.error("Image Gen Error", imgErr);
-          }
-          
-          updatedState.narrative.illustration_request = null;
-          if (narrResult.game_state?.narrative) {
-              narrResult.game_state.narrative.illustration_request = null;
-          }
-      }
-
   } catch (e) {
       console.error("Narrator Error:", e);
       finalStoryText = `*The vision blurs momentarily.* (The simulation is recalibrating...)`;
@@ -286,10 +247,52 @@ export const processGameTurn = async (
       ...narratorStateUpdates
   };
 
+  // 4. IMAGE GENERATION (NON-BLOCKING)
+  // We construct the promise here but DO NOT await it.
+  const imagePromise = (async () => {
+      let hasVisualTag = false;
+      if (finalStoryText.includes('[ESTABLISHING_SHOT]')) hasVisualTag = true;
+      if (finalStoryText.includes('[SELF_PORTRAIT]')) hasVisualTag = true;
+
+      // Clean tags from text logic handles in UI/Narrator, but we leave text clean-up to the display layer usually.
+      // Here we just check triggers.
+
+      const requestFromState = updatedState.narrative.illustration_request || (narratorStateUpdates as any)?.narrative?.illustration_request;
+      const triggerImage = requestFromState || hasVisualTag;
+
+      if (triggerImage) {
+          if (onStreamLogic) onStreamLogic("queueing visual artifact...\n", 'narrative');
+          
+          let prompt = typeof requestFromState === 'string' ? requestFromState : "Establishing Shot";
+          if (prompt.toLowerCase().includes('portrait') || prompt.toLowerCase().includes('self')) {
+              prompt = "Atmospheric view of the current location. Empty and ominous.";
+          }
+          
+          try {
+              // Note: We use finalState here to get the most up-to-date room desc
+              return await generateImage(
+                  prompt, 
+                  finalState.narrative.visual_motif,
+                  finalState.location_state.room_map[finalState.location_state.current_room_id]?.description_cache,
+                  false 
+              );
+          } catch (imgErr) {
+              console.error("Image Gen Error", imgErr);
+              return undefined;
+          }
+      }
+      return undefined;
+  })();
+
+  // Clear illustration request for next turn in the returned state
+  if (finalState.narrative.illustration_request) {
+      finalState.narrative.illustration_request = null;
+  }
+
   return {
       gameState: finalState,
       storyText: finalStoryText, 
-      imageUrl
+      imagePromise
   };
 };
 

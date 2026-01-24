@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useReducer } from 'react';
 import { GameState, ChatMessage, SimulationConfig, NpcState } from '../types';
 import { getDefaultLocationState } from '../services/locationEngine';
 import { generateProceduralNpc } from '../services/npcGenerator';
@@ -15,20 +15,56 @@ export interface SaveSlot {
     history: ChatMessage[];
 }
 
+const DEFAULT_GAME_STATE: GameState = {
+    meta: { turn: 50, perspective: 'First Person', mode: 'Survivor', intensity_level: 'Level 3', active_cluster: 'None' },
+    villain_state: { name: 'Unknown', archetype: 'Unknown', threat_scale: 0, primary_goal: 'Unknown', current_tactic: 'None' },
+    npc_states: [],
+    location_state: getDefaultLocationState(),
+    narrative: { visual_motif: '', illustration_request: null },
+    suggested_actions: []
+};
+
+// --- REDUCER DEFINITIONS ---
+
+export type GameAction = 
+  | { type: 'UPDATE_FULL_STATE'; payload: GameState }
+  | { type: 'PATCH_STATE'; payload: Partial<GameState> }
+  | { type: 'SET_TURN'; payload: number }
+  | { type: 'UPDATE_NPC'; payload: { index: number; updates: Partial<NpcState> } };
+
+const gameReducer = (state: GameState, action: GameAction): GameState => {
+    switch (action.type) {
+        case 'UPDATE_FULL_STATE':
+            return action.payload;
+        case 'PATCH_STATE':
+            return { ...state, ...action.payload };
+        case 'SET_TURN':
+            return { 
+                ...state, 
+                meta: { ...state.meta, turn: action.payload } 
+            };
+        case 'UPDATE_NPC':
+            const newNpcs = [...state.npc_states];
+            if (newNpcs[action.payload.index]) {
+                newNpcs[action.payload.index] = { 
+                    ...newNpcs[action.payload.index], 
+                    ...action.payload.updates 
+                };
+            }
+            return { ...state, npc_states: newNpcs };
+        default:
+            return state;
+    }
+};
+
 export const useGameEngine = (initialApiKey: string) => {
     // --- STATE ---
     const [apiKey, setApiKey] = useState(initialApiKey);
     const [isInitialized, setIsInitialized] = useState(false);
     
-    // Core Game Data
-    const [gameState, setGameState] = useState<GameState>({
-        meta: { turn: 50, perspective: 'First Person', mode: 'Survivor', intensity_level: 'Level 3', active_cluster: 'None' },
-        villain_state: { name: 'Unknown', archetype: 'Unknown', threat_scale: 0, primary_goal: 'Unknown', current_tactic: 'None' },
-        npc_states: [],
-        location_state: getDefaultLocationState(),
-        narrative: { visual_motif: '', illustration_request: null },
-        suggested_actions: []
-    });
+    // Core Game Data (Reducer)
+    const [gameState, dispatch] = useReducer(gameReducer, DEFAULT_GAME_STATE);
+    
     const [history, setHistory] = useState<ChatMessage[]>([]);
 
     // UI/Process State
@@ -108,7 +144,7 @@ export const useGameEngine = (initialApiKey: string) => {
             suggested_actions: []
         };
         
-        setGameState(newState);
+        dispatch({ type: 'UPDATE_FULL_STATE', payload: newState });
         setHistory([]); 
         setIsInitialized(true);
         
@@ -136,20 +172,40 @@ export const useGameEngine = (initialApiKey: string) => {
         const currentState = overrideState || gameState;
 
         try {
+            // processGameTurn now returns { gameState, storyText, imagePromise }
             const result = await processGameTurn(currentState, text, files, (chunk, phase) => {
                 setStreamPhase(phase);
                 if (phase === 'logic') setLogicStream(prev => prev + chunk);
                 else setNarrativeStream(prev => prev + chunk);
             });
             
-            setGameState(result.gameState);
-            setHistory(prev => [...prev, { 
-                role: 'model', 
-                text: result.storyText, 
-                gameState: result.gameState, 
-                imageUrl: result.imageUrl,
-                timestamp: Date.now() 
-            }]);
+            // 1. Immediate Update: State and Text
+            dispatch({ type: 'UPDATE_FULL_STATE', payload: result.gameState });
+            
+            const messageTimestamp = Date.now();
+            const newMessage: ChatMessage = {
+                role: 'model',
+                text: result.storyText,
+                gameState: result.gameState,
+                imageUrl: undefined, // Initially undefined
+                timestamp: messageTimestamp
+            };
+
+            setHistory(prev => [...prev, newMessage]);
+            setIsLoading(false); // Unlock UI immediately for next turn
+
+            // 2. Deferred Update: Image (Non-Blocking)
+            if (result.imagePromise) {
+                result.imagePromise.then(imageUrl => {
+                    if (imageUrl) {
+                        setHistory(prev => prev.map(msg => 
+                            msg.timestamp === messageTimestamp 
+                                ? { ...msg, imageUrl: imageUrl }
+                                : msg
+                        ));
+                    }
+                }).catch(err => console.error("Background Image Generation Failed", err));
+            }
 
         } catch (e) {
             console.error("Game Loop Error:", e);
@@ -158,9 +214,9 @@ export const useGameEngine = (initialApiKey: string) => {
                 text: "CRITICAL FAILURE: Simulation Desync.", 
                 timestamp: Date.now() 
             }]);
+            setIsLoading(false);
             setAutoMode({ active: false, remainingCycles: 0 });
         } finally {
-            setIsLoading(false);
             processingRef.current = false;
         }
     }, [gameState]); 
@@ -168,14 +224,7 @@ export const useGameEngine = (initialApiKey: string) => {
     const resetGame = useCallback(() => {
         setAutoMode({ active: false, remainingCycles: 0 });
         setHistory([]);
-        setGameState({
-            meta: { turn: 50, perspective: 'First Person', mode: 'Survivor', intensity_level: 'Level 3', active_cluster: 'None' },
-            villain_state: { name: 'Unknown', archetype: 'Unknown', threat_scale: 0, primary_goal: 'Unknown', current_tactic: 'None' },
-            npc_states: [],
-            location_state: getDefaultLocationState(),
-            narrative: { visual_motif: '', illustration_request: null },
-            suggested_actions: []
-        });
+        dispatch({ type: 'UPDATE_FULL_STATE', payload: DEFAULT_GAME_STATE });
         setIsInitialized(false);
     }, []);
 
@@ -215,7 +264,7 @@ export const useGameEngine = (initialApiKey: string) => {
         const saves = getSaves();
         const slot = saves.find(s => s.id === slotId);
         if (slot) {
-            setGameState(slot.gameState);
+            dispatch({ type: 'UPDATE_FULL_STATE', payload: slot.gameState });
             setHistory(slot.history);
             setIsInitialized(true);
             return true;
@@ -258,7 +307,7 @@ export const useGameEngine = (initialApiKey: string) => {
         
         // Actions
         setApiKey,
-        setGameState, // Exposed if components need to patch state (e.g. NPC editor)
+        dispatch, // Exposed for granular updates
         initializeGame,
         sendMessage: handleSendMessage,
         resetGame,
