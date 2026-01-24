@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Send, Activity, FastForward, Paperclip, X, 
   FileText, Terminal, ChevronRight, MessageSquare, Eye, 
-  Zap, Hand
+  Zap, Hand, Edit2, CornerDownLeft
 } from 'lucide-react';
 
 interface InputAreaProps {
@@ -51,7 +51,17 @@ export const InputArea: React.FC<InputAreaProps> = ({
 
   const handleOptionClick = (option: string) => {
     if (!isLoading) {
-      onSend(option, []);
+      setText(option);
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        // Small timeout to allow render cycle to update value then set cursor
+        setTimeout(() => {
+            if (textareaRef.current) {
+                textareaRef.current.selectionStart = textareaRef.current.value.length;
+                textareaRef.current.selectionEnd = textareaRef.current.value.length;
+            }
+        }, 0);
+      }
     }
   };
 
@@ -132,7 +142,10 @@ export const InputArea: React.FC<InputAreaProps> = ({
       {options && options.length > 0 && !isLoading && (
         <div className={`flex gap-3 mb-2 animate-fadeIn pb-2 ${isSidebar ? 'flex-col overflow-y-auto flex-1 min-h-0 custom-scrollbar pr-2' : 'flex-wrap justify-end'}`}>
           {isSidebar && <div className="mt-auto" />}
-          {isSidebar && <div className="text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-3 border-b border-gray-800 pb-2 shrink-0">Available Vectors</div>}
+          {isSidebar && <div className="text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-3 border-b border-gray-800 pb-2 shrink-0 flex justify-between items-center">
+              <span>Suggested Vectors</span>
+              <span className="text-[9px] opacity-50">Click to Edit</span>
+          </div>}
           
           {options.map((option, idx) => {
             const { icon: Icon, style } = getActionStyle(option);
@@ -140,13 +153,22 @@ export const InputArea: React.FC<InputAreaProps> = ({
               <button
                 key={idx}
                 onClick={() => handleOptionClick(option)}
-                className={`px-4 py-3 border rounded-sm text-sm font-mono tracking-wide transition-all duration-300 flex items-center gap-3 group backdrop-blur-md shadow-lg ${style} ${isSidebar ? 'w-full justify-between text-left shrink-0 whitespace-normal h-auto' : ''}`}
+                className={`relative px-4 py-4 border rounded-sm text-sm font-mono tracking-wide transition-all duration-300 flex items-start gap-4 group backdrop-blur-md shadow-lg ${style} ${isSidebar ? 'w-full text-left shrink-0 whitespace-normal h-auto' : ''}`}
               >
-                <div className="flex items-start gap-3 min-w-0 flex-1">
-                    <Icon className="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity group-hover:scale-110 duration-200 flex-shrink-0 mt-0.5" />
-                    <span className={`font-semibold leading-relaxed ${isSidebar ? 'break-words' : 'truncate'}`}>{option}</span>
+                <div className="flex-shrink-0 mt-0.5">
+                    <Icon className="w-4 h-4 opacity-70 group-hover:opacity-100 transition-opacity group-hover:scale-110 duration-200" />
                 </div>
-                {isSidebar && <ChevronRight className="w-3 h-3 opacity-30 group-hover:opacity-100 flex-shrink-0 self-center" />}
+                
+                <div className="flex-1 min-w-0">
+                    <span className={`font-semibold leading-relaxed block ${isSidebar ? 'break-words' : 'truncate'}`}>{option}</span>
+                </div>
+
+                {isSidebar && (
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 bg-black/50 px-2 py-1 rounded border border-white/10">
+                        <span className="text-[9px] uppercase tracking-widest text-white">Use</span>
+                        <CornerDownLeft className="w-3 h-3 text-white" />
+                    </div>
+                )}
               </button>
             );
           })}

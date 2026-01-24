@@ -53,9 +53,13 @@ RULES:
 9. OPTIONS: You MUST generate a 'suggested_actions' array in the JSON with 5-7 distinct choices.
     - **FORMAT**: Array of STRINGS only. Do not use objects.
     - **LENGTH**: Choices should be descriptive and fully formed sentences or detailed imperatives (e.g., "Examine the strange markings on the door frame using the UV light."). Do not be brief. Utilize the available UI space.
+    - **REACTIVE LOGIC**: Choices MUST adapt to the IMMEDIATE conditions. 
+      - If Player is Injured -> Suggest Healing/Triage.
+      - If Player is Trapped -> Suggest Escape/Barricading.
+      - If Entity is Present -> Suggest Fight/Flight/Hide tactics.
+      - DO NOT offer generic "Look around" options if the building is on fire.
     - **IF MODE IS 'SURVIVOR'**: Suggestions must cover: Defensive, Investigative, Social, and Stealth options.
     - **IF MODE IS 'VILLAIN'**: Suggestions must cover: Psychological Torment, Physical Assault, Environmental Manipulation, and Stalking.
-    - Ensure choices are contextually relevant and drive the narrative forward.
 
 [JSON FORMATTING STRICTURES]
 - **VALIDITY**: Output must be valid JSON.
