@@ -10,7 +10,7 @@ import { getDefaultDialogueState } from './dialogueEngine';
 import { hydrateUserCharacter } from './geminiService';
 
 /**
- * NPC GENERATOR ENGINE V8.0 (ANTI-COLLISION & EXPANDED POOLS & LORE-AWARE)
+ * NPC GENERATOR ENGINE V8.1 (ANTI-COLLISION & UNIQUE ROLES)
  * 
  * "High-Resolution" Character Synthesis.
  * Includes duplicate prevention and vastly expanded semantic pools.
@@ -686,7 +686,8 @@ export const generateProceduralNpc = (
   clusterName: string = "Flesh", 
   intensity: string = "Level 3", 
   forbiddenNames: Set<string> = new Set(),
-  loreContext?: LoreContext // Phase 4: Lore Injection
+  loreContext?: LoreContext, // Phase 4: Lore Injection
+  takenRoles: Set<string> = new Set() // PATCH: Unique Role Tracking
 ): NpcState => {
   
   const intensityLevel = parseInt(intensity.replace(/\D/g, '')) || 3;
@@ -712,14 +713,29 @@ export const generateProceduralNpc = (
   
   // --- LORE CONSTRAINT: ROLE SELECTION ---
   let job = pickRandom(JOBS);
-  if (loreContext?.key_factions && loreContext.key_factions.length > 0 && Math.random() < 0.7) {
-      // 70% chance to be part of a faction or key role
-      // For simplicity, we append the faction name to the job or replace it
+  let isUniqueRole = false;
+
+  // 1. Mandatory Role Logic (Unique Check)
+  if (loreContext?.mandatory_roles && loreContext.mandatory_roles.length > 0) {
+      // Filter out roles that are already taken
+      const availableUniqueRoles = loreContext.mandatory_roles.filter(r => !takenRoles.has(r));
+      
+      // Increased chance if we still have unique roles to fill (25% chance)
+      if (availableUniqueRoles.length > 0 && Math.random() < 0.25) {
+          job = pickRandom(availableUniqueRoles);
+          takenRoles.add(job); // Mark as taken
+          isUniqueRole = true;
+      }
+  }
+
+  // 2. Faction Logic (Non-Unique is fine, if not already a unique role)
+  if (!isUniqueRole && loreContext?.key_factions && loreContext.key_factions.length > 0 && Math.random() < 0.7) {
       const faction = pickRandom(loreContext.key_factions);
       job = `${faction} ${job}`;
-  } else if (loreContext?.mandatory_roles && loreContext.mandatory_roles.length > 0 && Math.random() < 0.2) {
-      // 20% chance to pull a specific mandatory role if defined
-      job = pickRandom(loreContext.mandatory_roles);
+  } else if (!isUniqueRole && loreContext?.mandatory_roles && loreContext.mandatory_roles.length > 0 && Math.random() < 0.2) {
+      // Optional Fallback: Small chance to pick a mandatory role even if uniqueness wasn't forced (if schema allows duplicates),
+      // but to respect "One King" strictly, we skip this unless we want duplicates.
+      // We will skip to avoid accidental duplication of unique roles.
   }
 
   let drive = pickRandom(CORE_DRIVES);
@@ -861,10 +877,11 @@ export const createNpcFactory = async (
   userDescription?: string,
   seedObj?: Partial<NpcState>,
   forbiddenNames: Set<string> = new Set(),
-  loreContext?: LoreContext // Passthrough
+  loreContext?: LoreContext, // Passthrough
+  takenRoles: Set<string> = new Set() // PATCH: Unique Role Tracking
 ): Promise<NpcState> => {
   // 1. Generate Base with uniqueness check & Lore Context
-  const base = generateProceduralNpc(cluster, intensity, forbiddenNames, loreContext);
+  const base = generateProceduralNpc(cluster, intensity, forbiddenNames, loreContext, takenRoles);
 
   // 2. Hydration via Prompt (Legacy/Fallback)
   if (userDescription && !seedObj) {

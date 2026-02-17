@@ -76,6 +76,7 @@ export const NpcSelector: React.FC<NpcSelectorProps> = ({ config, onConfirm, onB
 
     // Initialize shared name registry to prevent duplicates within this batch
     const batchForbiddenNames = new Set<string>();
+    const batchTakenRoles = new Set<string>(); // New: Prevent duplicate mandatory roles in batch
 
     // Register already known seed names if any
     seedObjects.forEach(s => {
@@ -87,7 +88,7 @@ export const NpcSelector: React.FC<NpcSelectorProps> = ({ config, onConfirm, onB
             // If we have a seed object for this index, use it.
             const seed = i < seedObjects.length ? seedObjects[i] : undefined;
             // Pass the shared registry
-            return await createNpcFactory(config.cluster, config.intensity, undefined, seed, batchForbiddenNames);
+            return await createNpcFactory(config.cluster, config.intensity, undefined, seed, batchForbiddenNames, config.lore_context, batchTakenRoles);
         });
 
         const newPool = await Promise.all(promises);

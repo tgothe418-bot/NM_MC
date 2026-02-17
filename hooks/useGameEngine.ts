@@ -106,8 +106,9 @@ export const useGameEngine = (initialApiKey: string) => {
         } else {
             const victimCount = config.victim_count || 3;
             const usedNames = new Set<string>();
+            const takenRoles = new Set<string>(); // Ensure unique roles
             initialNpcs = Array.from({ length: victimCount }).map(() => 
-                generateProceduralNpc(config.cluster, config.intensity, usedNames, config.lore_context)
+                generateProceduralNpc(config.cluster, config.intensity, usedNames, config.lore_context, takenRoles)
             );
         }
 
