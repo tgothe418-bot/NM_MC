@@ -720,8 +720,8 @@ export const generateProceduralNpc = (
       // Filter out roles that are already taken
       const availableUniqueRoles = loreContext.mandatory_roles.filter(r => !takenRoles.has(r));
       
-      // Increased chance if we still have unique roles to fill (25% chance)
-      if (availableUniqueRoles.length > 0 && Math.random() < 0.25) {
+      // Increased chance if we still have unique roles to fill (40% chance)
+      if (availableUniqueRoles.length > 0 && Math.random() < 0.4) {
           job = pickRandom(availableUniqueRoles);
           takenRoles.add(job); // Mark as taken
           isUniqueRole = true;
