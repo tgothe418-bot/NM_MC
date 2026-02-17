@@ -185,6 +185,18 @@ export const VillainStateSchema = z.object({
   victim_profile: z.string().optional(),
 });
 
+// Phase 1: The Source of Truth - LoreContext
+export const LoreContextSchema = z.object({
+  source_id: z.string(),
+  central_conflict: z.string(),
+  tonal_directives: z.array(z.string()),
+  key_factions: z.array(z.string()),
+  mandatory_roles: z.array(z.string()),
+  forbidden_tropes: z.array(z.string()),
+  magic_system_rules: z.array(z.string()).optional(),
+  tech_level_cap: z.string().optional(),
+});
+
 export const GameStateSchema = z.object({
   meta: z.object({
     turn: z.number(),
@@ -195,9 +207,11 @@ export const GameStateSchema = z.object({
     player_profile: z.object({
         name: z.string(),
         background: z.string(),
-        traits: z.union([z.string(), z.array(z.string())])
+        traits: z.union([z.string(), z.array(z.string())]),
+        fracture_state: z.number().optional() // Phase 2 requirement
     }).optional()
   }),
+  lore_context: LoreContextSchema.optional(), // Phase 1 requirement
   villain_state: VillainStateSchema,
   npc_states: z.array(NpcStateSchema),
   location_state: LocationStateSchema,
@@ -213,7 +227,6 @@ export const SimulatorResponseSchema = z.any();
 
 export const NarratorResponseSchema = z.object({
   story_text: z.string(),
-  // Relaxed to z.any() to allow partial updates from LLM without strict validation failure
   game_state: z.any().optional(),
 });
 

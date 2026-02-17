@@ -22,7 +22,8 @@ import {
   CharacterProfileSchema,
   TileTypeSchema,
   GridCellSchema,
-  GridLayoutSchema
+  GridLayoutSchema,
+  LoreContextSchema
 } from './schemas';
 
 // Re-export Schema-Derived Types
@@ -45,6 +46,7 @@ export type ParsedCharacter = z.infer<typeof ParsedCharacterSchema>;
 export type SourceAnalysisResult = z.infer<typeof SourceAnalysisResultSchema>;
 export type ScenarioConcepts = z.infer<typeof ScenarioConceptsSchema>;
 export type CharacterProfile = z.infer<typeof CharacterProfileSchema>;
+export type LoreContext = z.infer<typeof LoreContextSchema>;
 
 // Spatial Types
 export type TileType = z.infer<typeof TileTypeSchema>;
@@ -78,6 +80,8 @@ export interface SimulationConfig {
   survivor_traits?: string;
   // New: Pre-selected NPCs from setup
   pre_generated_npcs?: NpcState[];
+  // Phase 1: Context Injection
+  lore_context?: LoreContext;
 }
 
 export interface KnowledgeNode {

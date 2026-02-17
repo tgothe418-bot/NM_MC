@@ -3,13 +3,14 @@ import {
   NpcState, 
   VoiceSignature, 
   DialogueState,
-  PsychologicalProfile
+  PsychologicalProfile,
+  LoreContext
 } from '../types';
 import { getDefaultDialogueState } from './dialogueEngine';
 import { hydrateUserCharacter } from './geminiService';
 
 /**
- * NPC GENERATOR ENGINE V8.0 (ANTI-COLLISION & EXPANDED POOLS)
+ * NPC GENERATOR ENGINE V8.0 (ANTI-COLLISION & EXPANDED POOLS & LORE-AWARE)
  * 
  * "High-Resolution" Character Synthesis.
  * Includes duplicate prevention and vastly expanded semantic pools.
@@ -536,7 +537,7 @@ const CLUSTER_SPECIFIC_TRAUMAS: Record<string, string[]> = {
     "Suffers from Capgras Delusion (thinks loved ones are identical imposters).",
     "Has absolutely no memory of their life before age 10.",
     "Constantly sees their own doppelganger in crowds looking back.",
-    "Believes they are a character in a story being written by a cruel god.",
+    "Believes their reflection moves a split second after they do.",
     "Cannot recognize their own face in mirrors (Prosopagnosia).",
     "Experiences 'Jamais Vu' constantly (familiar things feel alien).",
     "Is convinced they died three years ago and this is purgatory.",
@@ -567,7 +568,7 @@ const CLUSTER_SPECIFIC_TRAUMAS: Record<string, string[]> = {
     "Ruined their family for a moment of intense pleasure.",
     "Obsessed with the texture of scars.",
     "Can only feel intimacy when in physical danger.",
-    "Believes they consumed their twin in the womb.",
+    "Believes their consumed their twin in the womb.",
     "Has a compulsion to taste things that are poisonous.",
     "Was the muse for an artist who committed suicide.",
     "Loves something that lives in the dark.",
@@ -681,7 +682,12 @@ const generateVoiceSignature = (region: string, personality: any): VoiceSignatur
 
 // --- 6. MAIN GENERATOR LOGIC ---
 
-export const generateProceduralNpc = (clusterName: string = "Flesh", intensity: string = "Level 3", forbiddenNames: Set<string> = new Set()): NpcState => {
+export const generateProceduralNpc = (
+  clusterName: string = "Flesh", 
+  intensity: string = "Level 3", 
+  forbiddenNames: Set<string> = new Set(),
+  loreContext?: LoreContext // Phase 4: Lore Injection
+): NpcState => {
   
   const intensityLevel = parseInt(intensity.replace(/\D/g, '')) || 3;
   const isHighIntensity = intensityLevel >= 4;
@@ -703,9 +709,41 @@ export const generateProceduralNpc = (clusterName: string = "Flesh", intensity: 
   forbiddenNames.add(name);
 
   const region = pickRandom(pool.regions);
-  const job = pickRandom(JOBS);
-  const drive = pickRandom(CORE_DRIVES);
-  const personality = pickRandom(PERSONALITY_ARCHETYPES);
+  
+  // --- LORE CONSTRAINT: ROLE SELECTION ---
+  let job = pickRandom(JOBS);
+  if (loreContext?.key_factions && loreContext.key_factions.length > 0 && Math.random() < 0.7) {
+      // 70% chance to be part of a faction or key role
+      // For simplicity, we append the faction name to the job or replace it
+      const faction = pickRandom(loreContext.key_factions);
+      job = `${faction} ${job}`;
+  } else if (loreContext?.mandatory_roles && loreContext.mandatory_roles.length > 0 && Math.random() < 0.2) {
+      // 20% chance to pull a specific mandatory role if defined
+      job = pickRandom(loreContext.mandatory_roles);
+  }
+
+  let drive = pickRandom(CORE_DRIVES);
+  // --- LORE CONSTRAINT: CONFLICT ---
+  if (loreContext?.central_conflict) {
+      // STRICT REQUIREMENT: If conflict exists, agenda MUST be derived from it.
+      drive = `Driven by the conflict: ${loreContext.central_conflict}`;
+  }
+
+  // --- LORE CONSTRAINT: FORBIDDEN TROPES ---
+  let personality = pickRandom(PERSONALITY_ARCHETYPES);
+  if (loreContext?.forbidden_tropes && loreContext.forbidden_tropes.length > 0) {
+      let safe = false;
+      let safetyTries = 0;
+      while (!safe && safetyTries < 10) {
+          if (!loreContext.forbidden_tropes.some(ft => personality.label.includes(ft))) {
+              safe = true;
+          } else {
+              personality = pickRandom(PERSONALITY_ARCHETYPES);
+              safetyTries++;
+          }
+      }
+  }
+
   // Context-Aware Item Selection
   const item = getContextualItem(job);
   const phobia = pickRandom(PHOBIAS);
@@ -822,10 +860,11 @@ export const createNpcFactory = async (
   intensity: string, 
   userDescription?: string,
   seedObj?: Partial<NpcState>,
-  forbiddenNames: Set<string> = new Set()
+  forbiddenNames: Set<string> = new Set(),
+  loreContext?: LoreContext // Passthrough
 ): Promise<NpcState> => {
-  // 1. Generate Base with uniqueness check
-  const base = generateProceduralNpc(cluster, intensity, forbiddenNames);
+  // 1. Generate Base with uniqueness check & Lore Context
+  const base = generateProceduralNpc(cluster, intensity, forbiddenNames, loreContext);
 
   // 2. Hydration via Prompt (Legacy/Fallback)
   if (userDescription && !seedObj) {

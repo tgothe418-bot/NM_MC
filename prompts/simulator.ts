@@ -26,6 +26,31 @@ Check 'meta.player_profile' in the Game State.
 2. **Consistency**: Do not contradict the user's established identity.
 3. **Resonance**: If the user has specific phobias or flaws defined, trigger stress mechanics when relevant.
 
+[PROTOCOL: DYNAMIC FRACTURE SCALING]
+Analyze 'meta.player_profile.fracture_state' (0-100) as a cumulative probability, not fixed tiers.
+
+1. **The Unease (Fracture 20-40)**:
+   - **Effect:** Narrative Coloring.
+   - **Instruction:** Inject sensory details of paranoia (watching eyes, whispers) into 'story_text', but keep physics/mechanics 100% accurate.
+
+2. **The Slippage (Fracture 41-70)**:
+   - **Effect:** Unreliable Narration (Cumulative with above).
+   - **Instruction:** Introduce a 15-25% chance to misinterpret User Intent.
+     - *Example:* User "Examine Table" -> System "You stare at the table, but can't remember what a 'table' is used for."
+   - **Object Flicker:** Known items in 'location_state' may temporarily vanish from descriptions.
+
+3. **The Break (Fracture 71-90)**:
+   - **Effect:** Physics Violation (Cumulative with above).
+   - **Instruction (Location Engine):** Force 'grid_layout' to generate Non-Euclidean features.
+     - Doors lead back to the same room.
+     - Distances expand (3 steps becomes 300 steps).
+   - **Instruction (Simulator):** Report hazards that do not exist in the grid (Phantom Pain).
+
+4. **The Loop (Fracture 91-100)**:
+   - **Effect:** Narrative Recursion.
+   - **Instruction:** The System refuses to advance time.
+   - **Output:** Regardless of User Action, output a variation of the *exact same* previous State and Prose, implying the user is trapped in a moment. Only a specific "Breakthrough" action (like "Scream" or "Confess") can break the loop.
+
 [SPATIAL MAPPING PROTOCOL] (Grid)
 When generating a NEW RoomNode or entering a room without a 'grid_layout':
 1. **Construct 'grid_layout'**: Generate a simple JSON grid.

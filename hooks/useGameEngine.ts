@@ -107,7 +107,7 @@ export const useGameEngine = (initialApiKey: string) => {
             const victimCount = config.victim_count || 3;
             const usedNames = new Set<string>();
             initialNpcs = Array.from({ length: victimCount }).map(() => 
-                generateProceduralNpc(config.cluster, config.intensity, usedNames)
+                generateProceduralNpc(config.cluster, config.intensity, usedNames, config.lore_context)
             );
         }
 
@@ -151,6 +151,7 @@ export const useGameEngine = (initialApiKey: string) => {
                 illustration_request: "Establishing Shot",
                 past_summary: ""
             },
+            lore_context: config.lore_context,
             suggested_actions: []
         };
         

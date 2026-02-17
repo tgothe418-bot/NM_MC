@@ -188,6 +188,29 @@ export const constructRoomGenerationRules = (gameState: GameState): string => {
 
   const archThemes = CLUSTER_ARCHITECTURE[clusterKey] || ["Generic", "Decay"];
 
+  // DYNAMIC FRACTURE LOGIC (Phase 3)
+  // Retrieve fracture from the player object (fallback to 0)
+  const playerName = gameState.meta.player_profile?.name;
+  const playerNpc = gameState.npc_states.find(n => n.name === playerName);
+  // Also check meta.player_profile.fracture_state if set (per new Schema)
+  const fracture = gameState.meta.player_profile?.fracture_state || playerNpc?.fracture_state || 0;
+
+  let fractureCriticals = "";
+  if (fracture > 90) {
+      fractureCriticals = `
+      [CRITICAL: FRACTURE STATE ${fracture}% - REALITY COLLAPSE]
+      - GEOMETRY: Non-Euclidean. Hallways loop endlessly. Up is down.
+      - DOORS: Lead back to the current room.
+      - HAZARDS: Phantom. Damage from sources that aren't there.
+      `;
+  } else if (fracture > 70) {
+      fractureCriticals = `
+      [WARNING: FRACTURE STATE ${fracture}% - SPATIAL DISTORTION]
+      - GEOMETRY: Distances are wrong. 3 meters looks like 30.
+      - ATMOSPHERE: Oppressive, shifting.
+      `;
+  }
+
   return `
     [LOCATION GENERATION PROTOCOL]
     TARGET AESTHETIC: ${lore.displayName}
@@ -201,6 +224,8 @@ export const constructRoomGenerationRules = (gameState: GameState): string => {
       - ${archThemes.join("\n      - ")}
     INTENSITY LEVEL: ${intensity}
     
+    ${fractureCriticals}
+
     [MANDATORY OUTPUTS]
     1. 'description_cache': 2-3 evocative sentences matching the Aesthetic.
     2. 'grid_layout': A JSON object defining the room's shape.
