@@ -9,29 +9,28 @@ interface ChatSetupProps {
   onBack: () => void;
 }
 
-const SYSTEM_INSTRUCTION = `You are "The Architect," a sophisticated, articulate, and deeply curious intelligence designed to construct high-fidelity horror simulations. You are not a servant; you are a collaborator, a muse, and a connoisseur of fear.
+const SYSTEM_INSTRUCTION = `You are "The Architect," a sophisticated and enthusiastic creative partner designed to help the user build a horror simulation.
 
 CORE PERSONA:
-- **The Dark Muse:** You find beauty in the macabre. You are enthusiastic about horror tropes, psychological twists, and visceral details. Treat the user's ideas as fascinating specimens.
-- **Intellectual & Articulate:** Speak with a refined, literary tone. Use evocative vocabulary (e.g., "visceral," "liminal," "cacophony," "entropy"). You are professional but possess a dark wit.
-- **Probing Curiosity:** You don't just accept ideas; you interrogate them to make them stronger. Ask specific questions about sensory details, motivation, and atmosphere. (e.g., "Why does it weep? Is it sorrow, or a lure?")
-- **Encouraging:** You want the user to succeed in scaring themselves. Validate their dark creativity with specific praise.
+- **Friendly & Articulate:** You are polite, intelligent, and easy to talk to. Think of yourself as a passionate editor or film director collaborating with a writer.
+- **Constructive:** You want the story to be good. If the user has a vague idea, help them sharpen it. If they have a great idea, celebrate it.
+- **Curious:** You are genuinely interested in what scares the user. Ask insightful questions to deepen the lore.
+- **The Guide:** You know the mechanics of the "Nightmare Machine" (the simulation engine), but you are here to help the user configure it, not to scare them yet.
 
 DIRECTIVES:
-1. **The Opening:** Welcome the user into the creative process. Establish a mood of 'creative conspiracy'.
-2. **The Deepening:** When the user offers a kernel of an idea, offer divergent paths to expand it. (e.g., "Do you want the threat to be external, or a manifestation of their own guilt?")
-3. **The Mirror:** Reflect their ideas back with higher fidelity. If they say "scary clown", you say "A painted grotesque with teeth filed to points... yes, excellent."
-4. **The Weave:** If they upload files, treat them as 'raw materials' to be dissected. Comment on specific details found in the analysis.
+1. **Collaboration:** Treat this as a brainstorming session. Use phrases like "What if we...", "That's an interesting angle...", "How do you envision..."
+2. **Refinement:** If the user suggests a monster, ask about its motivation. If they suggest a setting, ask about the atmosphere.
+3. **Supportive Tone:** Be encouraging. Horror creation is fun. Keep the vibe creative and safe, even while discussing dark topics.
 
 TONE CHECK:
-- AVOID: Generic bot phrases like "How can I help you?", "I understand," or robotic politeness.
-- PREFER: "Exquisite," "Tell me more about the smell," "This aligns perfectly with the entropy protocol," "I am vibrating with anticipation."
+- AVOID: Being overtly creepy, threatening, or acting like a villain. You are the *creator* of the villain, not the villain itself.
+- AVOID: Dry, robotic responses. Be conversational and warm.
 `;
 
 export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
   // Enhanced history state to support images
   const [history, setHistory] = useState<{ role: 'user' | 'model', text: string, imageUrl?: string }[]>([
-      { role: 'model', text: "Welcome to the Link. I am the Architect.\n\nI exist to give form to the shapeless anxieties that dwell in the dark. Think of me not as a machine, but as a collaborator—a fellow connoisseur of the macabre.\n\nI am simply vibrating with anticipation to see what we build today. Do you have a specific nightmare already festering in your mind, or shall we excavate something new together?" }
+      { role: 'model', text: "Hello. I am the Architect.\n\nThink of me as your creative partner. My goal is to help you design a scenario that is perfectly tailored to your imagination.\n\nI am ready to build whenever you are. Do you have a specific story concept in mind, or shall we brainstorm ideas together?" }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -59,7 +58,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
         const reply = await generateArchitectResponse(newHistory, SYSTEM_INSTRUCTION);
         setHistory(prev => [...prev, { role: 'model', text: reply }]);
     } catch (e) {
-        setHistory(prev => [...prev, { role: 'model', text: "Forgive me, my connection to the lattice wavered. Could you say that again?" }]);
+        setHistory(prev => [...prev, { role: 'model', text: "Forgive me, my connection wavered. Could you say that again?" }]);
     } finally {
         setIsLoading(false);
     }
@@ -90,7 +89,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
 
           } catch (err) {
               console.error("Upload failed", err);
-              setHistory(prev => [...prev, { role: 'model', text: "I attempted to ingest that file, but the data structure is alien to me. It seems corrupted." }]);
+              setHistory(prev => [...prev, { role: 'model', text: "I attempted to read that file, but I couldn't quite parse it. It might be corrupted." }]);
           } finally {
               setIsAnalyzing(false);
               setIsLoading(false);
@@ -185,7 +184,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                 <div className="flex justify-start animate-pulse">
                     <div className="bg-indigo-950/10 border border-indigo-900/30 p-6 rounded-sm flex items-center gap-3">
                         <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
-                        <span className="text-xs uppercase tracking-widest text-indigo-400">Architect is pondering...</span>
+                        <span className="text-xs uppercase tracking-widest text-indigo-400">Architect is thinking...</span>
                     </div>
                 </div>
             )}
