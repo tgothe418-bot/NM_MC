@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Settings, Upload, Terminal, MessageSquare } from 'lucide-react';
+import { Settings, Upload, MessageSquare, Bug } from 'lucide-react';
 import { SetupMode } from './types';
 import { SourceUploader } from './SourceUploader';
 
@@ -117,14 +117,14 @@ export const ChoiceModeSelector: React.FC<Props> = ({ onSelect }) => (
             className="group flex items-center gap-4 px-6 py-3 rounded-full border border-gray-900 hover:border-amber-900/50 bg-black hover:bg-amber-900/10 transition-all opacity-50 hover:opacity-100"
         >
             <div className="p-1.5 rounded-full bg-gray-900 group-hover:bg-amber-900/20 text-gray-600 group-hover:text-amber-500 transition-colors">
-                <Terminal className="w-3 h-3" />
+                <Bug className="w-3 h-3" />
             </div>
             <div className="text-left">
                 <div className="text-[10px] font-mono font-bold text-gray-500 group-hover:text-amber-500 uppercase tracking-widest transition-colors">
-                    Tell Me A Story
+                    Test / Debug Mode
                 </div>
                 <div className="text-[8px] font-mono text-gray-700 uppercase tracking-wider">
-                    Autonomous Test Loop
+                    Automated Stress-Test & Logic Probe
                 </div>
             </div>
         </button>

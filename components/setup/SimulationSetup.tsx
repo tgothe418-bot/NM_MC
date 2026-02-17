@@ -185,8 +185,8 @@ export const SimulationSetup: React.FC<Props> = ({ onRun, onBack }) => {
                 <div className="flex gap-6">
                     <Bot className="w-14 h-14 text-amber-500 animate-pulse" />
                     <div>
-                        <h2 className="font-mono text-5xl font-bold tracking-[0.25em] text-amber-500">DIAGNOSTIC PROTOCOL</h2>
-                        <p className="text-sm font-mono text-gray-500 tracking-[0.4em] mt-2">Autonomous Narrative Execution Engine</p>
+                        <h2 className="font-mono text-5xl font-bold tracking-[0.25em] text-amber-500">TEST MODE</h2>
+                        <p className="text-sm font-mono text-gray-500 tracking-[0.4em] mt-2">Narrative Logic & Integrity Stress-Test</p>
                     </div>
                 </div>
                 <div className="flex gap-4">
@@ -254,7 +254,7 @@ export const SimulationSetup: React.FC<Props> = ({ onRun, onBack }) => {
                 {/* Cycles (Unique to Simulation) */}
                 <div className="space-y-4">
                     <label className="text-sm font-mono text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                        <Activity className="w-4 h-4 text-amber-500" /> Cycles
+                        <Activity className="w-4 h-4 text-amber-500" /> Test Cycles
                     </label>
                     <div className="flex items-center gap-4 bg-black border-2 border-gray-800 p-4">
                         <input 
@@ -270,10 +270,9 @@ export const SimulationSetup: React.FC<Props> = ({ onRun, onBack }) => {
                     </div>
                     {/* ADDED DESCRIPTION */}
                     <p className="text-[10px] text-gray-500 font-mono leading-relaxed border-l-2 border-amber-500/20 pl-4 py-2 opacity-80">
-                        The "Cycles" count determines the duration of autonomous decision-making. 
-                        The Machine will simulate a User persona to stress-test the narrative logic, 
-                        making its own choices, asking questions, or breaking character until the cycle count depletes 
-                        or the system hallucinations reach critical failure.
+                        Defines the number of automated turns. The system will simulate a User Persona to 
+                        probe the logic engine, attempt to break constraints, and verify causal consistency 
+                        without human intervention.
                     </p>
                 </div>
 
@@ -378,7 +377,7 @@ export const SimulationSetup: React.FC<Props> = ({ onRun, onBack }) => {
                 className={`w-full max-w-2xl py-8 bg-amber-500 text-black font-mono font-bold uppercase tracking-[0.6em] hover:bg-amber-400 transition-colors flex items-center justify-center gap-6 shadow-[0_0_50px_rgba(245,158,11,0.3)] ${isStarting ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
                 {isStarting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5 fill-black" />}
-                {isStarting ? 'INITIALIZING...' : 'RUN DIAGNOSTICS'}
+                {isStarting ? 'INITIALIZING TEST...' : 'INITIATE TEST SEQUENCE'}
             </button>
         </div>
     </div>
