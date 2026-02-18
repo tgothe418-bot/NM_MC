@@ -117,7 +117,7 @@ export const parseSimulatorResponse = (text: string): Partial<GameState> => {
     // We allow Partial GameState because the Simulator might only return updates
     return cleanAndParse(
         text, 
-        GameStateSchema.deepPartial(), 
+        GameStateSchema.partial(), 
         {}
     );
 };
@@ -125,7 +125,7 @@ export const parseSimulatorResponse = (text: string): Partial<GameState> => {
 export const parseNarratorResponse = (text: string): { story_text: string, game_state?: Partial<GameState> } => {
     const Schema = z.object({
         story_text: z.string(),
-        game_state: GameStateSchema.deepPartial().optional()
+        game_state: GameStateSchema.partial().optional()
     });
 
     return cleanAndParse(text, Schema, { 

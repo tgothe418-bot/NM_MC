@@ -1,18 +1,12 @@
 
 import React, { useEffect, useRef } from 'react';
 import { ChatMessage } from '../types';
-import { Image, FileText, Terminal, Feather } from 'lucide-react';
-import { SigilLoader } from './SigilLoader';
-import { ThinkingExpander } from './ThinkingExpander';
+import { Image } from 'lucide-react';
 
 interface StoryLogProps {
   history: ChatMessage[];
   isLoading: boolean;
   activeCluster?: string;
-  showLogic?: boolean;
-  logicStream?: string;
-  narrativeStream?: string;
-  streamPhase?: 'logic' | 'narrative';
   className?: string;
 }
 
@@ -62,20 +56,16 @@ const getColorClass = (color: string) => {
   return "text-gray-200 font-bold";
 };
 
-// Processes Keywords and ANSI codes only (Spans are handled at the parent level)
 const applyTypographicAnomalies = (text: string): React.ReactNode[] => {
-  // Capture groups: 1=ANSICyan, 2=ANSIRed, 3=Keywords
   const regex = /(\x1b\[34m[\s\S]*?\x1b\[0m)|(\x1b\[31m[\s\S]*?\x1b\[0m)|(\b(?:house|home|dwelling|hallway|hallways|corridor|room|rooms|walls|structure|place)\b|\b(?:minotaur|beast|monster|threat|horror)\b|\b(?:russet|crimson lake|crimson|cerulean sky|cerulean|cobalt|vermilion|ochre|umber|sienna|viridian)\b)/gi;
   
   const parts = text.split(regex).filter(p => p);
   
   return parts.map((part, index) => {
-    // ANSI Blue - System/Cold/Structure
     if (part.startsWith('\x1b[34m')) {
         const content = part.replace(/\x1b\[34m|\x1b\[0m/g, '');
         return <span key={index} className="text-blue-400 font-bold drop-shadow-[0_0_8px_rgba(96,165,250,0.5)] animate-pulse">{content}</span>;
     }
-    // ANSI Red - Flesh/Danger/Violence
     if (part.startsWith('\x1b[31m')) {
         const content = part.replace(/\x1b\[31m|\x1b\[0m/g, '');
         return <span key={index} className="text-red-500 font-bold drop-shadow-[0_0_8px_rgba(220,38,38,0.5)] animate-pulse">{content}</span>;
@@ -97,7 +87,6 @@ const applyTypographicAnomalies = (text: string): React.ReactNode[] => {
   });
 };
 
-// Handles Markdown, Footnotes, Zalgo, and Keyword Highlighting
 const FormattedTextContent: React.FC<{ text: string, cluster?: string }> = ({ text, cluster }) => {
   const isSystem = cluster?.includes("System");
   const parts = text.split(/(\[\^\d+\])/g);
@@ -134,12 +123,10 @@ const FormattedTextContent: React.FC<{ text: string, cluster?: string }> = ({ te
   );
 };
 
-// Top-level formatter: Priorities SPANS first, then delegates content to FormattedTextContent
 const FormattedText: React.FC<{ text: string, cluster?: string }> = ({ text, cluster }) => {
   const cleanHtmlString = (str: string) => str.replace(/<br\s*\/?>/gi, '\n').replace(/<b>(.*?)<\/b>/gi, '**$1**').replace(/<i>(.*?)<\/i>/gi, '*$1*').replace(/<strong>(.*?)<\/strong>/gi, '**$1**').replace(/<em>(.*?)<\/em>/gi, '*$1*');
   const processedText = cleanHtmlString(text);
   
-  // Robust Regex to catch HTML span tags with attributes, tolerating whitespace and different quote types
   const spanRegex = /(<span\s+[^>]*>[\s\S]*?<\/span>)/gi;
   const parts = processedText.split(spanRegex);
 
@@ -147,71 +134,42 @@ const FormattedText: React.FC<{ text: string, cluster?: string }> = ({ text, clu
     <span>
       {parts.map((part, index) => {
         if (part.match(/^<span/i)) {
-           // Parse the span content
            const contentMatch = part.match(/>([\s\S]*?)<\/span>/i);
            const content = contentMatch ? contentMatch[1] : "";
-           
-           // Determine color based on class or style
            let color = "";
-           
-           // Check for class (e.g. class="blue")
            const classMatch = part.match(/class=['"]([^'"]*)['"]/i);
            if (classMatch) {
              const cls = classMatch[1].toLowerCase();
              if (cls.includes('blue')) color = 'blue';
              else if (cls.includes('red')) color = 'red';
            }
-           
-           // Fallback: Check for inline style color if class didn't catch it
            if (!color) {
                const styleMatch = part.match(/color:\s*([a-z]+|#[0-9a-f]{3,6})/i);
                if (styleMatch) color = styleMatch[1];
            }
-           
            return (
              <span key={index} className={getColorClass(color)}>
                <FormattedTextContent text={content} cluster={cluster} />
              </span>
            );
         }
-        // Normal text processing for non-span parts
         return <FormattedTextContent key={index} text={part} cluster={cluster} />;
       })}
     </span>
   );
 };
 
-export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, activeCluster, showLogic, logicStream, narrativeStream, streamPhase, className = "pb-64" }) => {
+export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, activeCluster, className = "pb-64" }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
-  const logicRef = useRef<HTMLDivElement>(null);
-  const narrativeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [history, isLoading]);
   
-  // Auto-scroll logic stream
-  useEffect(() => {
-      if (showLogic && logicRef.current) logicRef.current.scrollTop = logicRef.current.scrollHeight;
-      if (showLogic && narrativeRef.current) narrativeRef.current.scrollTop = narrativeRef.current.scrollHeight;
-  }, [logicStream, narrativeStream, showLogic]);
-
-  // Derived loading state text
-  const loadingText = streamPhase === 'logic' ? 'Calculating Consequences...' : 'Rendering Narrative...';
-  const combinedStream = (logicStream || "") + (narrativeStream || "");
-
   return (
     <div className={`flex-1 overflow-y-auto p-10 lg:p-20 custom-scrollbar bg-transparent relative z-10 ${className}`}>
       <div className="max-w-4xl mx-auto space-y-16 min-h-full">
-        {/* INITIAL LOAD SCREEN */}
         {history.length === 0 && isLoading && (
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-auto px-4">
-                <SigilLoader cluster={activeCluster} text={loadingText} />
-                <div className="w-full max-w-xl mt-8 animate-fadeIn">
-                    <ThinkingExpander 
-                        stream={combinedStream} 
-                        phase={streamPhase || 'logic'} 
-                        defaultExpanded={true} 
-                    />
-                </div>
+                <span className="text-gray-500 font-mono animate-pulse uppercase tracking-[0.3em]">Initializing Simulation...</span>
             </div>
         )}
 
@@ -224,18 +182,12 @@ export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, activeCl
               </div>
             ) : (
               <div className="max-w-full w-full space-y-8">
-                {/* Establishing Shot / Image Render */}
                 {msg.imageUrl && (
                   <div className="mb-12 rounded-sm overflow-hidden border-2 border-gray-800 shadow-[0_0_100px_rgba(255,255,255,0.05)] relative group max-w-4xl w-full">
                     <img src={msg.imageUrl} alt="Neural hallucination" className="w-full h-auto opacity-90 group-hover:opacity-100 transition-all duration-1500 grayscale hover:grayscale-0 scale-105 hover:scale-100" />
                     <div className="absolute bottom-6 right-6 bg-black/80 px-5 py-3 text-[10px] text-gray-300 font-mono flex items-center gap-3 uppercase tracking-[0.3em] backdrop-blur-md border border-gray-700 rounded-sm">
                       <Image className="w-4 h-4 text-white" /> Neural Projection
                     </div>
-                    {/* Corner accents to match schematic vibe */}
-                    <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-white/20"></div>
-                    <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-white/20"></div>
-                    <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-white/20"></div>
-                    <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-white/20"></div>
                   </div>
                 )}
                 <div className="prose prose-invert prose-p:font-serif prose-p:text-gray-200 prose-p:leading-[1.7] prose-headings:font-sans prose-headings:tracking-[0.3em] prose-headings:text-gray-400 prose-strong:text-green-300 max-w-none w-full">
@@ -255,28 +207,9 @@ export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, activeCl
           </div>
         ))}
         
-        {/* SUBSEQUENT TURN LOADING INDICATOR (Thoughts) */}
         {isLoading && history.length > 0 && (
-            <div className="animate-fadeIn mt-8">
-                <ThinkingExpander 
-                    stream={combinedStream} 
-                    phase={streamPhase || 'logic'} 
-                    defaultExpanded={false}
-                />
-            </div>
-        )}
-        
-        {/* Logic Stream Overlay (Legacy Hacker Mode) */}
-        {showLogic && (
-            <div className="fixed top-20 right-10 w-96 bg-black/90 border border-green-900/50 p-4 font-mono text-[10px] text-green-500 h-[60vh] overflow-hidden flex flex-col z-50 shadow-[0_0_30px_rgba(0,255,0,0.1)] rounded-sm pointer-events-none">
-                <div className="border-b border-green-900/50 pb-2 mb-2 flex justify-between items-center">
-                    <span className="animate-pulse">/// LOGIC_KERNEL_ACCESS ///</span>
-                    <Terminal className="w-3 h-3" />
-                </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4" ref={logicRef}>
-                    <div className="whitespace-pre-wrap opacity-80">{logicStream}</div>
-                    {streamPhase === 'narrative' && <div className="text-white/50 border-t border-green-900/30 pt-4 mt-4" ref={narrativeRef}>{narrativeStream}</div>}
-                </div>
+            <div className="animate-fadeIn mt-8 text-gray-500 font-mono text-xs uppercase tracking-widest pl-4 border-l-2 border-gray-800">
+                ... Thinking
             </div>
         )}
 

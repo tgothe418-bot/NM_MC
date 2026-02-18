@@ -7,6 +7,16 @@ export const RoomExitSchema = z.object({
   target_node_id: z.string().nullable(),
 });
 
+export const RoomNodeSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  archetype: z.string(),
+  description_cache: z.string(),
+  exits: z.array(RoomExitSchema),
+  hazards: z.array(z.string()),
+  items: z.array(z.string()),
+});
+
 // Spatial / Grid Schemas
 export const TileTypeSchema = z.enum(['Floor', 'Wall', 'Void', 'Hazard', 'Cover']);
 
@@ -22,17 +32,6 @@ export const GridLayoutSchema = z.object({
   width: z.number(),
   height: z.number(),
   cells: z.array(z.array(GridCellSchema)),
-});
-
-export const RoomNodeSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  archetype: z.string(),
-  description_cache: z.string(),
-  exits: z.array(RoomExitSchema),
-  hazards: z.array(z.string()),
-  items: z.array(z.string()),
-  grid_layout: GridLayoutSchema.optional(),
 });
 
 export const LocationStateSchema = z.object({
@@ -185,7 +184,6 @@ export const VillainStateSchema = z.object({
   victim_profile: z.string().optional(),
 });
 
-// Phase 1: The Source of Truth - LoreContext
 export const LoreContextSchema = z.object({
   source_id: z.string(),
   central_conflict: z.string(),
@@ -208,10 +206,10 @@ export const GameStateSchema = z.object({
         name: z.string(),
         background: z.string(),
         traits: z.union([z.string(), z.array(z.string())]),
-        fracture_state: z.number().optional() // Phase 2 requirement
+        fracture_state: z.number().optional()
     }).optional()
   }),
-  lore_context: LoreContextSchema.optional(), // Phase 1 requirement
+  lore_context: LoreContextSchema.optional(),
   villain_state: VillainStateSchema,
   npc_states: z.array(NpcStateSchema),
   location_state: LocationStateSchema,
@@ -254,6 +252,8 @@ export const SourceAnalysisResultSchema = z.object({
 });
 
 export const ScenarioConceptsSchema = z.object({
+  theme_cluster: z.string().optional(),
+  intensity: z.string().optional(),
   villain_name: z.string().nullable().optional(),
   villain_appearance: z.string().nullable().optional(),
   villain_methods: z.string().nullable().optional(),

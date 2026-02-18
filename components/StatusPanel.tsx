@@ -1,9 +1,7 @@
 
 import React, { useState } from 'react';
 import { GameState, NpcState } from '../types';
-import { Skull, Radio, Users, Eye, Brain, ChevronUp, ChevronDown, Activity, ZapOff, Stethoscope, Cpu, FileText, Square, Target, BookOpen, Power, GripHorizontal, Map, Save } from 'lucide-react';
-import { CharacterPortrait } from './CharacterPortrait';
-import { RoomGrid } from './RoomGrid';
+import { Skull, Radio, Users, Eye, ChevronUp, ChevronDown, Stethoscope, Cpu, FileText, Square, BookOpen, Power, GripHorizontal, Map, Save, Activity } from 'lucide-react';
 
 interface StatusPanelProps {
   gameState: GameState;
@@ -20,7 +18,6 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
     onOpenSimulation, 
     isTesting, 
     onAbortTest,
-    onUpdateNpc,
     onReset,
     onOpenSaveLoad
 }) => {
@@ -29,9 +26,7 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [expandedNpcs, setExpandedNpcs] = useState<Record<string, boolean>>({});
 
-  // Current Room Layout extraction
   const currentRoom = location_state?.room_map?.[location_state.current_room_id];
-  const currentLayout = currentRoom?.grid_layout;
 
   const toggleNpc = (name: string) => {
     setExpandedNpcs(prev => ({ ...prev, [name]: !prev[name] }));
@@ -161,17 +156,13 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
                     </div>
                 </div>
 
-                {/* Spatial Map (New) */}
-                <div className="bg-[#0c0c0c] border border-gray-800 rounded-sm overflow-hidden">
-                    <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-black/20">
-                        <div className="flex items-center gap-3 text-gray-400 font-bold text-xs uppercase tracking-[0.2em]">
-                            <Map className="w-4 h-4" /> LOCAL MAP
-                        </div>
-                        <div className="text-[9px] text-gray-600 font-mono">{currentRoom?.name || "Unknown"}</div>
+                {/* Spatial Map (Simplified) */}
+                <div className="bg-[#0c0c0c] border border-gray-800 rounded-sm overflow-hidden p-6">
+                    <div className="flex items-center gap-3 text-gray-400 font-bold text-xs uppercase tracking-[0.2em] mb-4">
+                        <Map className="w-4 h-4" /> LOCATION CONTEXT
                     </div>
-                    <div className="p-4">
-                        <RoomGrid layout={currentLayout} />
-                    </div>
+                    <div className="text-gray-300 font-mono text-sm mb-2">{currentRoom?.name || "Unknown"}</div>
+                    <div className="text-gray-500 text-xs italic leading-relaxed">{currentRoom?.description_cache || "Data unavailable."}</div>
                 </div>
 
                 {/* Villain State */}
@@ -229,7 +220,6 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
                             return (
                                 <div key={idx} className={`rounded-sm border transition-all ${isAnomaly ? 'bg-black border-system-green/30' : 'bg-black/40 border-gray-800 hover:border-gray-700'}`}>
                                     <div className="p-3 flex items-start gap-4">
-                                        <CharacterPortrait npc={npc} onUpdateNpc={(updates) => onUpdateNpc && onUpdateNpc(idx, updates)} />
                                         <div className="flex-1 min-w-0">
                                             <div className="flex justify-between items-start">
                                                 <button onClick={() => toggleNpc(npc.name)} className="text-left group">

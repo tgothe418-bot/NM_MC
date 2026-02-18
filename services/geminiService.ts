@@ -359,6 +359,13 @@ export const generateImage = async (
     return undefined;
 };
 
+// New Helper for NPC Portraits
+export const generateNpcPortrait = async (npc: NpcState): Promise<string | undefined> => {
+    const prompt = `Portrait of a horror character. ${npc.archetype}. ${npc.physical?.distinguishing_feature}. ${npc.physical?.clothing_style}. ${npc.physical?.build}. Mood: ${npc.psychology?.emotional_state}. Style: Dark, Cinematic, Photorealistic.`;
+    // Reuse generateImage logic
+    return generateImage(prompt, "Cinematic Horror", "Character Portrait", false); 
+};
+
 // Robust Helper for MIME types
 const getMimeType = (file: File): string => {
     if (file.type && file.type !== 'application/octet-stream') return file.type;
@@ -512,15 +519,6 @@ export const extractCharactersFromText = async (text: string, cluster: string): 
       console.error("Failed to parse character extraction", e);
       return [];
   }
-};
-
-export const generateNpcPortrait = async (npc: NpcState): Promise<string | undefined> => {
-    return generateImage(
-        `Portrait of ${npc.name}, ${npc.archetype}. ${npc.physical.distinguishing_feature}. Horror style.`, 
-        "Dark, Cinematic, detailed",
-        "",
-        true // Allow characters for portraits
-    );
 };
 
 export const analyzeImageContext = async (file: File, aspect: string): Promise<string> => {

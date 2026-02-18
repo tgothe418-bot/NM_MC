@@ -1,9 +1,8 @@
 
 import React, { useState, useRef } from 'react';
-import { ChevronRight, Image, Loader2, UserPlus, Eye, Clapperboard, Activity, Cpu, Ghost, Fingerprint, Zap, Radio, Flame, UserCheck, Skull, Wand2, Users } from 'lucide-react';
+import { ChevronRight, Image, Loader2, Eye, Clapperboard, Activity, Cpu, Ghost, Fingerprint, Zap, Radio, Flame, UserCheck, Skull, Wand2 } from 'lucide-react';
 import { useSetupStore } from './store';
 import { GuidedQuestion } from './types';
-import { NeuralPet } from '../NeuralPet';
 import { analyzeImageContext, generateCharacterProfile, generateCalibrationField } from '../../services/geminiService';
 import { SimulationConfig } from '../../types';
 
@@ -113,7 +112,7 @@ export const GuidedSetup: React.FC<Props> = ({ onComplete, onBack }) => {
     const answer = val || input;
     const q = QUESTIONS[step];
     
-    if (!answer && !q.options && q.key !== 'victim_description') return; // victim_description can be empty
+    if (!answer && !q.options && q.key !== 'victim_description') return; 
 
     // Update Global Store with Answer
     if (q.key === 'mode') store.setMode(answer === 'Survivor' ? 'The Survivor (Prey Protocol)' : 'The Antagonist (Predator Protocol)');
@@ -298,9 +297,9 @@ export const GuidedSetup: React.FC<Props> = ({ onComplete, onBack }) => {
 
             <div className="w-1/3 hidden lg:flex flex-col border-l border-gray-900 bg-[#050505] min-w-[350px]">
                 <div className="flex-1 flex flex-col items-center justify-center relative p-8 border-b border-gray-900 overflow-hidden">
-                    <div className="absolute top-6 left-6 text-[10px] font-mono text-red-600 uppercase tracking-[0.3em] z-10 font-bold border border-red-900/30 px-3 py-1 bg-red-950/10">Machine</div>
-                    <div className="relative w-full h-full flex items-center justify-center">
-                        <NeuralPet step={step} answers={answers} currentInput={input} />
+                    <div className="text-[10px] font-mono text-gray-500 uppercase tracking-[0.4em] mb-4">Calibration Status</div>
+                    <div className="w-full h-1 bg-gray-900 rounded-full overflow-hidden">
+                        <div className="h-full bg-haunt-gold transition-all duration-1000" style={{ width: `${((step + 1) / QUESTIONS.length) * 100}%` }}></div>
                     </div>
                 </div>
                 <div className="h-1/3 min-h-[200px] p-8 overflow-y-auto custom-scrollbar bg-black/40">

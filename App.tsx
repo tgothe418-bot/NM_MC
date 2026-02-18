@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { WelcomeScreen } from './components/WelcomeScreen';
-import { SetupOverlay } from './components/SetupOverlay';
+import { SetupOverlay } from './components/setup/SetupOverlay';
 import { StatusPanel } from './components/StatusPanel';
 import { StoryLog } from './components/StoryLog';
 import { InputArea } from './components/InputArea';
@@ -14,11 +14,9 @@ import { NpcState } from './types';
 export default function App() {
   const [showSetup, setShowSetup] = useState(false);
   const [showSimModal, setShowSimModal] = useState(false);
-  const [showLogic, setShowLogic] = useState(false);
   const [showSaveLoad, setShowSaveLoad] = useState(false);
 
   // Initialize Engine
-  // This hook now manages the Game Loop, Auto-Pilot, Gemini Connection, and Save/Load logic
   const {
       apiKey,
       setApiKey,
@@ -29,7 +27,6 @@ export default function App() {
       isLoading,
       autoMode,
       setAutoMode,
-      streams,
       initializeGame,
       sendMessage,
       resetGame,
@@ -79,10 +76,6 @@ export default function App() {
                 history={history} 
                 isLoading={isLoading} 
                 activeCluster={gameState.meta.active_cluster}
-                showLogic={showLogic}
-                logicStream={streams.logicStream}
-                narrativeStream={streams.narrativeStream}
-                streamPhase={streams.streamPhase}
                 className="pb-24" 
             />
         </div>
@@ -94,8 +87,6 @@ export default function App() {
                 onSend={(text, files) => sendMessage(text, files)} 
                 isLoading={isLoading} 
                 onAdvance={() => sendMessage("Wait. Observe.")}
-                showLogic={showLogic}
-                onToggleLogic={() => setShowLogic(!showLogic)}
                 options={gameState.suggested_actions}
                 isSidebar={true}
             />
@@ -120,11 +111,9 @@ export default function App() {
                 setShowSimModal(false);
                 if (config.cycles > 0) {
                     setAutoMode({ active: true, remainingCycles: config.cycles });
-                    // Patch metadata if changing mid-game
                     if (!isInitialized) {
-                       initializeGame(config); // If not started, full init
+                       initializeGame(config); 
                     } else {
-                        // If started, just update meta params
                        const newMeta = {
                            ...gameState.meta,
                            mode: config.mode as any,

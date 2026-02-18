@@ -1,5 +1,5 @@
 
-import { LocationState, RoomNode, GameState, GridLayout } from '../types';
+import { LocationState, RoomNode, GameState } from '../types';
 import { LORE_LIBRARY } from '../loreLibrary';
 
 const CLUSTER_ARCHITECTURE: Record<string, string[]> = {
@@ -68,52 +68,6 @@ const CLUSTER_ARCHITECTURE: Record<string, string[]> = {
   ]
 };
 
-const renderAsciiMap = (layout: GridLayout): string => {
-    if (!layout || !layout.cells) return "[Map Corrupted]";
-    
-    let map = "";
-    // Header (X coords)
-    map += "   ";
-    for(let x=0; x<layout.width; x++) map += `${x} `;
-    map += "\n";
-
-    for (let y = 0; y < layout.height; y++) {
-        map += `${y}  `; // Y coord
-        for (let x = 0; x < layout.width; x++) {
-            // Safety check for row existence
-            if (!layout.cells[y]) {
-                map += "? "; 
-                continue;
-            }
-            
-            const cell = layout.cells[y][x];
-            
-            // Safety check for cell existence (prevents crash on undefined access)
-            if (!cell) {
-                map += "X ";
-                continue;
-            }
-
-            let symbol = ". ";
-            
-            if (cell.occupant_id === 'Player') symbol = "P ";
-            else if (cell.occupant_id) symbol = "E "; // Entity
-            else {
-                switch(cell.type) {
-                    case 'Wall': symbol = "# "; break;
-                    case 'Void': symbol = "  "; break;
-                    case 'Hazard': symbol = "! "; break;
-                    case 'Cover': symbol = "∆ "; break; // Delta for cover
-                    default: symbol = ". "; // Floor
-                }
-            }
-            map += symbol;
-        }
-        map += "\n";
-    }
-    return map;
-};
-
 export const getDefaultRoom = (id: string = "start_node", name: string = "Initial Void"): RoomNode => ({
   id,
   name,
@@ -145,13 +99,6 @@ export const constructLocationManifesto = (loc: LocationState): string => {
 
   let m = `\n\n*** L. LOCATION MANIFESTO ***\nCURRENT: "${current.name}"\nCACHE: ${current.description_cache}\n`;
   
-  if (current.grid_layout) {
-      m += `\n[SPATIAL AWARENESS - CURRENT GRID]\n`;
-      m += `Legend: P=Player, E=Entity, #=Wall, .=Floor, !=Hazard, ∆=Cover\n`;
-      m += renderAsciiMap(current.grid_layout);
-      m += `\n`;
-  }
-
   m += `EXITS:\n`;
   if (current.exits && Array.isArray(current.exits)) {
     current.exits.forEach(e => {
@@ -163,7 +110,7 @@ export const constructLocationManifesto = (loc: LocationState): string => {
         m += ` - ${e.direction}: ${targetName}\n`;
     });
   }
-  m += `[SYSTEM]: If entering UNEXPLORED, Simulator MUST generate a NEW node with a NEW 'grid_layout'.\n`;
+  m += `[SYSTEM]: If entering UNEXPLORED, Simulator MUST generate a NEW node.\n`;
   
   if (loc.architectural_notes && loc.architectural_notes.length > 0) {
       m += `ARCHITECTURAL CONTEXT (Active Details): ${loc.architectural_notes.join(" | ")}\n`;
@@ -188,12 +135,7 @@ export const constructRoomGenerationRules = (gameState: GameState): string => {
 
   const archThemes = CLUSTER_ARCHITECTURE[clusterKey] || ["Generic", "Decay"];
 
-  // DYNAMIC FRACTURE LOGIC (Phase 3)
-  // Retrieve fracture from the player object (fallback to 0)
-  const playerName = gameState.meta.player_profile?.name;
-  const playerNpc = gameState.npc_states.find(n => n.name === playerName);
-  // Also check meta.player_profile.fracture_state if set (per new Schema)
-  const fracture = gameState.meta.player_profile?.fracture_state || playerNpc?.fracture_state || 0;
+  const fracture = gameState.meta.player_profile?.fracture_state || 0;
 
   let fractureCriticals = "";
   if (fracture > 90) {
@@ -228,10 +170,6 @@ export const constructRoomGenerationRules = (gameState: GameState): string => {
 
     [MANDATORY OUTPUTS]
     1. 'description_cache': 2-3 evocative sentences matching the Aesthetic.
-    2. 'grid_layout': A JSON object defining the room's shape.
-       - If ${clusterKey} == 'System' or 'Flesh': Use tight, claustrophobic corridors (3x6 or 4x4).
-       - If ${clusterKey} == 'Survival' or 'Haunting': Use wider spaces with 'Void' edges (6x6 or 7x5).
-       - Populate 'cells' with Hazards relevant to the theme (e.g. Bio-waste for Flesh, Live Wires for System).
-    3. 'architectural_notes': 3-5 distinct features derived from themes.
+    2. 'architectural_notes': 3-5 distinct features derived from themes.
   `;
 };

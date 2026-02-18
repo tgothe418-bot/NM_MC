@@ -2,8 +2,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Send, Activity, FastForward, Paperclip, X, 
-  FileText, Terminal, ChevronRight, MessageSquare, Eye, 
-  Zap, Hand, Edit2, CornerDownLeft
+  FileText, ChevronRight, MessageSquare, Eye, 
+  Zap, Hand, CornerDownLeft
 } from 'lucide-react';
 
 interface InputAreaProps {
@@ -12,8 +12,6 @@ interface InputAreaProps {
   isLoading: boolean;
   inputType?: 'text' | 'choice_yes_no';
   externalValue?: string;
-  showLogic?: boolean;
-  onToggleLogic?: () => void;
   options?: string[];
   isSidebar?: boolean;
 }
@@ -24,8 +22,6 @@ export const InputArea: React.FC<InputAreaProps> = ({
   isLoading, 
   inputType = 'text', 
   externalValue, 
-  showLogic, 
-  onToggleLogic, 
   options,
   isSidebar = false
 }) => {
@@ -54,7 +50,6 @@ export const InputArea: React.FC<InputAreaProps> = ({
       setText(option);
       if (textareaRef.current) {
         textareaRef.current.focus();
-        // Small timeout to allow render cycle to update value then set cursor
         setTimeout(() => {
             if (textareaRef.current) {
                 textareaRef.current.selectionStart = textareaRef.current.value.length;
@@ -77,7 +72,6 @@ export const InputArea: React.FC<InputAreaProps> = ({
       const newFiles = Array.from(e.target.files);
       setFiles(prev => [...prev, ...newFiles]);
     }
-    // Reset input so same file can be selected again if needed
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -95,7 +89,6 @@ export const InputArea: React.FC<InputAreaProps> = ({
   const getActionStyle = (action: string) => {
     const lower = action.toLowerCase();
     
-    // Dialogue
     if (lower.startsWith('"') || lower.startsWith("'") || lower.startsWith('ask') || lower.startsWith('say') || lower.startsWith('shout') || lower.startsWith('whisper') || lower.startsWith('threaten') || lower.startsWith('speak')) {
       return { 
         icon: MessageSquare, 
@@ -103,7 +96,6 @@ export const InputArea: React.FC<InputAreaProps> = ({
         label: "Dialogue"
       };
     }
-    // Observation / Examine
     if (lower.startsWith('examine') || lower.startsWith('look') || lower.startsWith('scan') || lower.startsWith('inspect') || lower.startsWith('read') || lower.startsWith('search') || lower.startsWith('check')) {
        return { 
         icon: Eye, 
@@ -111,7 +103,6 @@ export const InputArea: React.FC<InputAreaProps> = ({
         label: "Observe"
       };
     }
-    // High Stakes Action / Combat
     if (lower.startsWith('attack') || lower.startsWith('fight') || lower.startsWith('shoot') || lower.startsWith('kill') || lower.startsWith('run') || lower.startsWith('flee') || lower.startsWith('destroy')) {
        return { 
         icon: Zap, 
@@ -119,7 +110,6 @@ export const InputArea: React.FC<InputAreaProps> = ({
         label: "Action"
       };
     }
-    // Interaction
     if (lower.startsWith('take') || lower.startsWith('grab') || lower.startsWith('use') || lower.startsWith('open') || lower.startsWith('pick') || lower.startsWith('enter') || lower.startsWith('barricade')) {
        return { 
         icon: Hand, 
@@ -127,7 +117,6 @@ export const InputArea: React.FC<InputAreaProps> = ({
         label: "Interact"
       };
     }
-    // Default
     return { 
       icon: ChevronRight, 
       style: "border-gray-800 bg-black/60 text-gray-400 hover:text-white hover:border-gray-500 hover:bg-gray-800",
@@ -138,7 +127,6 @@ export const InputArea: React.FC<InputAreaProps> = ({
   return (
     <div className={`relative w-full mx-auto flex flex-col gap-4 ${isSidebar ? 'h-full' : 'max-w-[1600px]'}`}>
       
-      {/* Options/Suggestions Area - Pushed to bottom above input if Sidebar, or scrollable */}
       {options && options.length > 0 && !isLoading && (
         <div className={`flex gap-3 mb-2 animate-fadeIn pb-2 ${isSidebar ? 'flex-col overflow-y-auto flex-1 min-h-0 custom-scrollbar pr-2' : 'flex-wrap justify-end'}`}>
           {isSidebar && <div className="mt-auto" />}
@@ -175,12 +163,10 @@ export const InputArea: React.FC<InputAreaProps> = ({
         </div>
       )}
 
-      {/* Input Form */}
       <form onSubmit={handleSubmit} className={`relative group ${isSidebar ? (!options || options.length === 0 ? 'mt-auto' : '') : ''}`}>
         <div className={`absolute -inset-1 bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 rounded-lg blur-md opacity-30 group-hover:opacity-70 transition duration-1000 ${isLoading ? 'animate-pulse' : ''}`}></div>
         <div className={`relative flex flex-col bg-black/90 border-2 rounded-lg p-3 shadow-3xl transition-all duration-700 backdrop-blur-xl border-gray-800 group-hover:border-gray-700`}>
           
-          {/* File Previews */}
           {files.length > 0 && (
             <div className="flex gap-3 px-2 mb-4 overflow-x-auto pb-2 custom-scrollbar">
               {files.map((file, idx) => (
@@ -242,17 +228,6 @@ export const InputArea: React.FC<InputAreaProps> = ({
                   title="Advance Narrative"
                 >
                    <FastForward className="w-5 h-5" />
-                </button>
-              )}
-
-              {onToggleLogic && (
-                <button
-                  type="button"
-                  onClick={onToggleLogic}
-                  className={`p-2 rounded-lg transition-all relative group/logic ${showLogic ? 'text-green-500 bg-green-900/20' : 'text-gray-500 hover:text-green-400 hover:bg-gray-800'}`}
-                  title="Toggle Logic Visualization"
-                >
-                   <Terminal className="w-5 h-5" />
                 </button>
               )}
             </div>
