@@ -164,14 +164,33 @@ export const processGameTurn = async (
 ): Promise<{ gameState: GameState, storyText: string, imagePromise?: Promise<string | undefined> }> => {
   const ai = getAI();
 
-  // 1. CONSTRUCT CONTEXT (Unchanged)
+  // [OPTIMIZATION] Focus State Construction
+  // Strip out the heavy "room_map" history to save tokens. 
+  // The LLM only needs the current room context + adjacency (which is implied by exits).
+  // Movement logic creates new rooms if they aren't found, or we merge the full map back later.
+  const focusState = {
+      meta: currentState.meta,
+      villain_state: currentState.villain_state,
+      npc_states: currentState.npc_states,
+      location_state: {
+          ...currentState.location_state,
+          // CRITICAL: Only send the active room node.
+          room_map: {
+              [currentState.location_state.current_room_id]: currentState.location_state.room_map[currentState.location_state.current_room_id]
+          }
+      },
+      narrative: currentState.narrative,
+      // We explicitly pass the summary string in the prompt, so we don't need deep history here.
+  };
+
+  // 1. CONSTRUCT CONTEXT
   const sensoryManifesto = constructSensoryManifesto(currentState);
   const voiceManifesto = constructVoiceManifesto(currentState.npc_states, currentState.meta.active_cluster);
   const locationManifesto = constructLocationManifesto(currentState.location_state);
   const roomRules = constructRoomGenerationRules(currentState);
 
   const contextBlock = `
-  ${JSON.stringify(currentState)}
+  ${JSON.stringify(focusState)}
   [PRIOR NARRATIVE SUMMARY]: ${currentState.narrative.past_summary || "None"}
   ${sensoryManifesto}
   ${voiceManifesto}
@@ -220,6 +239,7 @@ export const processGameTurn = async (
   if (partialState.location_state) {
       newLocationState = { ...newLocationState, ...partialState.location_state };
       if (partialState.location_state.room_map) {
+          // Robust Merge: Keep old map, apply new rooms/updates
           newLocationState.room_map = { ...currentState.location_state.room_map, ...partialState.location_state.room_map };
       }
   }
@@ -245,6 +265,8 @@ export const processGameTurn = async (
           model: 'gemini-3-pro-preview',
           contents: {
               parts: [
+                  // We also optimize the Narrator input by using the merged state but potentially could strip map here too.
+                  // For now, we pass the updatedState because the narrator might need context of where we moved FROM.
                   { text: JSON.stringify(updatedState) },
                   { text: `USER ACTION: "${userAction}"` },
                   { text: `SIMULATOR OUTCOME: ${JSON.stringify(partialState)}` }
