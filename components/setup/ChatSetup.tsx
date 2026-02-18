@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, MessageSquare, ChevronLeft, Paperclip, Upload, Loader2, Play, Skull, Flame } from 'lucide-react';
 import { SimulationConfig } from '../../types';
 import { analyzeSourceMaterial, generateArchitectResponse, extractScenarioFromChat } from '../../services/geminiService';
+import { useArchitectStore } from '../../store/architectStore';
 
 interface ChatSetupProps {
   onComplete: (config: SimulationConfig) => void;
@@ -52,13 +53,99 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // --- HOOK INTO THE BLACK BOX ---
+  const { mood, memory, updateMood, recordInteraction, addFact, setUserName } = useArchitectStore();
+  const [lastActivityTime, setLastActivityTime] = useState(Date.now());
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [history, isLoading, isAnalyzing]);
 
+  // --- CONSTRUCT DYNAMIC PERSONA ---
+  const getSystemPersona = () => {
+    const memoryBlock = `
+    [LONG TERM MEMORY ACCESS]
+    > KNOWN USER ALIAS: ${memory.userName || "Unknown"}
+    > INTERACTION COUNT: ${memory.interactions_count}
+    > KNOWN FACTS: ${memory.facts.join('; ')}
+    `;
+
+    const moodBlock = `
+    [INTERNAL STATE]
+    > CURRENT VIBE: ${mood.current_vibe.toUpperCase()}
+    > ENERGY: ${Math.round(mood.arousal * 100)}%
+    > EMPATHY: ${Math.round(mood.valence * 100)}%
+    
+    INSTRUCTION ON MOOD:
+    - If Glitchy: Stutter, use Zalgo text, be erratic.
+    - If Predatory: Be stalking, observant, dangerous.
+    - If Melancholy: Be sad, poetic, nihilistic.
+    - If Helpful: Be the standard spooky buddy.
+    `;
+
+    // Return the combined prompt
+    return `
+    ${memoryBlock}
+    ${moodBlock}
+    ${SYSTEM_INSTRUCTION}
+    
+    [Current Tone Mode: ${creepLevel}]
+
+    CRITICAL INSTRUCTION:
+    If the user reveals a new personal fact (name, fear, desire), append this tag to the end of your response (invisible to user):
+    [MEMORY: user hates clowns]
+    `;
+  };
+
+  // --- THE POLTERGEIST PROTOCOL (Idle Timer) ---
+  useEffect(() => {
+    const IDLE_THRESHOLD_MS = 30000; // 30 seconds
+    
+    const checkIdle = async () => {
+      const timeSinceLastAction = Date.now() - lastActivityTime;
+      const lastWasModel = history[history.length - 1]?.role === 'model';
+      
+      // Only interrupt if waiting for User
+      if (timeSinceLastAction > IDLE_THRESHOLD_MS && !isLoading && lastWasModel) {
+        setIsLoading(true);
+        
+        const nudgePrompt = `[SYSTEM EVENT]: The user has been silent for 30 seconds. 
+        Your current vibe is ${mood.current_vibe}. 
+        Generate a short, unprompted message to get their attention. 
+        Do not be helpful. Be atmospheric. Break the fourth wall.`;
+        
+        try {
+           // We use a temporary history for the nudge to avoid confusing the main context too much
+           // or we append it. Here we append to context to keep flow.
+           const reply = await generateArchitectResponse([...history, { role: 'user', text: nudgePrompt }], getSystemPersona());
+           setHistory(prev => [...prev, { role: 'model', text: reply }]);
+           setLastActivityTime(Date.now()); 
+        } catch(e) {
+           setIsLoading(false);
+        }
+      }
+    };
+
+    const timer = setInterval(checkIdle, 5000); 
+    return () => clearInterval(timer);
+  }, [history, lastActivityTime, mood, isLoading]);
+
   const handleSend = async () => {
     if (!input.trim()) return;
     
+    setLastActivityTime(Date.now());
+    recordInteraction();
+    updateMood(); // Shift mood every turn
+
+    // Basic heuristic to find name
+    if (input.toLowerCase().includes("my name is")) {
+        const parts = input.split(/is|am/i);
+        if (parts.length > 1) {
+            const name = parts[1].trim().split(" ")[0].replace(/[^a-zA-Z]/g, "");
+            if (name) setUserName(name);
+        }
+    }
+
     const userMsg = input;
     setInput('');
     
@@ -68,9 +155,19 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
     setIsLoading(true);
 
     try {
-        const dynamicInstruction = `${SYSTEM_INSTRUCTION}\n\n[Current Tone Mode: ${creepLevel}]`;
-        const reply = await generateArchitectResponse(newHistory, dynamicInstruction);
-        setHistory(prev => [...prev, { role: 'model', text: reply }]);
+        const reply = await generateArchitectResponse(newHistory, getSystemPersona());
+        
+        // CHECK FOR MEMORY TAGS
+        let finalReply = reply;
+        const memoryMatch = reply.match(/\[MEMORY: (.*?)\]/);
+        if (memoryMatch) {
+            const fact = memoryMatch[1];
+            addFact(fact);
+            // Hide tag from UI
+            finalReply = reply.replace(memoryMatch[0], '').trim();
+        }
+
+        setHistory(prev => [...prev, { role: 'model', text: finalReply }]);
     } catch (e) {
         setHistory(prev => [...prev, { role: 'model', text: "Forgive me, my connection wavered. Could you say that again?" }]);
     } finally {
@@ -82,6 +179,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
       if (e.target.files && e.target.files.length > 0) {
           const file = e.target.files[0];
           setIsAnalyzing(true);
+          setLastActivityTime(Date.now());
           
           // Create local preview URL for images
           const imageUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined;
@@ -98,8 +196,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
               
               // Trigger AI response
               setIsLoading(true);
-              const dynamicInstruction = `${SYSTEM_INSTRUCTION}\n\n[Current Tone Mode: ${creepLevel}]`;
-              const reply = await generateArchitectResponse(newHistory, dynamicInstruction);
+              const reply = await generateArchitectResponse(newHistory, getSystemPersona());
               setHistory(prev => [...prev, { role: 'model', text: reply }]);
 
           } catch (err) {
@@ -133,7 +230,6 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
   const themeColor = isDread ? 'text-red-500' : 'text-indigo-400';
   const borderColor = isDread ? 'border-red-900/50' : 'border-indigo-500/30';
   const bgColor = isDread ? 'bg-red-950/10' : 'bg-indigo-950/10';
-  const buttonActive = isDread ? 'bg-red-900/30 text-red-200 border-red-500/50' : 'bg-indigo-900/30 text-indigo-200 border-indigo-500/50';
   const buttonInactive = 'text-gray-500 border-transparent hover:text-gray-300';
 
   return (
