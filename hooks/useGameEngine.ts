@@ -66,9 +66,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     }
 };
 
-export const useGameEngine = (initialApiKey: string) => {
+export const useGameEngine = () => {
     // --- STATE ---
-    const [apiKey, setApiKey] = useState(initialApiKey);
     const [isInitialized, setIsInitialized] = useState(false);
     
     // Core Game Data (Reducer)
@@ -88,12 +87,10 @@ export const useGameEngine = (initialApiKey: string) => {
     // Refs for safety (avoid stale closures in timeouts)
     const processingRef = useRef(false);
 
-    // Initialize Service when Key Changes
+    // Initialize Service immediately
     useEffect(() => {
-        if (apiKey) {
-            initializeGemini(apiKey);
-        }
-    }, [apiKey]);
+        initializeGemini(process.env.API_KEY || "");
+    }, []);
 
     // --- ACTIONS ---
 
@@ -329,7 +326,6 @@ export const useGameEngine = (initialApiKey: string) => {
 
     return {
         // Data
-        apiKey,
         gameState,
         history,
         isInitialized,
@@ -338,7 +334,6 @@ export const useGameEngine = (initialApiKey: string) => {
         streams: { logicStream, narrativeStream, streamPhase },
         
         // Actions
-        setApiKey,
         dispatch, // Exposed for granular updates
         initializeGame,
         sendMessage: handleSendMessage,

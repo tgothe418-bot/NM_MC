@@ -186,7 +186,7 @@ export const processGameTurn = async (
   
   try {
       const simResponse = await ai.models.generateContent({
-        model: 'gemini-2.0-flash-exp', // Suggestion: Use Flash for Logic (Faster)
+        model: 'gemini-3-flash-preview', // Updated per guidelines for basic logic/text tasks
         contents: {
             parts: [
                 { text: contextBlock },

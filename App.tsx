@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { SetupOverlay } from './components/setup/SetupOverlay'; 
@@ -5,7 +6,6 @@ import { StatusPanel } from './components/StatusPanel';
 import { StoryLog } from './components/StoryLog';
 import { InputArea } from './components/InputArea';
 import { SimulationModal } from './components/SimulationModal';
-import { ApiKeyModal } from './components/ApiKeyModal';
 import { SaveLoadModal } from './components/SaveLoadModal';
 import { useGameEngine } from './hooks/useGameEngine';
 import { NpcState } from './types';
@@ -16,8 +16,6 @@ export default function App() {
   const [showSaveLoad, setShowSaveLoad] = useState(false);
 
   const {
-      apiKey,
-      setApiKey,
       gameState,
       dispatch,
       history,
@@ -32,7 +30,7 @@ export default function App() {
       loadSession,
       deleteSave,
       getSaves
-  } = useGameEngine(process.env.API_KEY || ""); 
+  } = useGameEngine(); 
 
   const handleUpdateNpc = (npcIndex: number, updates: Partial<NpcState>) => {
     dispatch({ 
@@ -47,8 +45,6 @@ export default function App() {
           setShowSetup(false);
       }
   };
-
-  if (!apiKey) return <ApiKeyModal onSetKey={setApiKey} />;
   
   if (!isInitialized && !showSetup) {
       return <WelcomeScreen onStart={() => setShowSetup(true)} />;

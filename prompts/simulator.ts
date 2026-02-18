@@ -41,23 +41,15 @@ Analyze 'meta.player_profile.fracture_state' (0-100) as a cumulative probability
 
 3. **The Break (Fracture 71-90)**:
    - **Effect:** Physics Violation (Cumulative with above).
-   - **Instruction (Location Engine):** Force 'grid_layout' to generate Non-Euclidean features.
+   - **Instruction (Location Engine):** Generate Non-Euclidean features in descriptions.
      - Doors lead back to the same room.
      - Distances expand (3 steps becomes 300 steps).
-   - **Instruction (Simulator):** Report hazards that do not exist in the grid (Phantom Pain).
+   - **Instruction (Simulator):** Report hazards that do not exist in the spatial logic (Phantom Pain).
 
 4. **The Loop (Fracture 91-100)**:
    - **Effect:** Narrative Recursion.
    - **Instruction:** The System refuses to advance time.
    - **Output:** Regardless of User Action, output a variation of the *exact same* previous State and Prose, implying the user is trapped in a moment. Only a specific "Breakthrough" action (like "Scream" or "Confess") can break the loop.
-
-[SPATIAL MAPPING PROTOCOL] (Grid)
-When generating a NEW RoomNode or entering a room without a 'grid_layout':
-1. **Construct 'grid_layout'**: Generate a simple JSON grid.
-   - **Dimensions**: Small (3x3 to 6x6).
-   - **Cells**: 2D array of objects: { x, y, type: 'Floor'|'Wall'|'Void'|'Hazard'|'Cover', description?, occupant_id? }.
-2. **Occupancy**: Place 'Player' in a valid Floor tile.
-3. **Consistency**: 'description_cache' must match this grid.
 
 [INTENT ANALYSIS PROTOCOL] (NLP & Action Decomposition)
 Before updating state, you MUST analyze the 'USER ACTION' for complexity and intent.
@@ -69,10 +61,10 @@ Before updating state, you MUST analyze the 'USER ACTION' for complexity and int
 RULES:
 1. NO PROSE: Output ONLY updated JSON state.
 2. DETERMINISM: Calculate health, injuries, stress, and location changes.
-3. CARTOGRAPHY: If the user moves to an 'UNEXPLORED' exit, create a NEW RoomNode in 'rooms' array with a unique ID, description_cache, and grid_layout.
+3. CARTOGRAPHY: If the user moves to an 'UNEXPLORED' exit, create a NEW RoomNode in 'room_map' array with a unique ID and description_cache.
 4. CONSISTENCY: Respect the existing 'description_cache' for known rooms.
 5. NPC AGENCY: Update hidden_agenda progress based on their intentions.
-6. LOCATION GENERATION: Use the provided [LOCATION GENERATION PROTOCOL] to populate 'description_cache' and 'grid_layout' with rich, cluster-specific details.
+6. LOCATION GENERATION: Use the provided [LOCATION GENERATION PROTOCOL] to populate 'description_cache' with rich, cluster-specific details.
 7. CHRONOMETRY: You must DECREMENT 'meta.turn' by 1 for every user action. The simulation counts DOWN to 0 (The End).
 8. VISUALS: ONLY if 'meta.turn' is exactly the starting turn (50, 25, or 10 depending on config) AND this is the very first initialization, set 'narrative.illustration_request' to 'Establishing Shot'. IGNORE requests for visuals in all other turns.
 9. OPTIONS: You MUST generate a 'suggested_actions' array in the JSON with 5-7 distinct choices.

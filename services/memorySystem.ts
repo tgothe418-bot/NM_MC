@@ -9,6 +9,9 @@ export const updateNpcMemories = (
   recentHistory: ChatMessage[]
 ): GameState => {
   const updatedNpcs = gameState.npc_states.map(npc => {
+    // Defensive check: If dialogue state is missing, we can't update memory.
+    if (!npc.dialogue_state || !npc.dialogue_state.memory) return npc;
+
     // 1. Filter history for this NPC's name (case-insensitive)
     const relevantChats = recentHistory.filter(msg => 
       msg.text.toLowerCase().includes(npc.name.toLowerCase()) || 
@@ -29,7 +32,7 @@ export const updateNpcMemories = (
     }));
 
     // 3. Append to existing episodic logs, keeping only the last 10 significant ones
-    const existingLogs = npc.dialogue_state?.memory?.episodic_logs || [];
+    const existingLogs = npc.dialogue_state.memory.episodic_logs || [];
     const updatedLogs = [...existingLogs, ...newMemories]
       .slice(-10); // Prune old memories to save tokens
 
