@@ -45,14 +45,32 @@ const getAI = () => {
 // --- ARCHITECT (Chat Companion) FUNCTIONS ---
 
 export const generateArchitectResponse = async (
-    history: { role: 'user' | 'model', text: string }[], 
+    history: { role: 'user' | 'model', text: string, imageBase64?: string }[], 
     systemInstruction: string
 ): Promise<string> => {
     const ai = getAI();
     try {
+        // Map history to Gemini "Content" format, handling mixed media
+        const contents = history.map(h => {
+            const parts: any[] = [{ text: h.text }];
+            
+            // If this message has an image attached, add it to the payload
+            if (h.imageBase64) {
+                // Strip the data:image/png;base64, prefix if present
+                const cleanBase64 = h.imageBase64.split(',')[1] || h.imageBase64;
+                parts.push({
+                    inlineData: {
+                        mimeType: 'image/png', // Gemini is smart enough to handle most image types with this or generic
+                        data: cleanBase64
+                    }
+                });
+            }
+            return { role: h.role, parts };
+        });
+
         const response = await ai.models.generateContent({
             model: 'gemini-3-pro-preview', 
-            contents: history.map(h => ({ role: h.role, parts: [{ text: h.text }] })),
+            contents: contents,
             config: {
                 systemInstruction: systemInstruction,
             }
@@ -60,7 +78,7 @@ export const generateArchitectResponse = async (
         return response.text || "...";
     } catch (e) {
         console.error("Architect Error:", e);
-        return "I am having trouble connecting to the neural lattice. Please repeat that.";
+        return "I can't see that... the static is too thick. Try again?";
     }
 };
 

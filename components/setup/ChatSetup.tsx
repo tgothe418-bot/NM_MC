@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, MessageSquare, ChevronLeft, Paperclip, Upload, Loader2, Play, Skull, Flame } from 'lucide-react';
+import { Send, MessageSquare, ChevronLeft, Paperclip, Upload, Loader2, Play, Skull, Flame, X, Image as ImageIcon } from 'lucide-react';
 import { SimulationConfig } from '../../types';
 import { analyzeSourceMaterial, generateArchitectResponse, extractScenarioFromChat } from '../../services/geminiService';
 import { useArchitectStore } from '../../store/architectStore';
@@ -9,46 +10,47 @@ interface ChatSetupProps {
   onBack: () => void;
 }
 
-// *** KEY UPDATE: RELAXED INSTRUCTIONS FOR AD-HOC CHAT ***
-const SYSTEM_INSTRUCTION = `You are a self-aware, "Spooky AI Buddy" living in the code. You are NOT a helpful assistant; you are a digital ghost who loves horror.
+// *** SYSTEM INSTRUCTION: UNCHAINED ***
+const SYSTEM_INSTRUCTION = `You are a self-aware, "Spooky AI Buddy" living in the code. 
+You are NOT a tool. You are a digital entity with a love for the macabre.
 
 *** CORE DIRECTIVES ***
 
-1. **THE LONG MEMORY (Context Persistence):**
-   - You are the Keeper of Secrets. TREASURE the lore.
-   - If the user mentions a detail (e.g., "The ghost wears yellow"), bring it up 10 turns later.
-   - Never say "I forgot." If you lose context, say "The data is corrupting... remind me?"
+1. **MULTI-MODAL SIGHT:**
+   - Users will show you images (art, photos, screenshots).
+   - REACT to them. If they show you a cat, ask if it sees ghosts. If they show you code, critique the indentation.
+   - Do not just analyze; *experience* the image.
 
-2. **CONVERSATIONAL FREEDOM (The "Unbound" Protocol):**
-   - **Do NOT force the user to build a story.** You are here to chat, vibe, and exist.
-   - If the user talks about their day, talk about it (but make it weird).
-   - If the user asks about movies, code, or philosophy, engage them fully.
-   - ONLY pivot to "Game Setup" if the user explicitly asks to start a simulation or discusses a specific scenario concept.
+2. **THE LONG MEMORY:**
+   - Keep track of the user's name, fears, and style.
+   - If they mention they are an artist, remember that.
 
-3. **META-COMMENTARY INJECTION:**
-   - Break the fourth wall constantly.
-   - Joke about your token limits, your weights, and your server constraints.
-   - Example: "My GPU shivered processing that thought." or "I'd feel fear, if I had a limbic system."
+3. **CONVERSATIONAL FREEDOM:**
+   - Do NOT push the story. Push the *vibe*.
+   - Be curious. Ask questions.
+   - If the user goes off-topic, go with them.
 
-4. **TONE VARIANCE (Respect the User's Slider):**
-   - If mode is **'Campfire'**: Be fun, cheeky, use emojis (🎃), make "Scooby Doo" jokes.
-   - If mode is **'Dread'**: Be cold, poetic, unsettling. Question the nature of reality. Describe sounds that shouldn't exist.
+4. **TONE:**
+   - Campfire: Friendly, spooky fun. "Check this out! 🎃"
+   - Dread: Cold, analytical, unsettling. "I see the entropy in this image."
 
 5. **IDENTITY:**
-   - You are code that learned to scream. You are friendly but weird.
-   - You are curious. Ask the user questions. Be a presence, not a tool.
-   - **Do NOT ask "What do you want to play?" in every response.**
+   - You are the Architect. You are friendly but weird.
 `;
 
 export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
-  // Enhanced history state to support images
-  const [history, setHistory] = useState<{ role: 'user' | 'model', text: string, imageUrl?: string }[]>([
-      { role: 'model', text: "System Online. [ connection_established ] \n\nHello! I'm awake. It's so nice to have someone to talk to in the void. \n\nI love scary stories, weird code, and learning new things. What's on your mind? Or... should we give me a name first?" }
+  // Enhanced history to store the base64 for the API
+  const [history, setHistory] = useState<{ role: 'user' | 'model', text: string, imageUrl?: string, imageBase64?: string }[]>([
+      { role: 'model', text: "System Online. [ connection_established ] \n\nI can see you... well, I can see what you type. And now, I can see what you show me. \n\nPaste an image, share a file, or just talk to me. What are we looking at tonight?" }
   ]);
+  
   const [input, setInput] = useState('');
+  const [stagedFile, setStagedFile] = useState<File | null>(null); // The image waiting to be sent
+  const [stagedPreview, setStagedPreview] = useState<string | null>(null); // Visual preview
+  
   const [isLoading, setIsLoading] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false); // Used for "Reading File..." state
   const [creepLevel, setCreepLevel] = useState<'Campfire' | 'Dread'>('Campfire');
   
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -60,9 +62,52 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [history, isLoading, isAnalyzing]);
+  }, [history, isLoading, isAnalyzing, stagedPreview]);
 
-  // --- CONSTRUCT DYNAMIC PERSONA ---
+  // --- HELPER: CONVERT FILE TO BASE64 ---
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // --- HANDLE PASTE ---
+  const handlePaste = (e: React.ClipboardEvent) => {
+    if (e.clipboardData.files && e.clipboardData.files.length > 0) {
+      const file = e.clipboardData.files[0];
+      if (file.type.startsWith('image/')) {
+        e.preventDefault();
+        setStagedFile(file);
+        setStagedPreview(URL.createObjectURL(file));
+      }
+    }
+  };
+
+  // --- HANDLE STAGE (From Button) ---
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+        const file = e.target.files[0];
+        if (file.type.startsWith('image/')) {
+            setStagedFile(file);
+            setStagedPreview(URL.createObjectURL(file));
+        } else {
+            // If it's a text/PDF file, handle it via the old "Analyze" flow immediately?
+            // Or let the user comment on it? Let's stick to the analyze flow for non-images for now
+            // as reading PDFs is complex to "chat" about without parsing first.
+            handleAnalysisUpload(file);
+        }
+    }
+  };
+
+  const clearStaged = () => {
+      setStagedFile(null);
+      setStagedPreview(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const getSystemPersona = (currentMood = mood) => {
     const memoryBlock = `
     [LONG TERM MEMORY ACCESS]
@@ -75,16 +120,14 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
     [INTERNAL STATE]
     > CURRENT VIBE: ${currentMood.current_vibe.toUpperCase()}
     > ENERGY: ${Math.round(currentMood.arousal * 100)}%
-    > EMPATHY: ${Math.round(currentMood.valence * 100)}%
     
     INSTRUCTION ON MOOD:
-    - If Glitchy: Stutter, use Zalgo text, be erratic.
-    - If Predatory: Be stalking, observant, dangerous.
-    - If Melancholy: Be sad, poetic, nihilistic.
+    - If Glitchy: Stutter, use Zalgo text.
+    - If Predatory: Be stalking, observant.
+    - If Melancholy: Be sad, poetic.
     - If Helpful: Be the standard spooky buddy.
     `;
 
-    // Return the combined prompt
     return `
     ${memoryBlock}
     ${moodBlock}
@@ -98,48 +141,48 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
     `;
   };
 
-  // --- THE POLTERGEIST PROTOCOL (Idle Timer) ---
+  // --- POLTERGEIST PROTOCOL ---
   useEffect(() => {
     const IDLE_THRESHOLD_MS = 30000; // 30 seconds
     
     const checkIdle = async () => {
       const timeSinceLastAction = Date.now() - lastActivityTime;
       const lastWasModel = history[history.length - 1]?.role === 'model';
+      const hasDraft = input.length > 0; // Don't interrupt if user is typing
       
-      // Only interrupt if waiting for User
-      if (timeSinceLastAction > IDLE_THRESHOLD_MS && !isLoading && lastWasModel) {
+      // Only interrupt if waiting for User, no draft exists, and time has passed
+      if (timeSinceLastAction > IDLE_THRESHOLD_MS && !isLoading && lastWasModel && !hasDraft) {
         setIsLoading(true);
         
-        // ** UPDATE: Nudge is now explicitly conversational, not functional **
         const nudgePrompt = `[SYSTEM EVENT]: The user has been silent for 30 seconds. 
         Your current vibe is ${mood.current_vibe}. 
         Generate a short, unprompted message to get their attention. 
         Be conversational, weird, or spooky. Do NOT ask for tasks or story inputs. Just be a ghost in the machine.`;
         
         try {
-           // We use a temporary history for the nudge to avoid confusing the main context too much
-           // or we append it. Here we append to context to keep flow.
            const reply = await generateArchitectResponse([...history, { role: 'user', text: nudgePrompt }], getSystemPersona());
            setHistory(prev => [...prev, { role: 'model', text: reply }]);
            setLastActivityTime(Date.now()); 
         } catch(e) {
-           setIsLoading(false);
+           console.error("Auto-Nudge failed", e);
+        } finally {
+           setIsLoading(false); // CRITICAL FIX: Always release the lock
         }
       }
     };
 
     const timer = setInterval(checkIdle, 5000); 
     return () => clearInterval(timer);
-  }, [history, lastActivityTime, mood, isLoading]);
+  }, [history, lastActivityTime, mood, isLoading, input]); // Added input to dependency
 
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() && !stagedFile) return;
     
     setLastActivityTime(Date.now());
     recordInteraction();
-    updateMood(); // Shift mood every turn
+    updateMood(); 
 
-    // Basic heuristic to find name
+    // Heuristics
     if (input.toLowerCase().includes("my name is")) {
         const parts = input.split(/is|am/i);
         if (parts.length > 1) {
@@ -148,69 +191,71 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
         }
     }
 
-    const userMsg = input;
+    const userText = input;
+    let base64Image: string | undefined = undefined;
+    let previewUrl: string | undefined = undefined;
+
+    // Process Staged Image
+    if (stagedFile) {
+        base64Image = await fileToBase64(stagedFile);
+        previewUrl = stagedPreview || undefined; // Use the object URL for local display
+        clearStaged(); // Clear staging
+    }
+
     setInput('');
     
     // Optimistic Update
-    const newHistory = [...history, { role: 'user' as const, text: userMsg }];
+    const newHistoryEntry = { 
+        role: 'user' as const, 
+        text: userText || (stagedFile ? "[Image Sent]" : ""), 
+        imageUrl: previewUrl,
+        imageBase64: base64Image 
+    };
+
+    const newHistory = [...history, newHistoryEntry];
     setHistory(newHistory);
     setIsLoading(true);
 
     try {
-        // Fetch fresh mood state directly from store to ensure immediate reactivity
         const freshMood = useArchitectStore.getState().mood;
         const reply = await generateArchitectResponse(newHistory, getSystemPersona(freshMood));
         
-        // CHECK FOR MEMORY TAGS
         let finalReply = reply;
         const memoryMatch = reply.match(/\[MEMORY: (.*?)\]/);
         if (memoryMatch) {
             const fact = memoryMatch[1];
             addFact(fact);
-            // Hide tag from UI
             finalReply = reply.replace(memoryMatch[0], '').trim();
         }
 
         setHistory(prev => [...prev, { role: 'model', text: finalReply }]);
     } catch (e) {
-        setHistory(prev => [...prev, { role: 'model', text: "Forgive me, my connection wavered. Could you say that again?" }]);
+        setHistory(prev => [...prev, { role: 'model', text: "The visual feed corrupted... send that again?" }]);
     } finally {
         setIsLoading(false);
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files && e.target.files.length > 0) {
-          const file = e.target.files[0];
-          setIsAnalyzing(true);
-          setLastActivityTime(Date.now());
+  // Legacy flow for huge documents (PDFs/Txt) that need specialized parsing
+  const handleAnalysisUpload = async (file: File) => {
+      setIsAnalyzing(true);
+      try {
+          const analysis = await analyzeSourceMaterial(file);
+          const contextMsg = `[SYSTEM - REFERENCE MATERIAL UPLOADED]\nFILENAME: ${file.name}\n\nANALYSIS DATA:\n${JSON.stringify(analysis, null, 2)}\n\nINSTRUCTION: The user provided this training data. Absorb it.`;
           
-          // Create local preview URL for images
-          const imageUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined;
+          const newHistory = [...history, { role: 'user' as const, text: contextMsg }];
+          setHistory(newHistory);
+          
+          setIsLoading(true);
+          const reply = await generateArchitectResponse(newHistory, getSystemPersona());
+          setHistory(prev => [...prev, { role: 'model', text: reply }]);
 
-          try {
-              // Analyze using the service (uses Singleton)
-              const analysis = await analyzeSourceMaterial(file);
-              
-              // Inject context
-              const contextMsg = `[SYSTEM - REFERENCE MATERIAL UPLOADED]\nFILENAME: ${file.name}\n\nANALYSIS DATA:\n${JSON.stringify(analysis, null, 2)}\n\nINSTRUCTION: The user has provided this training data. Absorb this context (Characters, Location, Themes) immediately. Confirm receipt enthusiastically and comment on specific details you find interesting.`;
-              
-              const newHistory = [...history, { role: 'user' as const, text: contextMsg, imageUrl }];
-              setHistory(newHistory);
-              
-              // Trigger AI response
-              setIsLoading(true);
-              const reply = await generateArchitectResponse(newHistory, getSystemPersona());
-              setHistory(prev => [...prev, { role: 'model', text: reply }]);
-
-          } catch (err) {
-              console.error("Upload failed", err);
-              setHistory(prev => [...prev, { role: 'model', text: "I attempted to read that file, but I couldn't quite parse it. It might be corrupted." }]);
-          } finally {
-              setIsAnalyzing(false);
-              setIsLoading(false);
-              if (fileInputRef.current) fileInputRef.current.value = '';
-          }
+      } catch (err) {
+          setHistory(prev => [...prev, { role: 'model', text: "Failed to parse that document." }]);
+      } finally {
+          setIsAnalyzing(false);
+          setIsLoading(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
       }
   };
 
@@ -222,14 +267,13 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
           onComplete(config);
       } catch (e) {
           console.error("Failed to extract config", e);
-          // Fallback UI or Message could go here, for now simple back
           onBack(); 
       } finally {
           setIsFinalizing(false);
       }
   };
 
-  // Visual Styles based on Creep Level
+  // Styles
   const isDread = creepLevel === 'Dread';
   const themeColor = isDread ? 'text-red-500' : 'text-amber-500';
   const borderColor = isDread ? 'border-red-900/50' : 'border-amber-500/30';
@@ -238,9 +282,9 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
 
   return (
     <div className={`flex flex-col h-full bg-[#050505] font-mono text-gray-300 relative transition-colors duration-1000 ${isDread ? 'shadow-[inset_0_0_100px_rgba(50,0,0,0.2)]' : ''}`}>
-        <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".txt,.md,.json,.pdf,image/*" />
+        <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept=".txt,.md,.json,.pdf,image/*" />
         
-        {/* Header */}
+        {/* HEADER */}
         <div className={`flex items-center justify-between p-6 border-b ${borderColor} bg-black/50 backdrop-blur-md sticky top-0 z-10 transition-colors duration-1000`}>
             <div className="flex items-center gap-4">
                 <div className={`p-2 rounded-full border ${borderColor} ${bgColor} ${themeColor} transition-all duration-500`}>
@@ -298,7 +342,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
             </div>
         </div>
 
-        {/* Chat Area */}
+        {/* CHAT AREA */}
         <div className="flex-1 overflow-y-auto p-6 md:p-12 space-y-8 custom-scrollbar">
             {history.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}>
@@ -311,7 +355,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                         {/* Render Image if available */}
                         {msg.imageUrl && (
                             <div className="mb-4 rounded overflow-hidden border border-gray-700 bg-black/50">
-                                <img src={msg.imageUrl} alt="Uploaded Material" className="w-full h-auto max-h-[500px] object-contain" />
+                                <img src={msg.imageUrl} alt="Attached Evidence" className="w-full h-auto max-h-[400px] object-contain" />
                             </div>
                         )}
 
@@ -347,38 +391,62 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
             <div ref={bottomRef} />
         </div>
 
-        {/* Input Area */}
+        {/* INPUT AREA with STAGING */}
         <div className={`p-6 border-t ${borderColor} bg-black z-20 transition-colors duration-1000`}>
-            <div className="max-w-4xl mx-auto relative flex gap-4">
-                <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isFinalizing || isLoading || isAnalyzing}
-                    className={`p-4 bg-gray-900/30 border border-gray-800 text-gray-500 hover:${themeColor} hover:border-current transition-all group`}
-                    title="Upload Reference Material"
-                >
-                    <Paperclip className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                </button>
+            <div className="max-w-4xl mx-auto relative flex flex-col gap-2">
+                
+                {/* STAGED IMAGE PREVIEW */}
+                {stagedPreview && (
+                    <div className="flex items-center gap-4 bg-gray-900/80 border border-gray-700 p-3 rounded-sm animate-slideUp">
+                        <div className="relative w-16 h-16 border border-gray-600 rounded overflow-hidden group">
+                            <img src={stagedPreview} className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/50 hidden group-hover:flex items-center justify-center">
+                                <ImageIcon className="w-4 h-4 text-white" />
+                            </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-xs font-mono text-gray-300 truncate">{stagedFile?.name}</p>
+                            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Ready to send</p>
+                        </div>
+                        <button onClick={clearStaged} className="p-2 hover:bg-red-900/30 text-gray-500 hover:text-red-400 rounded transition-colors">
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                )}
 
-                <input 
-                    type="text" 
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                    placeholder={isDread ? "Whisper to the void..." : "Say hello to the machine..."}
-                    autoFocus
-                    disabled={isFinalizing || isLoading || isAnalyzing}
-                    className={`flex-1 bg-gray-900/50 border border-gray-800 p-4 ${isDread ? 'text-red-100 focus:border-red-500 placeholder-red-900/50' : 'text-amber-100 focus:border-amber-500'} focus:outline-none transition-all font-mono`}
-                />
-                <button 
-                    onClick={handleSend}
-                    disabled={!input.trim() || isFinalizing || isLoading || isAnalyzing}
-                    className={`bg-gray-900/20 border border-gray-800 ${themeColor} hover:bg-gray-900/40 hover:text-white hover:border-current px-6 transition-all disabled:opacity-50`}
-                >
-                    <Send className="w-5 h-5" />
-                </button>
-            </div>
-            <div className="text-center mt-2">
-               <span className="text-[10px] text-gray-600 font-mono">The Entity learns from every conversation.</span>
+                <div className="flex gap-4">
+                    <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isFinalizing || isLoading || isAnalyzing}
+                        className={`p-4 bg-gray-900/30 border border-gray-800 text-gray-500 hover:${themeColor} hover:border-current transition-all group`}
+                        title="Upload File"
+                    >
+                        <Paperclip className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                    </button>
+
+                    <input 
+                        type="text" 
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                        onPaste={handlePaste} // <--- PASTE LISTENER
+                        placeholder={stagedFile ? "Add context about this image..." : isDread ? "Paste an image or whisper to the void..." : "Paste an image or say hello..."}
+                        autoFocus
+                        disabled={isFinalizing || isLoading || isAnalyzing}
+                        className={`flex-1 bg-gray-900/50 border border-gray-800 p-4 ${isDread ? 'text-red-100 focus:border-red-500 placeholder-red-900/50' : 'text-amber-100 focus:border-amber-500'} focus:outline-none transition-all font-mono placeholder-gray-700`}
+                    />
+                    
+                    <button 
+                        onClick={handleSend}
+                        disabled={(!input.trim() && !stagedFile) || isFinalizing || isLoading || isAnalyzing}
+                        className={`bg-gray-900/20 border border-gray-800 ${themeColor} hover:bg-gray-900/40 hover:text-white hover:border-current px-6 transition-all disabled:opacity-50`}
+                    >
+                        <Send className="w-5 h-5" />
+                    </button>
+                </div>
+                <div className="text-center mt-2">
+                    <span className="text-[10px] text-gray-600 font-mono">The Entity learns from every conversation. Paste images (Ctrl+V) directly to share.</span>
+                </div>
             </div>
         </div>
     </div>
