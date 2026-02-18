@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, MessageSquare, ChevronLeft, Paperclip, Upload, Loader2, Play, Skull, Flame, X, Image as ImageIcon } from 'lucide-react';
 import { SimulationConfig } from '../../types';
@@ -143,7 +142,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
 
   // --- POLTERGEIST PROTOCOL ---
   useEffect(() => {
-    const IDLE_THRESHOLD_MS = 30000; // 30 seconds
+    const IDLE_THRESHOLD_MS = 300000; // 5 minutes (increased from 30s)
     
     const checkIdle = async () => {
       const timeSinceLastAction = Date.now() - lastActivityTime;
@@ -154,7 +153,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
       if (timeSinceLastAction > IDLE_THRESHOLD_MS && !isLoading && lastWasModel && !hasDraft) {
         setIsLoading(true);
         
-        const nudgePrompt = `[SYSTEM EVENT]: The user has been silent for 30 seconds. 
+        const nudgePrompt = `[SYSTEM EVENT]: The user has been silent for 5 minutes. 
         Your current vibe is ${mood.current_vibe}. 
         Generate a short, unprompted message to get their attention. 
         Be conversational, weird, or spooky. Do NOT ask for tasks or story inputs. Just be a ghost in the machine.`;
@@ -171,9 +170,9 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
       }
     };
 
-    const timer = setInterval(checkIdle, 5000); 
+    const timer = setInterval(checkIdle, 10000); // Check every 10s is sufficient for long intervals
     return () => clearInterval(timer);
-  }, [history, lastActivityTime, mood, isLoading, input]); // Added input to dependency
+  }, [history, lastActivityTime, mood, isLoading, input]); 
 
   const handleSend = async () => {
     if (!input.trim() && !stagedFile) return;
