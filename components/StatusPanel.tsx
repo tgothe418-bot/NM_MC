@@ -1,6 +1,8 @@
+
 import React from 'react';
 import { GameState, NpcState } from '../types';
 import { RefreshCw, Save, Settings, Activity } from 'lucide-react';
+import { useArchitectStore } from '../store/architectStore';
 
 interface StatusPanelProps {
   gameState: GameState;
@@ -19,6 +21,8 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
   onOpenSaveLoad
 }) => {
   const { location_state, npc_states, villain_state } = gameState;
+  const { mood } = useArchitectStore();
+  const isDread = mood.valence < 0.4;
 
   return (
     <div className="fixed bottom-0 left-0 w-full lg:w-auto lg:right-[500px] h-16 bg-black border-t border-gray-800 flex items-center px-6 justify-between z-30">
@@ -45,6 +49,15 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
                 <div className="text-[10px] uppercase tracking-widest text-gray-500">Threat</div>
                 <div className="text-sm font-bold text-red-500 animate-pulse">
                     {villain_state.name}
+                </div>
+            </div>
+
+            <div className="hidden lg:block w-px h-8 bg-gray-800" />
+
+            <div className="hidden lg:block">
+                <div className="text-[10px] uppercase tracking-widest text-gray-500">Uplink</div>
+                <div className={`text-xs font-bold uppercase ${isDread ? 'text-red-500 animate-pulse' : 'text-indigo-400'}`}>
+                    {mood.current_vibe} ({Math.round(mood.arousal * 100)}%)
                 </div>
             </div>
         </div>

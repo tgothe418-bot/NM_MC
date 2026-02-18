@@ -5,7 +5,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>The Nightmare Machine</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <script>
       tailwind.config = {
@@ -46,8 +46,18 @@
               'heartbeat-fast': 'heartbeat 0.8s ease-in-out infinite',
               'particle-float': 'particleFloat 20s ease-in-out infinite',
               'particle-rise': 'particleRise 15s linear infinite',
+              'fadeIn': 'fadeIn 0.5s ease-out forwards',
+              'slideUp': 'slideUp 0.3s ease-out forwards',
             },
             keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              slideUp: {
+                '0%': { transform: 'translateY(10px)', opacity: '0' },
+                '100%': { transform: 'translateY(0)', opacity: '1' },
+              },
               glitch: {
                 '2%, 64%': { transform: 'translate(2px,0) skew(0deg)' },
                 '4%, 60%': { transform: 'translate(-2px,0) skew(0deg)' },
@@ -140,7 +150,9 @@
     "zustand": "https://aistudiocdn.com/zustand@^5.0.3",
     "zod": "https://aistudiocdn.com/zod@^3.23.8",
     "zod-to-json-schema": "https://esm.sh/zod-to-json-schema@^3.25.1",
-    "zustand/": "https://esm.sh/zustand@^5.0.11/"
+    "zustand/": "https://esm.sh/zustand@^5.0.11/",
+    "react-markdown": "https://esm.sh/react-markdown@9?bundle",
+    "remark-gfm": "https://esm.sh/remark-gfm@4?bundle"
   }
 }
 </script>
@@ -150,3 +162,4 @@
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>
+    

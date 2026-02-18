@@ -1,4 +1,7 @@
+
 import React, { useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { ChatMessage } from '../types';
 import { Loader2, Upload } from 'lucide-react';
 
@@ -36,7 +39,9 @@ export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, classNam
             )}
 
             <div className="prose prose-invert prose-sm md:prose-base leading-relaxed whitespace-pre-wrap font-serif">
-               {msg.text}
+               <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                 {msg.text}
+               </ReactMarkdown>
             </div>
           </div>
         </div>

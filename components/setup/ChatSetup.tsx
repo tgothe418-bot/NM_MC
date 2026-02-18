@@ -142,7 +142,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
 
   // --- POLTERGEIST PROTOCOL ---
   useEffect(() => {
-    const IDLE_THRESHOLD_MS = 300000; // 5 minutes (increased from 30s)
+    const IDLE_THRESHOLD_MS = 300000; // 5 minutes
     
     const checkIdle = async () => {
       const timeSinceLastAction = Date.now() - lastActivityTime;
