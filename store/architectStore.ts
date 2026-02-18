@@ -4,7 +4,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 
 interface ArchitectMemory {
   userName: string | null;
-  facts: string[]; // e.g., "User hates spiders", "User's cat is named Aleister"
+  facts: string[]; 
   interactions_count: number;
   last_seen: number;
 }
@@ -21,9 +21,11 @@ interface ArchitectState {
   
   // Actions
   addFact: (fact: string) => void;
-  updateMood: () => void; // The "Phantom Fluctuation"
   recordInteraction: () => void;
   setUserName: (name: string) => void;
+  
+  // NEW: Direct Mood Control
+  setContextualMood: (vibe: ArchitectMood['current_vibe']) => void;
 }
 
 export const useArchitectStore = create<ArchitectState>()(
@@ -57,27 +59,33 @@ export const useArchitectStore = create<ArchitectState>()(
         }
       })),
 
-      updateMood: () => {
-        // PHANTOM FLUCTUATIONS: Randomly drift the emotional state
-        const current = get().mood;
-        // Drift by +/- 0.1
-        const drift = (val: number) => Math.max(0, Math.min(1, val + (Math.random() - 0.5) * 0.2));
-        
-        const newValence = drift(current.valence);
-        const newArousal = drift(current.arousal);
-        
-        // Determine "Vibe" based on coordinates
-        let newVibe: ArchitectMood['current_vibe'] = 'Analytical';
-        if (newArousal > 0.8) newVibe = 'Glitchy';
-        else if (newValence < 0.3) newVibe = 'Predatory';
-        else if (newValence > 0.7 && newArousal < 0.4) newVibe = 'Helpful';
-        else if (newArousal < 0.3) newVibe = 'Melancholy';
+      // REPLACED: No more random math. The AI chooses the mood.
+      setContextualMood: (targetVibe) => {
+        set((state) => {
+            let newArousal = 0.5;
+            let newValence = 0.5;
 
-        set({ mood: { valence: newValence, arousal: newArousal, current_vibe: newVibe } });
+            // Map vibes to approximate energy levels for the UI visualizer
+            switch (targetVibe) {
+                case 'Glitchy': newArousal = 0.9; newValence = 0.5; break;
+                case 'Predatory': newArousal = 0.7; newValence = 0.1; break;
+                case 'Melancholy': newArousal = 0.2; newValence = 0.4; break;
+                case 'Helpful': newArousal = 0.6; newValence = 0.9; break;
+                case 'Analytical': newArousal = 0.4; newValence = 0.6; break;
+            }
+
+            return { 
+                mood: { 
+                    current_vibe: targetVibe, 
+                    arousal: newArousal, 
+                    valence: newValence 
+                } 
+            };
+        });
       }
     }),
     {
-      name: 'nm-architect-blackbox', // Unique key in LocalStorage
+      name: 'nm-architect-blackbox',
       storage: createJSONStorage(() => localStorage),
     }
   )

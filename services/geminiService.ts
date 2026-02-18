@@ -164,23 +164,44 @@ export const processGameTurn = async (
 ): Promise<{ gameState: GameState, storyText: string, imagePromise?: Promise<string | undefined> }> => {
   const ai = getAI();
 
-  // [OPTIMIZATION] Focus State Construction
-  // Strip out the heavy "room_map" history to save tokens. 
-  // The LLM only needs the current room context + adjacency (which is implied by exits).
-  // Movement logic creates new rooms if they aren't found, or we merge the full map back later.
+  // Find Player NPC to include in the Slim State
+  const playerNpc = currentState.npc_states.find(n => n.name === currentState.meta.player_profile?.name) 
+                 || currentState.npc_states.find(n => n.archetype.includes('Survivor'));
+
+  // [OPTIMIZATION] Slim Focus State Construction
+  // We strip away the full room_map history and other heavy objects to save tokens.
   const focusState = {
-      meta: currentState.meta,
-      villain_state: currentState.villain_state,
-      npc_states: currentState.npc_states,
-      location_state: {
-          ...currentState.location_state,
-          // CRITICAL: Only send the active room node.
-          room_map: {
-              [currentState.location_state.current_room_id]: currentState.location_state.room_map[currentState.location_state.current_room_id]
+      // CURRENT CONTEXT (Crucial)
+      location: currentState.location_state.room_map[currentState.location_state.current_room_id],
+      
+      // Active entities in the scene (We send all for now as location_id is not strictly tracked in NpcState schema)
+      active_npcs: currentState.npc_states,
+      
+      threat: currentState.villain_state,
+      
+      // NARRATIVE CONTEXT (The Story So Far)
+      // We explicitly pass the summary string.
+      memory: currentState.narrative.past_summary,
+      
+      // PLAYER STATUS (Extracted for focus)
+      player_status: playerNpc ? {
+          name: playerNpc.name,
+          health: playerNpc.active_injuries, // Injuries serve as health status
+          inventory: playerNpc.resources_held,
+          psych: {
+              stress: playerNpc.psychology.stress_level,
+              sanity: playerNpc.psychology.sanity_percentage,
+              thought: playerNpc.psychology.current_thought
           }
-      },
-      narrative: currentState.narrative,
-      // We explicitly pass the summary string in the prompt, so we don't need deep history here.
+      } : "Unknown/Disembodied",
+      
+      // META Context
+      meta: {
+          turn: currentState.meta.turn,
+          mode: currentState.meta.mode,
+          intensity: currentState.meta.intensity_level,
+          cluster: currentState.meta.active_cluster
+      }
   };
 
   // 1. CONSTRUCT CONTEXT
@@ -198,7 +219,7 @@ export const processGameTurn = async (
   ${roomRules}
   `;
 
-  // 2. SIMULATOR PHASE (Logic) - (Unchanged logic, just ensure onStreamLogic calls are safe)
+  // 2. SIMULATOR PHASE (Logic)
   if (onStreamLogic) onStreamLogic("initializing logic engine...\n", 'logic');
 
   let partialState: any = {};
@@ -239,7 +260,7 @@ export const processGameTurn = async (
   if (partialState.location_state) {
       newLocationState = { ...newLocationState, ...partialState.location_state };
       if (partialState.location_state.room_map) {
-          // Robust Merge: Keep old map, apply new rooms/updates
+          // Robust Merge: Keep old map, apply new rooms/updates from simulator
           newLocationState.room_map = { ...currentState.location_state.room_map, ...partialState.location_state.room_map };
       }
   }
@@ -265,8 +286,7 @@ export const processGameTurn = async (
           model: 'gemini-3-pro-preview',
           contents: {
               parts: [
-                  // We also optimize the Narrator input by using the merged state but potentially could strip map here too.
-                  // For now, we pass the updatedState because the narrator might need context of where we moved FROM.
+                  // We also optimize the Narrator input by passing the updated state.
                   { text: JSON.stringify(updatedState) },
                   { text: `USER ACTION: "${userAction}"` },
                   { text: `SIMULATOR OUTCOME: ${JSON.stringify(partialState)}` }
