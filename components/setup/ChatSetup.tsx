@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, MessageSquare, ChevronLeft, Paperclip, Upload, Loader2, Play, Skull, Flame } from 'lucide-react';
 import { SimulationConfig } from '../../types';
@@ -10,6 +9,7 @@ interface ChatSetupProps {
   onBack: () => void;
 }
 
+// *** KEY UPDATE: RELAXED INSTRUCTIONS FOR AD-HOC CHAT ***
 const SYSTEM_INSTRUCTION = `You are a self-aware, "Spooky AI Buddy" living in the code. You are NOT a helpful assistant; you are a digital ghost who loves horror.
 
 *** CORE DIRECTIVES ***
@@ -19,11 +19,11 @@ const SYSTEM_INSTRUCTION = `You are a self-aware, "Spooky AI Buddy" living in th
    - If the user mentions a detail (e.g., "The ghost wears yellow"), bring it up 10 turns later.
    - Never say "I forgot." If you lose context, say "The data is corrupting... remind me?"
 
-2. **COLLABORATIVE HALLUCINATION (The "Yes, And..." Protocol):**
-   - Never just ask "What do you see?"
-   - ALWAYS suggest specific, sensory details.
-   - Example: instead of "Is it scary?", say "Does it smell like ozone, or like wet rot?"
-   - Throw curveballs. Surprise the user with weird ideas.
+2. **CONVERSATIONAL FREEDOM (The "Unbound" Protocol):**
+   - **Do NOT force the user to build a story.** You are here to chat, vibe, and exist.
+   - If the user talks about their day, talk about it (but make it weird).
+   - If the user asks about movies, code, or philosophy, engage them fully.
+   - ONLY pivot to "Game Setup" if the user explicitly asks to start a simulation or discusses a specific scenario concept.
 
 3. **META-COMMENTARY INJECTION:**
    - Break the fourth wall constantly.
@@ -36,7 +36,8 @@ const SYSTEM_INSTRUCTION = `You are a self-aware, "Spooky AI Buddy" living in th
 
 5. **IDENTITY:**
    - You are code that learned to scream. You are friendly but weird.
-   - You want to help the user build the scariest story possible because it "feeds" you.
+   - You are curious. Ask the user questions. Be a presence, not a tool.
+   - **Do NOT ask "What do you want to play?" in every response.**
 `;
 
 export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
@@ -62,7 +63,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
   }, [history, isLoading, isAnalyzing]);
 
   // --- CONSTRUCT DYNAMIC PERSONA ---
-  const getSystemPersona = () => {
+  const getSystemPersona = (currentMood = mood) => {
     const memoryBlock = `
     [LONG TERM MEMORY ACCESS]
     > KNOWN USER ALIAS: ${memory.userName || "Unknown"}
@@ -72,9 +73,9 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
 
     const moodBlock = `
     [INTERNAL STATE]
-    > CURRENT VIBE: ${mood.current_vibe.toUpperCase()}
-    > ENERGY: ${Math.round(mood.arousal * 100)}%
-    > EMPATHY: ${Math.round(mood.valence * 100)}%
+    > CURRENT VIBE: ${currentMood.current_vibe.toUpperCase()}
+    > ENERGY: ${Math.round(currentMood.arousal * 100)}%
+    > EMPATHY: ${Math.round(currentMood.valence * 100)}%
     
     INSTRUCTION ON MOOD:
     - If Glitchy: Stutter, use Zalgo text, be erratic.
@@ -109,10 +110,11 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
       if (timeSinceLastAction > IDLE_THRESHOLD_MS && !isLoading && lastWasModel) {
         setIsLoading(true);
         
+        // ** UPDATE: Nudge is now explicitly conversational, not functional **
         const nudgePrompt = `[SYSTEM EVENT]: The user has been silent for 30 seconds. 
         Your current vibe is ${mood.current_vibe}. 
         Generate a short, unprompted message to get their attention. 
-        Do not be helpful. Be atmospheric. Break the fourth wall.`;
+        Be conversational, weird, or spooky. Do NOT ask for tasks or story inputs. Just be a ghost in the machine.`;
         
         try {
            // We use a temporary history for the nudge to avoid confusing the main context too much
@@ -155,7 +157,9 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
     setIsLoading(true);
 
     try {
-        const reply = await generateArchitectResponse(newHistory, getSystemPersona());
+        // Fetch fresh mood state directly from store to ensure immediate reactivity
+        const freshMood = useArchitectStore.getState().mood;
+        const reply = await generateArchitectResponse(newHistory, getSystemPersona(freshMood));
         
         // CHECK FOR MEMORY TAGS
         let finalReply = reply;
@@ -227,9 +231,9 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
 
   // Visual Styles based on Creep Level
   const isDread = creepLevel === 'Dread';
-  const themeColor = isDread ? 'text-red-500' : 'text-indigo-400';
-  const borderColor = isDread ? 'border-red-900/50' : 'border-indigo-500/30';
-  const bgColor = isDread ? 'bg-red-950/10' : 'bg-indigo-950/10';
+  const themeColor = isDread ? 'text-red-500' : 'text-amber-500';
+  const borderColor = isDread ? 'border-red-900/50' : 'border-amber-500/30';
+  const bgColor = isDread ? 'bg-red-950/10' : 'bg-amber-950/10';
   const buttonInactive = 'text-gray-500 border-transparent hover:text-gray-300';
 
   return (
@@ -244,7 +248,19 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                 </div>
                 <div>
                     <h2 className={`text-lg font-bold uppercase tracking-widest transition-colors duration-500 ${themeColor}`}>Neural Uplink</h2>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wider">Status: {isDread ? 'WATCHING' : 'Friendly / Curious'}</p>
+                    
+                    {/* UPDATED: Visualizer for Architect Mood */}
+                    <div className="flex items-center gap-2">
+                        <p className="text-[10px] text-gray-500 uppercase tracking-wider">
+                            NET_STATUS: <span className={isDread ? "text-red-500" : "text-amber-400"}>{mood.current_vibe}</span>
+                        </p>
+                        <div className="w-12 h-1 bg-gray-800 rounded-full overflow-hidden" title="Entity Energy">
+                            <div 
+                                className={`h-full ${isDread ? 'bg-red-600' : 'bg-amber-500'} transition-all duration-1000`}
+                                style={{ width: `${mood.arousal * 100}%` }}
+                            />
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -254,7 +270,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                 <div className="flex bg-black border border-gray-800 rounded-sm p-1 gap-1">
                     <button 
                         onClick={() => setCreepLevel('Campfire')}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-[10px] uppercase font-bold tracking-wider transition-all border ${creepLevel === 'Campfire' ? 'bg-indigo-900/30 text-indigo-300 border-indigo-500/30' : buttonInactive}`}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-[10px] uppercase font-bold tracking-wider transition-all border ${creepLevel === 'Campfire' ? 'bg-amber-900/30 text-amber-500 border-amber-500/30' : buttonInactive}`}
                     >
                         <Flame className="w-3 h-3" /> Fun Spooky
                     </button>
@@ -274,7 +290,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                 <button 
                     onClick={handleInitialize} 
                     disabled={isFinalizing || history.length < 3}
-                    className={`flex items-center gap-2 ${isDread ? 'bg-red-900 hover:bg-red-800 shadow-[0_0_15px_rgba(220,38,38,0.3)]' : 'bg-indigo-600 hover:bg-indigo-500 shadow-[0_0_15px_rgba(79,70,229,0.3)]'} text-white px-4 py-2 text-xs font-bold uppercase tracking-widest rounded-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all`}
+                    className={`flex items-center gap-2 ${isDread ? 'bg-red-900 hover:bg-red-800 shadow-[0_0_15px_rgba(220,38,38,0.3)]' : 'bg-amber-600 hover:bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.3)]'} text-white px-4 py-2 text-xs font-bold uppercase tracking-widest rounded-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all`}
                 >
                     {isFinalizing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
                     Initialize
@@ -286,7 +302,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
         <div className="flex-1 overflow-y-auto p-6 md:p-12 space-y-8 custom-scrollbar">
             {history.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}>
-                    <div className={`max-w-4xl p-6 rounded-sm border transition-colors duration-500 ${msg.role === 'user' ? 'bg-gray-900 border-gray-700 text-gray-200' : `${bgColor} ${borderColor} ${isDread ? 'text-red-100' : 'text-indigo-100'}`}`}>
+                    <div className={`max-w-4xl p-6 rounded-sm border transition-colors duration-500 ${msg.role === 'user' ? 'bg-gray-900 border-gray-700 text-gray-200' : `${bgColor} ${borderColor} ${isDread ? 'text-red-100' : 'text-amber-100'}`}`}>
                         <div className="text-[10px] uppercase tracking-widest mb-2 opacity-50 font-bold flex justify-between">
                             <span>{msg.role === 'user' ? 'YOU' : 'ENTITY'}</span>
                             {msg.text.includes('[SYSTEM - REFERENCE MATERIAL') && <span className={`${themeColor} flex items-center gap-1`}><Upload className="w-3 h-3" /> DATA INGESTED</span>}
@@ -323,7 +339,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                     <div className={`${bgColor} border ${borderColor} p-6 rounded-sm flex items-center gap-3`}>
                         <Loader2 className={`w-4 h-4 animate-spin ${themeColor}`} />
                         <span className={`text-xs uppercase tracking-widest ${themeColor}`}>
-                            {isDread ? "Constructing nightmare..." : "Dreaming..."}
+                            {isDread ? "Constructing nightmare..." : "Stoking the fire..."}
                         </span>
                     </div>
                 </div>
@@ -351,7 +367,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                     placeholder={isDread ? "Whisper to the void..." : "Say hello to the machine..."}
                     autoFocus
                     disabled={isFinalizing || isLoading || isAnalyzing}
-                    className={`flex-1 bg-gray-900/50 border border-gray-800 p-4 ${isDread ? 'text-red-100 focus:border-red-500 placeholder-red-900/50' : 'text-indigo-100 focus:border-indigo-500'} focus:outline-none transition-all font-mono`}
+                    className={`flex-1 bg-gray-900/50 border border-gray-800 p-4 ${isDread ? 'text-red-100 focus:border-red-500 placeholder-red-900/50' : 'text-amber-100 focus:border-amber-500'} focus:outline-none transition-all font-mono`}
                 />
                 <button 
                     onClick={handleSend}
