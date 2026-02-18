@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import { WelcomeScreen } from './components/WelcomeScreen';
-import { SetupOverlay } from './components/setup/SetupOverlay';
+import { SetupOverlay } from './components/setup/SetupOverlay'; 
 import { StatusPanel } from './components/StatusPanel';
 import { StoryLog } from './components/StoryLog';
 import { InputArea } from './components/InputArea';
@@ -16,7 +15,6 @@ export default function App() {
   const [showSimModal, setShowSimModal] = useState(false);
   const [showSaveLoad, setShowSaveLoad] = useState(false);
 
-  // Initialize Engine
   const {
       apiKey,
       setApiKey,
@@ -36,8 +34,6 @@ export default function App() {
       getSaves
   } = useGameEngine(process.env.API_KEY || ""); 
 
-  // --- HANDLERS ---
-  
   const handleUpdateNpc = (npcIndex: number, updates: Partial<NpcState>) => {
     dispatch({ 
         type: 'UPDATE_NPC', 
@@ -51,8 +47,6 @@ export default function App() {
           setShowSetup(false);
       }
   };
-
-  // --- RENDER ---
 
   if (!apiKey) return <ApiKeyModal onSetKey={setApiKey} />;
   
@@ -75,14 +69,12 @@ export default function App() {
             <StoryLog 
                 history={history} 
                 isLoading={isLoading} 
-                activeCluster={gameState.meta.active_cluster}
                 className="pb-24" 
             />
         </div>
 
         {/* RIGHT COLUMN: Input Sidebar */}
         <div className="w-full lg:w-[450px] xl:w-[500px] border-t lg:border-t-0 lg:border-l border-gray-800 bg-[#080808]/95 z-20 flex flex-col p-6 shadow-2xl relative pb-24 lg:pb-24">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-gray-700 to-transparent opacity-20"></div>
             <InputArea 
                 onSend={(text, files) => sendMessage(text, files)} 
                 isLoading={isLoading} 
@@ -92,7 +84,7 @@ export default function App() {
             />
         </div>
 
-        {/* Bottom Status Panel (Fixed) */}
+        {/* Bottom Status Panel */}
         <StatusPanel 
             gameState={gameState} 
             onOpenSimulation={() => setShowSimModal(true)}
@@ -103,7 +95,7 @@ export default function App() {
             onOpenSaveLoad={() => setShowSaveLoad(true)}
         />
 
-        {/* Simulation Modal */}
+        {/* Modals */}
         <SimulationModal 
             isOpen={showSimModal} 
             onClose={() => setShowSimModal(false)}
@@ -120,18 +112,7 @@ export default function App() {
                            intensity_level: config.intensity,
                            active_cluster: config.cluster,
                        };
-                       const newVillain = {
-                           ...gameState.villain_state,
-                           name: config.villain_name || gameState.villain_state.name,
-                           archetype: config.villain_appearance || gameState.villain_state.archetype,
-                           primary_goal: config.primary_goal || gameState.villain_state.primary_goal,
-                           victim_profile: config.victim_description || gameState.villain_state.victim_profile
-                       };
-                       
-                       dispatch({ 
-                           type: 'PATCH_STATE', 
-                           payload: { meta: newMeta, villain_state: newVillain } 
-                       });
+                       dispatch({ type: 'PATCH_STATE', payload: { meta: newMeta } });
                     }
                 }
             }}
@@ -141,7 +122,6 @@ export default function App() {
             currentVillainState={gameState.villain_state}
         />
 
-        {/* Save/Load Modal */}
         <SaveLoadModal 
             isOpen={showSaveLoad}
             onClose={() => setShowSaveLoad(false)}

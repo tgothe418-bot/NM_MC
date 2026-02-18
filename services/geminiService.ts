@@ -544,7 +544,7 @@ export const analyzeImageContext = async (file: File, aspect: string): Promise<s
 
 export const generateCharacterProfile = async (cluster: string, intensity: string, role: string): Promise<CharacterProfile> => {
     const ai = getAI();
-    const jsonSchema = zodToJsonSchema(CharacterProfileSchema, "profile");
+    const jsonSchema = zodToJsonSchema(CharacterProfileSchema as any, "profile");
 
     const res = await ai.models.generateContent({
         model: 'gemini-3-pro-preview', // Upgraded to Pro
@@ -559,7 +559,7 @@ export const generateCharacterProfile = async (cluster: string, intensity: strin
 
 export const generateScenarioConcepts = async (cluster: string, intensity: string, mode: string): Promise<ScenarioConcepts> => {
     const ai = getAI();
-    const jsonSchema = zodToJsonSchema(ScenarioConceptsSchema, "concepts");
+    const jsonSchema = zodToJsonSchema(ScenarioConceptsSchema as any, "concepts");
 
     const res = await ai.models.generateContent({
         model: 'gemini-3-pro-preview', // Upgraded to Pro

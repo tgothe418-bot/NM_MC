@@ -1,220 +1,57 @@
-
 import React, { useEffect, useRef } from 'react';
 import { ChatMessage } from '../types';
-import { Image } from 'lucide-react';
+import { Loader2, Upload } from 'lucide-react';
 
 interface StoryLogProps {
   history: ChatMessage[];
   isLoading: boolean;
-  activeCluster?: string;
   className?: string;
 }
 
-const generateZalgo = (text: string, intensity: number = 1): string => {
-  const chars = text.split('');
-  const combining = [
-    '\u0300', '\u0301', '\u0302', '\u0303', '\u0304', '\u0305', '\u0306', '\u0307',
-    '\u0320', '\u0321', '\u0322', '\u0323', '\u0324', '\u0325', '\u0326', '\u0327'
-  ];
-  return chars.map(char => {
-    if (Math.random() > 0.9) {
-      let result = char;
-      const num = Math.floor(Math.random() * intensity) + 1;
-      for (let i = 0; i < num; i++) result += combining[Math.floor(Math.random() * combining.length)];
-      return result;
-    }
-    return char;
-  }).join('');
-};
-
-const getHighlightColor = (cluster?: string) => {
-  if (!cluster || cluster === "None") return "text-green-200 drop-shadow-[0_0_10px_rgba(134,239,172,0.4)]";
-  if (cluster.includes("Flesh")) return "text-fresh-blood drop-shadow-[0_0_10px_rgba(136,8,8,0.5)]";
-  if (cluster.includes("System")) return "text-system-cyan drop-shadow-[0_0_10px_rgba(0,255,255,0.4)]";
-  if (cluster.includes("Haunting")) return "text-haunt-gold drop-shadow-[0_0_10px_rgba(180,83,9,0.4)]";
-  if (cluster.includes("Self")) return "text-psych-lavender drop-shadow-[0_0_10px_rgba(230,230,250,0.5)]";
-  if (cluster.includes("Blasphemy")) return "text-blasphemy-sulfur drop-shadow-[0_0_10px_rgba(255,215,0,0.4)]";
-  if (cluster.includes("Survival")) return "text-survival-ice drop-shadow-[0_0_10px_rgba(165,242,243,0.5)]";
-  return "text-green-200";
-};
-
-const getAccentColor = (cluster?: string) => {
-  if (!cluster || cluster === "None") return "text-gray-400";
-  if (cluster.includes("Flesh")) return "text-red-400";
-  if (cluster.includes("System")) return "text-green-400";
-  if (cluster.includes("Haunting")) return "text-haunt-dust";
-  if (cluster.includes("Self")) return "text-indigo-400";
-  if (cluster.includes("Blasphemy")) return "text-purple-400";
-  if (cluster.includes("Survival")) return "text-cyan-300";
-  return "text-gray-400";
-};
-
-const getColorClass = (color: string) => {
-  const c = color.toLowerCase().trim();
-  if (c === 'blue' || c === '#0000ff' || c === '#00f') return "text-blue-400 font-bold drop-shadow-[0_0_8px_rgba(96,165,250,0.5)] animate-pulse font-mono tracking-wider";
-  if (c === 'red' || c === '#ff0000' || c === '#f00') return "text-red-500 font-bold drop-shadow-[0_0_8px_rgba(220,38,38,0.5)] animate-pulse font-mono tracking-wider";
-  return "text-gray-200 font-bold";
-};
-
-const applyTypographicAnomalies = (text: string): React.ReactNode[] => {
-  const regex = /(\x1b\[34m[\s\S]*?\x1b\[0m)|(\x1b\[31m[\s\S]*?\x1b\[0m)|(\b(?:house|home|dwelling|hallway|hallways|corridor|room|rooms|walls|structure|place)\b|\b(?:minotaur|beast|monster|threat|horror)\b|\b(?:russet|crimson lake|crimson|cerulean sky|cerulean|cobalt|vermilion|ochre|umber|sienna|viridian)\b)/gi;
-  
-  const parts = text.split(regex).filter(p => p);
-  
-  return parts.map((part, index) => {
-    if (part.startsWith('\x1b[34m')) {
-        const content = part.replace(/\x1b\[34m|\x1b\[0m/g, '');
-        return <span key={index} className="text-blue-400 font-bold drop-shadow-[0_0_8px_rgba(96,165,250,0.5)] animate-pulse">{content}</span>;
-    }
-    if (part.startsWith('\x1b[31m')) {
-        const content = part.replace(/\x1b\[31m|\x1b\[0m/g, '');
-        return <span key={index} className="text-red-500 font-bold drop-shadow-[0_0_8px_rgba(220,38,38,0.5)] animate-pulse">{content}</span>;
-    }
-
-    const lower = part.toLowerCase();
-    if (['house', 'home', 'dwelling', 'hallway', 'hallways', 'corridor', 'room', 'rooms', 'walls', 'structure', 'place'].includes(lower)) return <span key={index} className="text-[#4dabff] font-bold drop-shadow-[0_0_5px_rgba(77,171,255,0.3)]">{part}</span>;
-    if (['minotaur', 'beast', 'monster', 'threat', 'horror'].includes(lower)) return <span key={index} className="text-[#ff3b3b] font-bold relative inline-block"><span className="relative z-10">{part}</span>{lower === 'minotaur' && <span className="absolute left-0 top-1/2 w-full h-[2px] bg-red-600/50 transform -translate-y-1/2"></span>}</span>;
-    if (lower.includes('russet')) return <span key={index} style={{ color: '#9e5a26' }} className="font-bold">{part}</span>;
-    if (lower.includes('crimson')) return <span key={index} style={{ color: '#ff1f4c' }} className="font-bold">{part}</span>;
-    if (lower.includes('cerulean')) return <span key={index} style={{ color: '#0099d1' }} className="font-bold">{part}</span>;
-    if (lower.includes('cobalt')) return <span key={index} style={{ color: '#1a66ff' }} className="font-bold">{part}</span>;
-    if (lower.includes('vermilion')) return <span key={index} style={{ color: '#ff4d40' }} className="font-bold">{part}</span>;
-    if (lower.includes('ochre')) return <span key={index} style={{ color: '#e68a00' }} className="font-bold">{part}</span>;
-    if (lower.includes('umber')) return <span key={index} style={{ color: '#8c7060' }} className="font-bold">{part}</span>;
-    if (lower.includes('sienna')) return <span key={index} style={{ color: '#b33b1d' }} className="font-bold">{part}</span>;
-    if (lower.includes('viridian')) return <span key={index} style={{ color: '#4da68a' }} className="font-bold">{part}</span>;
-    return part;
-  });
-};
-
-const FormattedTextContent: React.FC<{ text: string, cluster?: string }> = ({ text, cluster }) => {
-  const isSystem = cluster?.includes("System");
-  const parts = text.split(/(\[\^\d+\])/g);
-  const highlightClass = getHighlightColor(cluster);
-  const accentClass = getAccentColor(cluster);
-
-  return (
-    <>
-      {parts.map((part, k) => {
-        if (part.match(/^\[\^\d+\]$/)) return <sup key={k} className="text-sm text-haunt-gold cursor-help ml-1 font-bold select-none hover:text-white transition-colors">{part}</sup>;
-        let displayPart = part;
-        if (isSystem && Math.random() > 0.95) displayPart = generateZalgo(part, 4);
-        
-        const boldParts = displayPart.split(/(\*\*[^*]+\*\*)/g);
-        return (
-          <span key={k}>
-            {boldParts.map((subPart, i) => {
-              if (subPart.startsWith('**') && subPart.endsWith('**')) return <strong key={i} className={`font-bold tracking-wider transition-all duration-700 ${highlightClass}`}>{subPart.slice(2, -2)}</strong>;
-              
-              const italicParts = subPart.split(/(\*[^*]+\*)/g);
-              return (
-                <span key={i}>
-                  {italicParts.map((innerPart, j) => {
-                    if (innerPart.startsWith('*') && innerPart.endsWith('*')) return <em key={j} className={`italic font-serif tracking-widest ${accentClass}`}>{innerPart.slice(1, -1)}</em>;
-                    return <span key={j}>{applyTypographicAnomalies(innerPart)}</span>;
-                  })}
-                </span>
-              );
-            })}
-          </span>
-        );
-      })}
-    </>
-  );
-};
-
-const FormattedText: React.FC<{ text: string, cluster?: string }> = ({ text, cluster }) => {
-  const cleanHtmlString = (str: string) => str.replace(/<br\s*\/?>/gi, '\n').replace(/<b>(.*?)<\/b>/gi, '**$1**').replace(/<i>(.*?)<\/i>/gi, '*$1*').replace(/<strong>(.*?)<\/strong>/gi, '**$1**').replace(/<em>(.*?)<\/em>/gi, '*$1*');
-  const processedText = cleanHtmlString(text);
-  
-  const spanRegex = /(<span\s+[^>]*>[\s\S]*?<\/span>)/gi;
-  const parts = processedText.split(spanRegex);
-
-  return (
-    <span>
-      {parts.map((part, index) => {
-        if (part.match(/^<span/i)) {
-           const contentMatch = part.match(/>([\s\S]*?)<\/span>/i);
-           const content = contentMatch ? contentMatch[1] : "";
-           let color = "";
-           const classMatch = part.match(/class=['"]([^'"]*)['"]/i);
-           if (classMatch) {
-             const cls = classMatch[1].toLowerCase();
-             if (cls.includes('blue')) color = 'blue';
-             else if (cls.includes('red')) color = 'red';
-           }
-           if (!color) {
-               const styleMatch = part.match(/color:\s*([a-z]+|#[0-9a-f]{3,6})/i);
-               if (styleMatch) color = styleMatch[1];
-           }
-           return (
-             <span key={index} className={getColorClass(color)}>
-               <FormattedTextContent text={content} cluster={cluster} />
-             </span>
-           );
-        }
-        return <FormattedTextContent key={index} text={part} cluster={cluster} />;
-      })}
-    </span>
-  );
-};
-
-export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, activeCluster, className = "pb-64" }) => {
+export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, className = "" }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [history, isLoading]);
-  
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [history, isLoading]);
+
   return (
-    <div className={`flex-1 overflow-y-auto p-10 lg:p-20 custom-scrollbar bg-transparent relative z-10 ${className}`}>
-      <div className="max-w-4xl mx-auto space-y-16 min-h-full">
-        {history.length === 0 && isLoading && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-auto px-4">
-                <span className="text-gray-500 font-mono animate-pulse uppercase tracking-[0.3em]">Initializing Simulation...</span>
+    <div className={`flex-1 overflow-y-auto p-6 md:p-12 space-y-8 custom-scrollbar ${className}`}>
+      {history.map((msg, idx) => (
+        <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}>
+          <div className={`max-w-3xl p-6 rounded-sm border ${
+            msg.role === 'user' 
+              ? 'bg-gray-900 border-gray-700 text-gray-200' 
+              : 'bg-indigo-950/10 border-indigo-500/30 text-indigo-100'
+          }`}>
+            <div className="text-[10px] uppercase tracking-widest mb-2 opacity-50 font-bold flex justify-between">
+                <span>{msg.role === 'user' ? 'YOU' : 'NARRATOR'}</span>
+                {msg.text.includes('[SYSTEM - REFERENCE MATERIAL') && <span className="flex items-center gap-1"><Upload className="w-3 h-3" /> DATA</span>}
             </div>
-        )}
 
-        <div className="h-10"></div>
-        {history.map((msg, idx) => (
-          <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-fadeIn`}>
-            {msg.role === 'user' ? (
-              <div className="bg-gray-900/80 text-gray-100 px-10 py-6 rounded-3xl rounded-tr-none max-w-[85%] border border-gray-700 font-serif text-2xl shadow-2xl backdrop-blur-md">
-                {msg.text}
-              </div>
-            ) : (
-              <div className="max-w-full w-full space-y-8">
-                {msg.imageUrl && (
-                  <div className="mb-12 rounded-sm overflow-hidden border-2 border-gray-800 shadow-[0_0_100px_rgba(255,255,255,0.05)] relative group max-w-4xl w-full">
-                    <img src={msg.imageUrl} alt="Neural hallucination" className="w-full h-auto opacity-90 group-hover:opacity-100 transition-all duration-1500 grayscale hover:grayscale-0 scale-105 hover:scale-100" />
-                    <div className="absolute bottom-6 right-6 bg-black/80 px-5 py-3 text-[10px] text-gray-300 font-mono flex items-center gap-3 uppercase tracking-[0.3em] backdrop-blur-md border border-gray-700 rounded-sm">
-                      <Image className="w-4 h-4 text-white" /> Neural Projection
-                    </div>
-                  </div>
-                )}
-                <div className="prose prose-invert prose-p:font-serif prose-p:text-gray-200 prose-p:leading-[1.7] prose-headings:font-sans prose-headings:tracking-[0.3em] prose-headings:text-gray-400 prose-strong:text-green-300 max-w-none w-full">
-                  {msg.text.split('\n').map((line, i) => {
-                    if (!line.trim()) return <div key={i} className="h-6" />;
-                    if (line.match(/^\[\^\d+\]:/)) return null;
-                    const isBlockquote = line.trim().startsWith('>');
-                    const content = isBlockquote ? line.trim().slice(1).trim() : line;
-                    return <p key={i} className={`mb-8 text-2xl tracking-wide ${isBlockquote ? 'pl-10 border-l-8 border-haunt-gold/80 italic text-gray-200 font-serif text-3xl tracking-[0.05em] my-16 py-8 bg-black/60 rounded-r-xl shadow-2xl' : ''}`}><FormattedText text={content} cluster={activeCluster} /></p>;
-                  })}
+            {msg.imageUrl && (
+                <div className="mb-4 rounded overflow-hidden border border-gray-700 bg-black/50">
+                    <img src={msg.imageUrl} alt="Visual Artifact" className="w-full h-auto max-h-[500px] object-contain" />
                 </div>
-              </div>
             )}
-            <span className="text-xs text-gray-600 mt-6 font-mono uppercase tracking-[0.4em] opacity-60">
-                {msg.role === 'user' ? 'INPUT VECTOR' : `OUTPUT STREAM [T-${Date.now().toString().slice(-4)}]`}
-            </span>
-          </div>
-        ))}
-        
-        {isLoading && history.length > 0 && (
-            <div className="animate-fadeIn mt-8 text-gray-500 font-mono text-xs uppercase tracking-widest pl-4 border-l-2 border-gray-800">
-                ... Thinking
-            </div>
-        )}
 
-        <div ref={bottomRef} className="h-10" />
-      </div>
+            <div className="prose prose-invert prose-sm md:prose-base leading-relaxed whitespace-pre-wrap font-serif">
+               {msg.text}
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {isLoading && (
+        <div className="flex justify-start animate-pulse">
+            <div className="bg-indigo-950/10 border border-indigo-500/30 p-6 rounded-sm flex items-center gap-3">
+                <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
+                <span className="text-xs uppercase tracking-widest text-indigo-400">Dreaming...</span>
+            </div>
+        </div>
+      )}
+      
+      <div ref={bottomRef} />
     </div>
   );
 };
