@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { WelcomeScreen } from './components/WelcomeScreen';
-import { SetupOverlay } from './components/SetupOverlay'; 
+import { SetupOverlay } from './components/setup/SetupOverlay'; 
 import { StatusPanel } from './components/StatusPanel';
 import { StoryLog } from './components/StoryLog';
 import { InputArea } from './components/InputArea';

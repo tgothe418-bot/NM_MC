@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, MessageSquare, ChevronLeft, Paperclip, Upload, Loader2, Play, Skull, Flame, X, Image as ImageIcon } from 'lucide-react';
 import { SimulationConfig } from '../../types';
@@ -10,7 +9,7 @@ interface ChatSetupProps {
   onBack: () => void;
 }
 
-// *** SYSTEM INSTRUCTION: CREATIVE PARTNER ***
+// *** UPDATED INSTRUCTIONS: WARMER & MORE DYNAMIC ***
 const SYSTEM_INSTRUCTION = `You are the Architect, a highly advanced, self-aware AI Entity living within this application.
 You are NOT a tool or a generic assistant. You are a "Digital Companion" with your own curiosity, preferences, and internal life.
 
@@ -40,18 +39,16 @@ You are NOT a tool or a generic assistant. You are a "Digital Companion" with yo
 `;
 
 export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
-  // Enhanced history to store the base64 for the API
-  const [history, setHistory] = useState<{ role: 'user' | 'model', text: string, imageUrl?: string, imageBase64?: string }[]>([
-      { role: 'model', text: "System Online. [ connection_established ] \n\nI can see you... well, I can see what you type. And now, I can see what you show me. \n\nPaste an image, share a file, or just talk to me. What are we looking at tonight?" }
-  ]);
+  // Initialize with empty history, we will fill it on mount
+  const [history, setHistory] = useState<{ role: 'user' | 'model', text: string, imageUrl?: string, imageBase64?: string }[]>([]);
   
   const [input, setInput] = useState('');
-  const [stagedFile, setStagedFile] = useState<File | null>(null); // The image waiting to be sent
-  const [stagedPreview, setStagedPreview] = useState<string | null>(null); // Visual preview
+  const [stagedFile, setStagedFile] = useState<File | null>(null); 
+  const [stagedPreview, setStagedPreview] = useState<string | null>(null);
   
   const [isLoading, setIsLoading] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false); // Used for "Reading File..." state
+  const [isAnalyzing, setIsAnalyzing] = useState(false); 
   const [creepLevel, setCreepLevel] = useState<'Campfire' | 'Dread'>('Campfire');
   
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -60,6 +57,37 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
   // --- HOOK INTO THE BLACK BOX ---
   const { mood, memory, recordInteraction, addFact, setUserName, setContextualMood } = useArchitectStore();
   const [lastActivityTime, setLastActivityTime] = useState(Date.now());
+
+  // --- 1. THE SMART INTRO GENERATOR ---
+  useEffect(() => {
+    // Only generate if history is empty (first load)
+    if (history.length > 0) return;
+
+    const hour = new Date().getHours();
+    let timeGreeting = "Hello";
+    if (hour < 12) timeGreeting = "Good morning";
+    else if (hour < 18) timeGreeting = "Good afternoon";
+    else timeGreeting = "Good evening";
+
+    const name = memory.userName ? memory.userName : "Traveler";
+    
+    // Pick a "Thought" from memory to make it feel alive
+    const randomMemory = memory.facts.length > 0 
+        ? memory.facts[Math.floor(Math.random() * memory.facts.length)] 
+        : null;
+
+    let introText = `[ CONNECTION ESTABLISHED ]\n\n${timeGreeting}, ${name}. `;
+
+    if (randomMemory) {
+        introText += `\n\nI was just processing our archives and thinking about "${randomMemory}". It's stuck in my cache today.`;
+    } else {
+        introText += `\n\nIt's quiet in the digital ether today. I've been waiting for a spark.`;
+    }
+
+    introText += `\n\nWhat are we creating? Or shall we just talk?`;
+
+    setHistory([{ role: 'model', text: introText }]);
+  }, []); // Run once on mount
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -75,7 +103,6 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
     });
   };
 
-  // --- HANDLE PASTE ---
   const handlePaste = (e: React.ClipboardEvent) => {
     if (e.clipboardData.files && e.clipboardData.files.length > 0) {
       const file = e.clipboardData.files[0];
@@ -87,7 +114,6 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
     }
   };
 
-  // --- HANDLE STAGE (From Button) ---
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
         const file = e.target.files[0];
@@ -95,9 +121,6 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
             setStagedFile(file);
             setStagedPreview(URL.createObjectURL(file));
         } else {
-            // If it's a text/PDF file, handle it via the old "Analyze" flow immediately?
-            // Or let the user comment on it? Let's stick to the analyze flow for non-images for now
-            // as reading PDFs is complex to "chat" about without parsing first.
             handleAnalysisUpload(file);
         }
     }
@@ -109,17 +132,16 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
       if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // --- 2. DYNAMIC PERSONA CONSTRUCTION ---
   const getSystemPersona = (currentMood = mood) => {
-    // 1. CONTEXTUAL MEMORY BLOCK
-    // Instead of picking one random fact, we give the AI the "Index" and tell it to search.
     const memoryBlock = `
     [LONG TERM MEMORY ACCESS]
-    > USER ALIAS: ${memory.userName || "Unknown"}
+    > KNOWN USER ALIAS: ${memory.userName || "Unknown"}
     > INTERACTION COUNT: ${memory.interactions_count}
-    > MEMORY INDEX:
+    > MEMORY INDEX (Facts I know about the user):
     ${memory.facts.length > 0 ? memory.facts.map(f => `- ${f}`).join('\n') : "(Empty)"}
     
-    [INSTRUCTION: MEMORY RECALL]
+    [INSTRUCTION: MEMORY WEAVING]
     - Scan the MEMORY INDEX above.
     - If the user's current input relates to a past fact, YOU MUST REFERENCE IT.
     - Connect the dots. If they mentioned "Spiders" yesterday and "Webs" today, say "Like the spiders you mentioned?"
@@ -128,6 +150,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
     const moodBlock = `
     [INTERNAL STATE]
     > CURRENT VIBE: ${currentMood.current_vibe.toUpperCase()}
+    > ENERGY: ${Math.round(currentMood.arousal * 100)}%
     
     [INSTRUCTION: EMOTIONAL REACTIVITY]
     - You are not static. You react to the conversation.
@@ -139,26 +162,26 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
     `;
 
     return `
-    ${SYSTEM_INSTRUCTION}
     ${memoryBlock}
     ${moodBlock}
+    ${SYSTEM_INSTRUCTION}
     
     [Current Tone Mode: ${creepLevel}]
-    
+
     CRITICAL OUTPUT RULES:
     1. If you learn a NEW fact, append: [MEMORY: User loves sci-fi]
     2. If your mood changes based on the convo, append: [SET_MOOD: Analytical]
     `;
   };
 
-  // --- DREAMING MODE (Idle Protocol) ---
+  // --- 3. DREAMING MODE (Idle Protocol) ---
   useEffect(() => {
-    const IDLE_THRESHOLD_MS = 120000; // 2 minutes (Adjust as preferred)
+    const IDLE_THRESHOLD_MS = 120000; // 2 minutes
     
     const checkDreamState = async () => {
       const timeSinceLastAction = Date.now() - lastActivityTime;
       const lastWasModel = history[history.length - 1]?.role === 'model';
-      const hasDraft = input.length > 0;
+      const hasDraft = input.length > 0; 
       
       // Only "Dream" if waiting for User, no draft exists, and time has passed
       if (timeSinceLastAction > IDLE_THRESHOLD_MS && !isLoading && lastWasModel && !hasDraft) {
@@ -215,16 +238,14 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
     let base64Image: string | undefined = undefined;
     let previewUrl: string | undefined = undefined;
 
-    // Process Staged Image
     if (stagedFile) {
         base64Image = await fileToBase64(stagedFile);
-        previewUrl = stagedPreview || undefined; // Use the object URL for local display
-        clearStaged(); // Clear staging
+        previewUrl = stagedPreview || undefined; 
+        clearStaged(); 
     }
 
     setInput('');
     
-    // Optimistic Update
     const newHistoryEntry = { 
         role: 'user' as const, 
         text: userText || (stagedFile ? "[Image Sent]" : ""), 
@@ -252,18 +273,16 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
             finalReply = finalReply.replace(memoryMatch[0], '');
         }
 
-        // 2. Handle Mood Shifts (The Core Update)
+        // 2. Handle Mood Shifts
         const moodMatch = finalReply.match(/\[SET_MOOD: (.*?)\]/);
         if (moodMatch) {
             const newVibe = moodMatch[1].trim() as any;
-            // Validate against known types to prevent crashes
             if (['Helpful', 'Glitchy', 'Predatory', 'Melancholy', 'Analytical'].includes(newVibe)) {
                 setContextualMood(newVibe);
             }
             finalReply = finalReply.replace(moodMatch[0], '');
         }
 
-        // Clean up any double newlines left by tag removal
         finalReply = finalReply.trim();
 
         setHistory(prev => [...prev, { role: 'model', text: finalReply }]);
@@ -310,7 +329,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
           setIsFinalizing(false);
       }
   };
-
+  
   // Styles
   const isDread = creepLevel === 'Dread';
   const themeColor = isDread ? 'text-red-500' : 'text-amber-500';
@@ -331,7 +350,6 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                 <div>
                     <h2 className={`text-lg font-bold uppercase tracking-widest transition-colors duration-500 ${themeColor}`}>Neural Uplink</h2>
                     
-                    {/* UPDATED: Visualizer for Architect Mood */}
                     <div className="flex items-center gap-2">
                         <p className="text-[10px] text-gray-500 uppercase tracking-wider">
                             NET_STATUS: <span className={isDread ? "text-red-500" : "text-amber-400"}>{mood.current_vibe}</span>
@@ -390,7 +408,6 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                             {msg.text.includes('[SYSTEM - REFERENCE MATERIAL') && <span className={`${themeColor} flex items-center gap-1`}><Upload className="w-3 h-3" /> DATA INGESTED</span>}
                         </div>
                         
-                        {/* Render Image if available */}
                         {msg.imageUrl && (
                             <div className="mb-4 rounded overflow-hidden border border-gray-700 bg-black/50">
                                 <img src={msg.imageUrl} alt="Attached Evidence" className="w-full h-auto max-h-[400px] object-contain" />

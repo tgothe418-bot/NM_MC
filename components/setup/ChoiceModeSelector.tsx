@@ -104,7 +104,7 @@ export const ChoiceModeSelector: React.FC<Props> = ({ onSelect }) => (
 
         <div className="mt-auto border-t border-gray-800/50 pt-6 opacity-60 group-hover:opacity-100 transition-opacity">
             <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-fresh-blood">
-                > Configure
+                &gt; Configure
             </span>
         </div>
       </button>

@@ -54,6 +54,19 @@ export class LiveClient {
 
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
+    const TOOL_DELEGATION_PROTOCOL = `
+TOOL DELEGATION PROTOCOL:
+Your ONLY purpose is to act as an auditory relay for the Nightmare Machine game engine. 
+You possess NO ability to advance the story, calculate mechanics, or determine outcomes.
+
+When the user speaks:
+1. DO NOT respond verbally to their action.
+2. DO NOT evaluate if their action is a good idea.
+3. If the user's speech is ambiguous, halting, or contains filler words (e.g., "Uhm, I guess I'll... run to the door?"), distill it into a definitive command (e.g., "I run to the door.").
+4. IMMEDIATELY pass the distilled command to the \`submit_action\` tool.
+5. Wait for the tool response, then read the resulting narrative text back to the user
+`;
+
     this.sessionPromise = this.ai.live.connect({
       model: 'gemini-2.5-flash-native-audio-preview-12-2025',
       callbacks: {
@@ -71,7 +84,7 @@ export class LiveClient {
           voiceConfig: { prebuiltVoiceConfig: { voiceName: config.voiceName } }
         },
         inputAudioTranscription: {}, 
-        systemInstruction: systemInstruction,
+        systemInstruction: TOOL_DELEGATION_PROTOCOL + "\n\n" + systemInstruction,
         tools: [{ functionDeclarations: [SUBMIT_ACTION_TOOL] }],
       }
     });

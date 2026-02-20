@@ -1,13 +1,12 @@
-
 import React, { useState } from 'react';
-import { SimulationConfig } from '../types';
-import { SetupMode } from './setup/types';
-import { ChoiceModeSelector } from './setup/ChoiceModeSelector';
-import { GuidedSetup } from './setup/GuidedSetup';
-import { ManualSetup } from './setup/ManualSetup';
-import { SimulationSetup } from './setup/SimulationSetup';
-import { ChatSetup } from './setup/ChatSetup';
-import { NpcSelector } from './setup/NpcSelector';
+import { SimulationConfig } from '../../types';
+import { SetupMode } from './types';
+import { ChoiceModeSelector } from './ChoiceModeSelector';
+import { GuidedSetup } from './GuidedSetup';
+import { ManualSetup } from './ManualSetup';
+import { SimulationSetup } from './SimulationSetup';
+import { ChatSetup } from './ChatSetup';
+import { NpcSelector } from './NpcSelector';
 
 interface SetupOverlayProps {
   onComplete: (config: SimulationConfig) => void;

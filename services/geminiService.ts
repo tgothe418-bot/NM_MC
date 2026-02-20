@@ -12,7 +12,8 @@ import {
 } from '../types';
 import {
   ScenarioConceptsSchema,
-  CharacterProfileSchema
+  CharacterProfileSchema,
+  SimulatorOutputSchema
 } from '../schemas';
 import { 
   parseSimulatorResponse, 
@@ -225,6 +226,8 @@ export const processGameTurn = async (
   let partialState: any = {};
   
   try {
+      const simulatorSchema = zodToJsonSchema(SimulatorOutputSchema, "simulator_output");
+
       const simResponse = await ai.models.generateContent({
         model: 'gemini-3-flash-preview', // Updated per guidelines for basic logic/text tasks
         contents: {
@@ -236,7 +239,8 @@ export const processGameTurn = async (
         // Inject summary into System Instruction for better retention
         config: { 
             systemInstruction: SIMULATOR_INSTRUCTION + `\n\n[LONG TERM MEMORY]: ${currentState.narrative.past_summary || "No prior history."}`, 
-            responseMimeType: 'application/json' 
+            responseMimeType: 'application/json',
+            responseSchema: simulatorSchema.definitions?.simulator_output as any // Force compliance
         }
       });
       
@@ -310,6 +314,12 @@ export const processGameTurn = async (
       finalStoryText = finalStoryText.replace(/\[ESTABLISHING_SHOT\]|\[SELF_PORTRAIT\]/g, '');
 
       const requestFromState = updatedState.narrative.illustration_request || (narratorStateUpdates as any)?.narrative?.illustration_request;
+      
+      // Nullify it immediately in the local object to prevent bleed-through in concurrent execution
+      updatedState.narrative.illustration_request = null;
+      if ((narratorStateUpdates as any)?.narrative) {
+          (narratorStateUpdates as any).narrative.illustration_request = null;
+      }
       
       if (requestFromState || hasVisualTag) {
           if (onStreamLogic) onStreamLogic("queuing visual artifact...\n", 'narrative');

@@ -221,6 +221,23 @@ export const GameStateSchema = z.object({
   suggested_actions: z.array(z.string()),
 });
 
+export const SimulatorOutputSchema = z.object({
+  _analysis: z.object({
+    intent: z.string(),
+    complexity: z.enum(["Simple", "Multi-part", "Abstract"]),
+    parsed_steps: z.array(z.string()),
+    success_probability: z.enum(["High", "Medium", "Low", "Impossible"])
+  }),
+  location_state: LocationStateSchema.partial().optional(),
+  villain_state: VillainStateSchema.partial().optional(),
+  meta: z.object({
+    turn: z.number()
+  }).optional(),
+  suggested_actions: z.array(z.string()).min(5).max(7),
+  narrative: z.any().optional(),
+  npc_states: z.any().optional(),
+});
+
 export const SimulatorResponseSchema = z.any();
 
 export const NarratorResponseSchema = z.object({

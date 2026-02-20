@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
@@ -23,9 +22,7 @@ interface ArchitectState {
   addFact: (fact: string) => void;
   recordInteraction: () => void;
   setUserName: (name: string) => void;
-  
-  // NEW: Direct Mood Control
-  setContextualMood: (vibe: ArchitectMood['current_vibe']) => void;
+  setContextualMood: (vibe: ArchitectMood['current_vibe']) => void; // New Action
 }
 
 export const useArchitectStore = create<ArchitectState>()(
@@ -59,13 +56,13 @@ export const useArchitectStore = create<ArchitectState>()(
         }
       })),
 
-      // REPLACED: No more random math. The AI chooses the mood.
+      // THE UPDATED MOOD SETTER (LLM Controlled)
       setContextualMood: (targetVibe) => {
         set((state) => {
             let newArousal = 0.5;
             let newValence = 0.5;
 
-            // Map vibes to approximate energy levels for the UI visualizer
+            // Map vibes to visual energy levels
             switch (targetVibe) {
                 case 'Glitchy': newArousal = 0.9; newValence = 0.5; break;
                 case 'Predatory': newArousal = 0.7; newValence = 0.1; break;
