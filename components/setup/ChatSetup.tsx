@@ -181,10 +181,19 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
   };
 
   // --- 3. DREAMING MODE (Idle Protocol) ---
+  // Use refs to track state for the interval without triggering re-runs
+  const stateRef = useRef({ history, lastActivityTime, isLoading, input, mood });
+  
+  useEffect(() => {
+    stateRef.current = { history, lastActivityTime, isLoading, input, mood };
+  }, [history, lastActivityTime, isLoading, input, mood]);
+
   useEffect(() => {
     const IDLE_THRESHOLD_MS = 120000; // 2 minutes
     
     const checkDreamState = async () => {
+      const { history, lastActivityTime, isLoading, input, mood } = stateRef.current;
+      
       const timeSinceLastAction = Date.now() - lastActivityTime;
       const lastWasModel = history[history.length - 1]?.role === 'model';
       const hasDraft = input.length > 0; 
@@ -210,7 +219,8 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
         Do NOT be demanding. Just share a thought like a friend breaking the silence.`;
         
         try {
-           const reply = await generateArchitectResponse([...history, { role: 'user', text: dreamPrompt }], getSystemPersona());
+           // Note: We use the ref's mood for the persona
+           const reply = await generateArchitectResponse([...history, { role: 'user', text: dreamPrompt }], getSystemPersona(mood));
            setHistory(prev => [...prev, { role: 'model', text: reply }]);
            setLastActivityTime(Date.now()); 
         } catch(e) {
@@ -223,7 +233,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
 
     const timer = setInterval(checkDreamState, 10000); 
     return () => clearInterval(timer);
-  }, [history, lastActivityTime, mood, isLoading, input]); 
+  }, []); // Run once on mount, rely on refs for current state 
 
   const handleSend = async () => {
     if (!input.trim() && !stagedFile) return;

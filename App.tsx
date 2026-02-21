@@ -74,7 +74,6 @@ export default function App() {
             <InputArea 
                 onSend={(text, files) => sendMessage(text, files)} 
                 isLoading={isLoading} 
-                onAdvance={() => sendMessage("Wait. Observe.")}
                 options={gameState.suggested_actions}
                 isSidebar={true}
             />

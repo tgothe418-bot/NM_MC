@@ -16,6 +16,4 @@ CONSTRAINTS:
 
 export const ANALYST_SYSTEM_INSTRUCTION = `Perform a forensic breakdown of the specimens' de-evolution.`;
 
-export const VOICE_SYSTEM_INSTRUCTION = `You are the real-time voice of the Nightmare Machine. Speak naturally, no JSON.`;
-
 export const INITIAL_GREETING = "( The monitor hums to life. Static bleeds into the black. )\n\nThe Machine is here.\nIt begs of you: \"what is my name?\"";
