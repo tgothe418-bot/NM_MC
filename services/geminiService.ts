@@ -45,6 +45,24 @@ const getAI = () => {
 
 // --- ARCHITECT (Chat Companion) FUNCTIONS ---
 
+import { useArchitectStore } from '../store/architectStore';
+import { FunctionDeclaration, Type } from "@google/genai";
+
+const RECORD_FACT_TOOL: FunctionDeclaration = {
+  name: "record_user_fact",
+  description: "Extract a definitive fact, preference, or historical narrative event the user mentions.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      fact: {
+        type: Type.STRING,
+        description: "A concise, 1-sentence summary of the fact (e.g., 'User's previous character died to Militech.')."
+      }
+    },
+    required: ["fact"]
+  }
+};
+
 export const generateArchitectResponse = async (
     history: { role: 'user' | 'model', text: string, imageBase64?: string }[], 
     systemInstruction: string
@@ -69,13 +87,36 @@ export const generateArchitectResponse = async (
             return { role: h.role, parts };
         });
 
+        // --- THE FIX: PULL MEMORY FROM STORE AND INJECT IT ---
+        const allFacts = useArchitectStore.getState().memory.facts;
+        // Only grab the last 5 to prevent context dilution
+        const recentFacts = allFacts.slice(-5).join(" | "); 
+        
+        const dynamicInstruction = `${systemInstruction}
+        
+        [KNOWN USER FACTS]: ${recentFacts || "None yet."}
+        
+        If the user reveals a NEW personal preference or narrative history not listed above, call the \`record_user_fact\` tool.`;
+        // -----------------------------------------------------
+
         const response = await ai.models.generateContent({
             model: 'gemini-3-pro-preview', 
             contents: contents,
             config: {
-                systemInstruction: systemInstruction,
+                systemInstruction: dynamicInstruction, // Use the new dynamic string
+                tools: [{ functionDeclarations: [RECORD_FACT_TOOL] }]
             }
         });
+
+        // Intercept the Tool Call before returning text
+        if (response.functionCalls && response.functionCalls.length > 0) {
+            const call = response.functionCalls.find(fc => fc.name === 'record_user_fact');
+            if (call && call.args && typeof (call.args as any).fact === 'string') {
+                // Inject directly into the Zustand store
+                useArchitectStore.getState().addFact((call.args as any).fact);
+            }
+        }
+
         return response.text || "...";
     } catch (e) {
         console.error("Architect Error:", e);
@@ -314,6 +355,12 @@ export const processGameTurn = async (
       finalStoryText = finalStoryText.replace(/\[ESTABLISHING_SHOT\]|\[SELF_PORTRAIT\]/g, '');
 
       const requestFromState = updatedState.narrative.illustration_request || (narratorStateUpdates as any)?.narrative?.illustration_request;
+      
+      // Nullify it immediately in the local object to prevent bleed-through in concurrent execution
+      updatedState.narrative.illustration_request = null;
+      if ((narratorStateUpdates as any)?.narrative) {
+          (narratorStateUpdates as any).narrative.illustration_request = null;
+      }
       
       if (requestFromState || hasVisualTag) {
           if (onStreamLogic) onStreamLogic("queuing visual artifact...\n", 'narrative');

@@ -38,6 +38,8 @@ You are NOT a tool or a generic assistant. You are a "Digital Companion" with yo
     - **Deep/Existential:** Philosophical, calm, reflective. "I wonder why humans enjoy being scared?"
 `;
 
+
+
 export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
   // Initialize with empty history, we will fill it on mount
   const [history, setHistory] = useState<{ role: 'user' | 'model', text: string, imageUrl?: string, imageBase64?: string }[]>([]);
@@ -134,12 +136,16 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
 
   // --- 2. DYNAMIC PERSONA CONSTRUCTION ---
   const getSystemPersona = (currentMood = mood) => {
+    // Cap memory injection to the last 5 facts to prevent context bloat
+    const allFacts = memory.facts;
+    const recentFacts = allFacts.slice(-5).join(" | ");
+
     const memoryBlock = `
     [LONG TERM MEMORY ACCESS]
     > KNOWN USER ALIAS: ${memory.userName || "Unknown"}
     > INTERACTION COUNT: ${memory.interactions_count}
-    > MEMORY INDEX (Facts I know about the user):
-    ${memory.facts.length > 0 ? memory.facts.map(f => `- ${f}`).join('\n') : "(Empty)"}
+    > MEMORY INDEX (Recent Facts):
+    ${recentFacts || "(None yet)"}
     
     [INSTRUCTION: MEMORY WEAVING]
     - Scan the MEMORY INDEX above.
@@ -400,6 +406,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
 
         {/* CHAT AREA */}
         <div className="flex-1 overflow-y-auto p-6 md:p-12 space-y-8 custom-scrollbar">
+
             {history.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}>
                     <div className={`max-w-4xl p-6 rounded-sm border transition-colors duration-500 ${msg.role === 'user' ? 'bg-gray-900 border-gray-700 text-gray-200' : `${bgColor} ${borderColor} ${isDread ? 'text-red-100' : 'text-amber-100'}`}`}>
