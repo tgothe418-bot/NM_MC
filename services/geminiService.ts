@@ -22,11 +22,10 @@ import {
   parseCharacterProfile, 
   parseHydratedCharacter
 } from '../parsers';
-import { SINGLE_PASS_ENGINE_INSTRUCTION } from '../prompts/instructions';
+import { SINGLE_PASS_ENGINE_INSTRUCTION, PLAYER_SYSTEM_INSTRUCTION } from '../prompts/instructions';
 import { constructVoiceManifesto } from './dialogueEngine';
 import { constructSensoryManifesto } from './sensoryEngine';
 import { constructLocationManifesto, constructRoomGenerationRules } from './locationEngine';
-import { PLAYER_SYSTEM_INSTRUCTION } from '../prompts/instructions';
 import { updateNpcMemories } from './memorySystem';
 
 // --- INITIALIZATION (Singleton Pattern) ---
