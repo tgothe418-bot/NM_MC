@@ -221,29 +221,23 @@ export const GameStateSchema = z.object({
   suggested_actions: z.array(z.string()),
 });
 
-export const SimulatorOutputSchema = z.object({
-  _analysis: z.object({
-    intent: z.string(),
-    complexity: z.enum(["Simple", "Multi-part", "Abstract"]),
-    parsed_steps: z.array(z.string()),
-    success_probability: z.enum(["High", "Medium", "Low", "Impossible"])
+export const GameTurnOutputSchema = z.object({
+  state_mutations: z.object({
+    location_state: LocationStateSchema.partial().optional(),
+    villain_state: VillainStateSchema.partial().optional(),
+    meta: z.object({
+      turn: z.number()
+    }).optional(),
+    npc_states: z.any().optional(),
+    suggested_actions: z.array(z.string()).min(5).max(7).optional(),
   }),
-  location_state: LocationStateSchema.partial().optional(),
-  villain_state: VillainStateSchema.partial().optional(),
-  meta: z.object({
-    turn: z.number()
-  }).optional(),
-  suggested_actions: z.array(z.string()).min(5).max(7),
-  narrative: z.any().optional(),
-  npc_states: z.any().optional(),
+  narrative_render: z.object({
+    story_text: z.string(),
+    illustration_request: z.string().nullable().optional(),
+  })
 });
 
 export const SimulatorResponseSchema = z.any();
-
-export const NarratorResponseSchema = z.object({
-  story_text: z.string(),
-  game_state: z.any().optional(),
-});
 
 export const ClusterResonanceSchema = z.object({
     cluster: z.string(),

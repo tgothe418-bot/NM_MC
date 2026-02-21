@@ -16,15 +16,13 @@ import {
   SimulatorOutputSchema
 } from '../schemas';
 import { 
-  parseSimulatorResponse, 
-  parseNarratorResponse, 
+  parseGameTurnOutput,
   parseSourceAnalysis, 
   parseScenarioConcepts, 
   parseCharacterProfile, 
   parseHydratedCharacter
 } from '../parsers';
-import { SIMULATOR_INSTRUCTION } from '../prompts/simulator';
-import { NARRATOR_INSTRUCTION } from '../prompts/narrator';
+import { SINGLE_PASS_ENGINE_INSTRUCTION } from '../prompts/instructions';
 import { constructVoiceManifesto } from './dialogueEngine';
 import { constructSensoryManifesto } from './sensoryEngine';
 import { constructLocationManifesto, constructRoomGenerationRules } from './locationEngine';
@@ -197,7 +195,7 @@ export const summarizeHistory = async (history: { role: 'user' | 'model', text: 
 
 // --- GAME LOOP ---
 
-// [OPTIMIZATION A] Parallel Pipeline Implementation
+// [OPTIMIZATION A] Parallel Pipeline Implementation -> NOW SINGLE PASS
 export const processGameTurn = async (
   currentState: GameState, 
   userAction: string, 
@@ -261,155 +259,95 @@ export const processGameTurn = async (
   ${roomRules}
   `;
 
-  // 2. SIMULATOR PHASE (Logic)
-  if (onStreamLogic) onStreamLogic("initializing logic engine...\n", 'logic');
-
-  let partialState: any = {};
-  
-  try {
-      const simulatorSchema = zodToJsonSchema(SimulatorOutputSchema, "simulator_output");
-
-      const simResponse = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview', // Updated per guidelines for basic logic/text tasks
-        contents: {
-            parts: [
-                { text: contextBlock },
-                { text: `USER ACTION: "${userAction}"` }
-            ]
-        },
-        // Inject summary into System Instruction for better retention
-        config: { 
-            systemInstruction: SIMULATOR_INSTRUCTION + `\n\n[LONG TERM MEMORY]: ${currentState.narrative.past_summary || "No prior history."}`, 
-            responseMimeType: 'application/json',
-            responseSchema: simulatorSchema.definitions?.simulator_output as any // Force compliance
-        }
-      });
-      
-      const simText = simResponse.text || "{}";
-      partialState = parseSimulatorResponse(simText);
-      
-      if (partialState._analysis && onStreamLogic) {
-         const { intent, complexity, success_probability } = partialState._analysis;
-         let log = `\n[INTENT RECOGNITION]\n> INTENT: ${intent}\n> COMPLEXITY: ${complexity}\n> PROBABILITY: ${success_probability}\n`; 
-         onStreamLogic(log, 'logic');
-         delete partialState._analysis;
-      }
-
-  } catch (e) {
-      console.error("Simulator Error:", e);
-      partialState = {};
-  }
-  
-  // MERGE STATE (Unchanged)
-  let newLocationState = { ...currentState.location_state };
-  if (partialState.location_state) {
-      newLocationState = { ...newLocationState, ...partialState.location_state };
-      if (partialState.location_state.room_map) {
-          // Robust Merge: Keep old map, apply new rooms/updates from simulator
-          newLocationState.room_map = { ...currentState.location_state.room_map, ...partialState.location_state.room_map };
-      }
-  }
-
-  const updatedState: GameState = {
-      ...currentState,
-      ...partialState,
-      meta: { ...currentState.meta, ...(partialState.meta || {}) },
-      villain_state: { ...currentState.villain_state, ...(partialState.villain_state || {}) },
-      narrative: { ...currentState.narrative, ...(partialState.narrative || {}) },
-      location_state: newLocationState, 
-  };
-
-  // 3. NARRATOR PHASE (Prose)
-  if (onStreamLogic) onStreamLogic("rendering narrative...\n", 'narrative');
+  // 2. SINGLE PASS GENERATION
+  if (onStreamLogic) onStreamLogic("processing neural turn...\n", 'logic');
 
   let finalStoryText = "*The vision blurs...*";
-  let narratorStateUpdates = {};
-  let imagePromise: Promise<string | undefined> | undefined; // Decoupled Promise
+  let stateMutations: any = {};
+  let imagePromise: Promise<string | undefined> | undefined;
 
   try {
-      const narratorResponse = await ai.models.generateContent({
+      const response = await ai.models.generateContent({
           model: 'gemini-3-pro-preview',
           contents: {
               parts: [
-                  // We also optimize the Narrator input by passing the updated state.
-                  { text: JSON.stringify(updatedState) },
-                  { text: `USER ACTION: "${userAction}"` },
-                  { text: `SIMULATOR OUTCOME: ${JSON.stringify(partialState)}` }
+                  { text: contextBlock },
+                  { text: `USER ACTION: "${userAction}"` }
               ]
           },
           config: { 
-              systemInstruction: NARRATOR_INSTRUCTION + `\n\n[LONG TERM MEMORY]: ${updatedState.narrative.past_summary || "No prior history."}`, 
+              systemInstruction: SINGLE_PASS_ENGINE_INSTRUCTION + `\n\n[LONG TERM MEMORY]: ${currentState.narrative.past_summary || "No prior history."}`, 
               responseMimeType: 'application/json' 
           }
       });
 
-      const narrText = narratorResponse.text || "{}";
-      const narrResult = parseNarratorResponse(narrText) as { story_text: string, game_state?: GameState };
+      const rawText = response.text || "{}";
+      const parsedOutput = parseGameTurnOutput(rawText);
       
-      finalStoryText = narrResult.story_text;
-      narratorStateUpdates = narrResult.game_state || {};
+      // Extract components
+      stateMutations = parsedOutput.state_mutations || {};
+      finalStoryText = parsedOutput.narrative_render.story_text || "...";
       
-      // 4. IMAGE GENERATION (NON-BLOCKING)
+      // 3. IMAGE GENERATION (NON-BLOCKING)
       let hasVisualTag = finalStoryText.includes('[ESTABLISHING_SHOT]') || finalStoryText.includes('[SELF_PORTRAIT]');
       // Clean tags from text
       finalStoryText = finalStoryText.replace(/\[ESTABLISHING_SHOT\]|\[SELF_PORTRAIT\]/g, '');
 
-      const requestFromState = updatedState.narrative.illustration_request || (narratorStateUpdates as any)?.narrative?.illustration_request;
+      const requestFromRender = parsedOutput.narrative_render.illustration_request;
       
-      // Nullify it immediately in the local object to prevent bleed-through in concurrent execution
-      updatedState.narrative.illustration_request = null;
-      if ((narratorStateUpdates as any)?.narrative) {
-          (narratorStateUpdates as any).narrative.illustration_request = null;
-      }
-      
-      if (requestFromState || hasVisualTag) {
+      if (requestFromRender || hasVisualTag) {
           if (onStreamLogic) onStreamLogic("queuing visual artifact...\n", 'narrative');
           
-          let prompt = typeof requestFromState === 'string' ? requestFromState : "Establishing Shot";
+          let prompt = typeof requestFromRender === 'string' ? requestFromRender : "Establishing Shot";
           // Trigger the promise but DO NOT await it here
           imagePromise = generateImage(
               prompt, 
-              updatedState.narrative.visual_motif,
-              updatedState.location_state.room_map[updatedState.location_state.current_room_id]?.description_cache,
+              currentState.narrative.visual_motif, // Use current state motif
+              currentState.location_state.room_map[currentState.location_state.current_room_id]?.description_cache,
               false 
           );
       }
 
   } catch (e) {
-      console.error("Narrator Error:", e);
+      console.error("Single Pass Engine Error:", e);
+      finalStoryText = "The machine screams in binary. (Engine Failure)";
+  }
+  
+  // MERGE STATE
+  let newLocationState = { ...currentState.location_state };
+  if (stateMutations.location_state) {
+      newLocationState = { ...newLocationState, ...stateMutations.location_state };
+      if (stateMutations.location_state.room_map) {
+          // Robust Merge: Keep old map, apply new rooms/updates from simulator
+          newLocationState.room_map = { ...currentState.location_state.room_map, ...stateMutations.location_state.room_map };
+      }
   }
 
-  // 5. MEMORY CONSOLIDATION (New Step)
+  const updatedState: GameState = {
+      ...currentState,
+      ...stateMutations,
+      meta: { ...currentState.meta, ...(stateMutations.meta || {}) },
+      villain_state: { ...currentState.villain_state, ...(stateMutations.villain_state || {}) },
+      // Narrative state is mostly handled by the text return, but we merge any structural updates
+      narrative: { 
+          ...currentState.narrative, 
+          illustration_request: null // Always clear the request after handling
+      },
+      location_state: newLocationState, 
+  };
+
+  // 4. MEMORY CONSOLIDATION
   // Create a temporary history object for the current turn to update memory immediately
   const turnHistory = [
       { role: 'user', text: userAction, timestamp: Date.now() },
       { role: 'model', text: finalStoryText, timestamp: Date.now() }
   ] as ChatMessage[];
 
-  // Combine simulator and narrator updates
-  const stateForMemory = {
-      ...updatedState,
-      ...narratorStateUpdates,
-      narrative: {
-          ...updatedState.narrative,
-          ...(narratorStateUpdates as any).narrative,
-      }
-  };
-
   // Run the memory update on the full state
-  const stateWithMemory = updateNpcMemories(stateForMemory, turnHistory);
-
-  // CLEAR THE REQUEST IN THE STATE SO IT DOESN'T LOOP
-  const finalState = {
-      ...stateWithMemory,
-      narrative: { 
-        ...stateWithMemory.narrative, 
-        illustration_request: null // Ensure we clear this
-      }
-  };
+  const stateWithMemory = updateNpcMemories(updatedState, turnHistory);
 
   return {
-      gameState: finalState,
+      gameState: stateWithMemory,
       storyText: finalStoryText,
       imagePromise // Return the promise to the UI
   };
