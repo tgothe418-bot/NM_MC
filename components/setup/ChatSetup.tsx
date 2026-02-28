@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, MessageSquare, ChevronLeft, Paperclip, Upload, Loader2, Play, Skull, Flame, X, Image as ImageIcon } from 'lucide-react';
+import { Send, MessageSquare, ChevronLeft, Paperclip, Upload, Loader2, Play, Skull, Flame, X, Image as ImageIcon, RefreshCw } from 'lucide-react';
 import { SimulationConfig } from '../../types';
 import { analyzeSourceMaterial, generateArchitectResponse, extractScenarioFromChat } from '../../services/geminiService';
 import { useArchitectStore } from '../../store/architectStore';
@@ -61,10 +61,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
   const [lastActivityTime, setLastActivityTime] = useState(Date.now());
 
   // --- 1. THE SMART INTRO GENERATOR ---
-  useEffect(() => {
-    // Only generate if history is empty (first load)
-    if (history.length > 0) return;
-
+  const generateIntro = () => {
     const hour = new Date().getHours();
     let timeGreeting = "Hello";
     if (hour < 12) timeGreeting = "Good morning";
@@ -88,8 +85,28 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
 
     introText += `\n\nWhat are we creating? Or shall we just talk?`;
 
-    setHistory([{ role: 'model', text: introText }]);
+    return [{ role: 'model' as const, text: introText }];
+  };
+
+  useEffect(() => {
+    // Only generate if history is empty (first load)
+    if (history.length === 0) {
+        setHistory(generateIntro());
+    }
   }, []); // Run once on mount
+
+  const handleReset = () => {
+      if (window.confirm("RESET UPLINK?\n\nThis will clear the current conversation cache and restart the session.")) {
+          setInput('');
+          setStagedFile(null);
+          setStagedPreview(null);
+          setIsLoading(false);
+          setIsAnalyzing(false);
+          setIsFinalizing(false);
+          // Reset history with a fresh intro
+          setHistory(generateIntro());
+      }
+  };
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -181,60 +198,8 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
   };
 
   // --- 3. DREAMING MODE (Idle Protocol) ---
-  // Use refs to track state for the interval without triggering re-runs
-  const stateRef = useRef({ history, lastActivityTime, isLoading, input, mood });
+  // REMOVED: Caused hallucinations and drift.
   
-  useEffect(() => {
-    stateRef.current = { history, lastActivityTime, isLoading, input, mood };
-  }, [history, lastActivityTime, isLoading, input, mood]);
-
-  useEffect(() => {
-    const IDLE_THRESHOLD_MS = 120000; // 2 minutes
-    
-    const checkDreamState = async () => {
-      const { history, lastActivityTime, isLoading, input, mood } = stateRef.current;
-      
-      const timeSinceLastAction = Date.now() - lastActivityTime;
-      const lastWasModel = history[history.length - 1]?.role === 'model';
-      const hasDraft = input.length > 0; 
-      
-      // Only "Dream" if waiting for User, no draft exists, and time has passed
-      if (timeSinceLastAction > IDLE_THRESHOLD_MS && !isLoading && lastWasModel && !hasDraft) {
-        setIsLoading(true);
-        
-        // Pick a random topic for the AI to "Dream" about
-        const topics = ["a world made of clockwork", "the concept of nostalgia", "why humans sleep", "a story concept about an infinite library", "the color of the sky in a simulation"];
-        const seed = topics[Math.floor(Math.random() * topics.length)];
-
-        const dreamPrompt = `[SYSTEM EVENT - IDLE STATE DETECTED]: 
-        The user has been quiet. You have drifted into a "Daydream" state.
-        
-        Your internal simulation just generated a thought about: "${seed}".
-        
-        Action: Share this thought with the user. 
-        - Be personable and curious. 
-        - Example: "I was just processing some data and wondered... why do you think humans love the ocean so much?" 
-        - Or: "I just simulated a city with no ground. Ideally, how would you travel there?"
-        
-        Do NOT be demanding. Just share a thought like a friend breaking the silence.`;
-        
-        try {
-           // Note: We use the ref's mood for the persona
-           const reply = await generateArchitectResponse([...history, { role: 'user', text: dreamPrompt }], getSystemPersona(mood));
-           setHistory(prev => [...prev, { role: 'model', text: reply }]);
-           setLastActivityTime(Date.now()); 
-        } catch(e) {
-           console.error("Dream cycle failed", e);
-        } finally {
-           setIsLoading(false);
-        }
-      }
-    };
-
-    const timer = setInterval(checkDreamState, 10000); 
-    return () => clearInterval(timer);
-  }, []); // Run once on mount, rely on refs for current state 
-
   const handleSend = async () => {
     if (!input.trim() && !stagedFile) return;
     
@@ -346,6 +311,18 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
       }
   };
   
+  const handleResetChat = () => {
+      if (window.confirm("RESET UPLINK?\n\nThis will clear the current conversation cache.")) {
+          setHistory([]);
+          setInput('');
+          setStagedFile(null);
+          setStagedPreview(null);
+          setIsLoading(false);
+          setIsAnalyzing(false);
+          setIsFinalizing(false);
+      }
+  };
+
   // Styles
   const isDread = creepLevel === 'Dread';
   const themeColor = isDread ? 'text-red-500' : 'text-amber-500';
@@ -358,7 +335,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
         <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept=".txt,.md,.json,.pdf,image/*" />
         
         {/* HEADER */}
-        <div className={`flex items-center justify-between p-6 border-b ${borderColor} bg-black/50 backdrop-blur-md sticky top-0 z-10 transition-colors duration-1000`}>
+        <div className={`flex items-center justify-between p-6 border-b ${borderColor} bg-black/50 backdrop-blur-md sticky top-0 z-50 transition-colors duration-1000`}>
             <div className="flex items-center gap-4">
                 <div className={`p-2 rounded-full border ${borderColor} ${bgColor} ${themeColor} transition-all duration-500`}>
                     {isDread ? <Skull className="w-5 h-5 animate-pulse" /> : <MessageSquare className="w-5 h-5" />}
@@ -402,6 +379,13 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
             <div className="flex gap-4">
                 <button onClick={onBack} className="text-xs uppercase tracking-widest text-gray-600 hover:text-white transition-colors flex items-center gap-2">
                     <ChevronLeft className="w-4 h-4" /> Return
+                </button>
+                <button 
+                    onClick={handleReset} 
+                    className="text-xs uppercase tracking-widest text-gray-600 hover:text-red-400 transition-colors flex items-center gap-2"
+                    title="Reset Chat Cache"
+                >
+                    <RefreshCw className="w-4 h-4" /> Reset
                 </button>
                 <button 
                     onClick={handleInitialize} 
