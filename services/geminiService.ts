@@ -25,7 +25,7 @@ import {
   parseCharacterProfile, 
   parseHydratedCharacter
 } from '../parsers';
-import { SINGLE_PASS_ENGINE_INSTRUCTION, PLAYER_SYSTEM_INSTRUCTION } from '../prompts/instructions';
+import { getSinglePassInstruction, PLAYER_SYSTEM_INSTRUCTION, NARRATIVE_EVALUATOR_INSTRUCTION } from '../prompts/instructions';
 import { constructVoiceManifesto } from './dialogueEngine';
 import { constructSensoryManifesto } from './sensoryEngine';
 import { constructLocationManifesto, constructRoomGenerationRules } from './locationEngine';
@@ -205,6 +205,42 @@ export const summarizeHistory = async (history: { role: 'user' | 'model', text: 
     }
 };
 
+export const evaluateNarrativeTransition = async (
+    history: ChatMessage[],
+    condition: string
+): Promise<{ conditionMet: boolean; reason: string }> => {
+    const ai = getAI();
+    const lastMessages = history.slice(-6); // Last 3 turns (user + model)
+    const transcript = lastMessages.map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n');
+    
+    const prompt = `CONDITION TO EVALUATE: "${condition}"
+    
+    RECENT TRANSCRIPT:
+    ${transcript}
+    
+    Does the transcript show that the condition has been met? Respond in JSON.`;
+
+    try {
+        const res = await withRetry(() => ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            config: { 
+                systemInstruction: NARRATIVE_EVALUATOR_INSTRUCTION,
+                responseMimeType: 'application/json' 
+            }
+        }));
+
+        const result = JSON.parse(res.text || "{}");
+        return {
+            conditionMet: !!result.conditionMet,
+            reason: result.reason || "No reason provided."
+        };
+    } catch (e) {
+        console.error("Narrative Evaluation Failed:", e);
+        return { conditionMet: false, reason: "Evaluator error." };
+    }
+};
+
 // --- GAME LOOP ---
 
 /**
@@ -273,7 +309,8 @@ export const processGameTurn = async (
           turn: currentState.meta.turn,
           mode: currentState.meta.mode,
           intensity: currentState.meta.intensity_level,
-          cluster: currentState.meta.active_cluster
+          cluster: currentState.meta.active_cluster,
+          narrative_phase: currentState.narrative_state?.currentPhase || 'Act1_Setup'
       }
   };
 
@@ -300,6 +337,8 @@ export const processGameTurn = async (
   let stateMutations: Partial<GameState> = {};
   let imagePromise: Promise<string | undefined> | undefined;
 
+  const jsonSchema = zodToJsonSchema(GameTurnOutputSchema as any, "turnOutput");
+
   try {
       const response = await withRetry(() => ai.models.generateContent({
           model: 'gemini-3-flash-preview',
@@ -311,8 +350,9 @@ export const processGameTurn = async (
               ]
           }],
           config: { 
-              systemInstruction: SINGLE_PASS_ENGINE_INSTRUCTION + `\n\n[LONG TERM MEMORY]: ${currentState.narrative.past_summary || "No prior history."}`, 
-              responseMimeType: 'application/json' 
+              systemInstruction: getSinglePassInstruction(currentState.narrative_state?.currentPhase) + `\n\n[LONG TERM MEMORY]: ${currentState.narrative.past_summary || "No prior history."}`, 
+              responseMimeType: 'application/json',
+              responseSchema: jsonSchema.definitions?.turnOutput as any
           }
       }));
 

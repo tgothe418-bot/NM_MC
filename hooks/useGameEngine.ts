@@ -1,11 +1,12 @@
 
 import { useState, useCallback, useEffect, useRef, useReducer } from 'react';
 import { get, set, del } from 'idb-keyval';
-import { GameState, ChatMessage, SimulationConfig, NpcState } from '../types';
+import { GameState, ChatMessage, SimulationConfig, NpcState, NarrativePhase } from '../types';
 import { getDefaultLocationState } from '../services/locationEngine';
 import { generateProceduralNpc } from '../services/npcGenerator';
-import { processGameTurn, generateAutoPlayerAction, initializeGemini, summarizeHistory } from '../services/geminiService';
+import { processGameTurn, generateAutoPlayerAction, initializeGemini, summarizeHistory, evaluateNarrativeTransition } from '../services/geminiService';
 import { useAutoPilot } from './useAutoPilot';
+import { useArchitectStore } from '../store/architectStore';
 
 export interface SaveSlot {
     id: string;
@@ -22,6 +23,7 @@ const DEFAULT_GAME_STATE: GameState = {
     npc_states: [],
     location_state: getDefaultLocationState(),
     narrative: { visual_motif: '', illustration_request: null, past_summary: '' },
+    narrative_state: { currentPhase: 'Act1_Setup', turnCountInPhase: 0, totalTurns: 0 },
     suggested_actions: []
 };
 
@@ -158,6 +160,11 @@ export const useGameEngine = () => {
                 illustration_request: "Establishing Shot",
                 past_summary: ""
             },
+            narrative_state: {
+                currentPhase: 'Act1_Setup',
+                turnCountInPhase: 0,
+                totalTurns: 0
+            },
             lore_context: config.lore_context,
             suggested_actions: []
         };
@@ -183,15 +190,77 @@ export const useGameEngine = () => {
         setNarrativeStream("");
         setStreamPhase('logic');
 
+        // --- NARRATIVE METRONOME (Step 1 & 3) ---
+        const { narrative: metronome, incrementTurnCount, advancePhase } = useArchitectStore.getState();
+        incrementTurnCount();
+        
+        // Semantic Trigger (Step 3 & 4)
+        // We evaluate every 3 turns to save on API calls
+        if (metronome.turnCount % 3 === 0 && metronome.currentPhase !== 'Resolution') {
+            let condition = "";
+            let nextPhase: NarrativePhase | null = null;
+
+            switch (metronome.currentPhase) {
+                case 'Act1_Setup':
+                    condition = "Has the user clearly committed to investigating the anomaly or been trapped by the nightmare? (The Inciting Incident is fully engaged; user cannot walk away).";
+                    nextPhase = 'Act2_RisingAction';
+                    break;
+                case 'Act2_RisingAction':
+                    condition = "Has the user faced significant escalating resistance and reached a 'Midpoint' or 'All-Is-Lost' moment where they must confront the primary antagonist or concept?";
+                    nextPhase = 'Act3_Climax';
+                    break;
+                case 'Act3_Climax':
+                    condition = "Has the user made a definitive choice or has the core tension been resolved?";
+                    nextPhase = 'Resolution';
+                    break;
+            }
+
+            if (nextPhase && condition) {
+                evaluateNarrativeTransition(history, condition).then(async (result) => {
+                    if (result.conditionMet) {
+                        console.log(`[NARRATIVE ARCHITECT]: Advancing to ${nextPhase}. Reason: ${result.reason}`);
+                        
+                        // --- EPISODIC COMPRESSION (Step 4) ---
+                        if (nextPhase === 'Act3_Climax') {
+                            console.log("[NARRATIVE ARCHITECT]: Executing Episodic Compression for Climax...");
+                            const summary = await summarizeHistory(history);
+                            if (summary) {
+                                // Update GameState with the new summary and purge history
+                                dispatch({ type: 'APPEND_SUMMARY', payload: summary });
+                                // Purge old messages from the active context array to free up tokens
+                                // We keep the last 2 messages for immediate continuity
+                                setHistory(prev => prev.slice(-2));
+                            }
+                        }
+
+                        advancePhase(nextPhase);
+                    }
+                }).catch(err => console.error("Narrative evaluation failed", err));
+            }
+        }
+
+        // Get updated metronome state (for CURRENT turn context)
+        const updatedMetronome = useArchitectStore.getState().narrative;
+
         if (!text.includes("BEGIN SIMULATION")) {
             setHistory(prev => [...prev, { role: 'user', text, timestamp: Date.now() }]);
         }
 
         const currentState = overrideState || gameState;
+        
+        // Inject narrative state into currentState for the engine
+        const stateWithNarrative = {
+            ...currentState,
+            narrative_state: {
+                currentPhase: updatedMetronome.currentPhase,
+                turnCountInPhase: updatedMetronome.turnCount, // Simplified for Step 1
+                totalTurns: updatedMetronome.turnCount
+            }
+        };
 
         try {
             // processGameTurn now returns { gameState, storyText, imagePromise }
-            const result = await processGameTurn(currentState, text, files, (chunk, phase) => {
+            const result = await processGameTurn(stateWithNarrative, text, files, (chunk, phase) => {
                 setStreamPhase(phase);
                 if (phase === 'logic') setLogicStream(prev => prev + chunk);
                 else setNarrativeStream(prev => prev + chunk);

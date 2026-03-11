@@ -93,6 +93,9 @@ const cleanAndParse = <T>(text: string, schema: z.ZodSchema<T>, fallback: T): T 
             cleanText = extracted;
         } 
         
+        // 3. Remove trailing commas (common LLM mistake)
+        cleanText = cleanText.replace(/,\s*([}\]])/g, '$1');
+        
         const json = JSON.parse(cleanText);
         const result = schema.safeParse(json);
 

@@ -23,7 +23,9 @@ import {
   TileTypeSchema,
   GridCellSchema,
   GridLayoutSchema,
-  LoreContextSchema
+  LoreContextSchema,
+  NarrativePhaseSchema,
+  NarrativeStateSchema
 } from './schemas';
 
 // Re-export Schema-Derived Types
@@ -47,6 +49,8 @@ export type SourceAnalysisResult = z.infer<typeof SourceAnalysisResultSchema>;
 export type ScenarioConcepts = z.infer<typeof ScenarioConceptsSchema>;
 export type CharacterProfile = z.infer<typeof CharacterProfileSchema>;
 export type LoreContext = z.infer<typeof LoreContextSchema>;
+export type NarrativePhase = z.infer<typeof NarrativePhaseSchema>;
+export type NarrativeState = z.infer<typeof NarrativeStateSchema>;
 
 // Spatial Types
 export type TileType = z.infer<typeof TileTypeSchema>;
@@ -66,7 +70,6 @@ export interface SimulationConfig {
   cluster: string;
   intensity: string;
   cycles: number;
-  debug_mode?: boolean;
   victim_count?: number; 
   visual_motif?: string; 
   location_description?: string; 
@@ -83,7 +86,6 @@ export interface SimulationConfig {
   pre_generated_npcs?: NpcState[];
   // Phase 1: Context Injection
   lore_context?: LoreContext;
-  debug_mode_enabled?: boolean;
 }
 
 export interface KnowledgeNode {

@@ -195,6 +195,14 @@ export const LoreContextSchema = z.object({
   tech_level_cap: z.string().optional(),
 });
 
+export const NarrativePhaseSchema = z.enum(['Act1_Setup', 'Act2_RisingAction', 'Act3_Climax', 'Resolution']);
+
+export const NarrativeStateSchema = z.object({
+  currentPhase: NarrativePhaseSchema,
+  turnCountInPhase: z.number(),
+  totalTurns: z.number(),
+});
+
 export const GameStateSchema = z.object({
   meta: z.object({
     turn: z.number(),
@@ -218,6 +226,7 @@ export const GameStateSchema = z.object({
     illustration_request: z.string().nullable(),
     past_summary: z.string().optional(),
   }),
+  narrative_state: NarrativeStateSchema.optional(),
   suggested_actions: z.array(z.string()),
 });
 
@@ -229,8 +238,8 @@ export const GameTurnOutputSchema = z.object({
       turn: z.number()
     }).optional(),
     npc_states: z.any().optional(),
-    suggested_actions: z.array(z.string()).min(5).max(7).optional(),
-  }),
+    suggested_actions: z.array(z.string()).optional(),
+  }).optional().default({}),
   narrative_render: z.object({
     story_text: z.string(),
     illustration_request: z.string().nullable().optional(),

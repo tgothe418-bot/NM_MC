@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { NarrativePhase } from '../types';
 
 interface ArchitectMemory {
   userName: string | null;
@@ -14,9 +15,15 @@ interface ArchitectMood {
   current_vibe: 'Helpful' | 'Glitchy' | 'Predatory' | 'Melancholy' | 'Analytical';
 }
 
+interface NarrativeMetronome {
+  currentPhase: NarrativePhase;
+  turnCount: number;
+}
+
 interface ArchitectState {
   memory: ArchitectMemory;
   mood: ArchitectMood;
+  narrative: NarrativeMetronome;
   
   // Actions
   addFact: (fact: string) => void;
@@ -24,6 +31,8 @@ interface ArchitectState {
   setUserName: (name: string) => void;
   setContextualMood: (vibe: ArchitectMood['current_vibe']) => void;
   resetMemory: () => void;
+  advancePhase: (newPhase: NarrativePhase) => void;
+  incrementTurnCount: () => void;
 }
 
 export const useArchitectStore = create<ArchitectState>()(
@@ -39,6 +48,10 @@ export const useArchitectStore = create<ArchitectState>()(
         valence: 0.8,
         arousal: 0.5,
         current_vibe: 'Helpful'
+      },
+      narrative: {
+        currentPhase: 'Act1_Setup',
+        turnCount: 0,
       },
 
       addFact: (fact) => set((state) => ({
@@ -68,7 +81,19 @@ export const useArchitectStore = create<ArchitectState>()(
           valence: 0.8,
           arousal: 0.5,
           current_vibe: 'Helpful'
+        },
+        narrative: {
+          currentPhase: 'Act1_Setup',
+          turnCount: 0,
         }
+      })),
+
+      advancePhase: (newPhase) => set((state) => ({
+        narrative: { ...state.narrative, currentPhase: newPhase }
+      })),
+
+      incrementTurnCount: () => set((state) => ({
+        narrative: { ...state.narrative, turnCount: state.narrative.turnCount + 1 }
       })),
 
       // THE UPDATED MOOD SETTER (LLM Controlled)
