@@ -268,9 +268,16 @@ export const SourceAnalysisResultSchema = z.object({
   characters: z.array(ParsedCharacterSchema).optional(),
   location: z.string().nullable().optional(),
   visual_motif: z.string().nullable().optional(),
-  theme_cluster: z.string().nullable().optional(),
+  // Force the cluster to match your actual system tags
+  theme_cluster: z.enum(['Flesh', 'System', 'Haunting', 'Survival', 'Self', 'Blasphemy', 'Desire', 'Unknown']).nullable().optional(),
   intensity: z.string().nullable().optional(),
   plot_hook: z.string().nullable().optional(),
+  
+  // --- NEW RPP FIELDS ---
+  rpp_transition_gate: z.string().nullable().optional(),
+  rpp_voice_manifesto: z.string().nullable().optional(),
+  // Strictly constrain vectors to your UI's supported types
+  rpp_primary_vectors: z.array(z.enum(['fear', 'isolation', 'guilt', 'paranoia'])).optional(),
 });
 
 export const ScenarioConceptsSchema = z.object({

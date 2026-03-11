@@ -12,14 +12,15 @@ interface SourceUploaderProps {
 }
 
 export const SourceUploader: React.FC<SourceUploaderProps> = ({ compact = false }) => {
-  const { 
+    const { 
     visualMotif, 
     setLocationDescription, 
     setVisualMotif, 
     setSelectedClusters, 
     setParsedCharacters,
     setIntensity,
-    setPlotHook
+    setPlotHook,
+    setTransitionGate
   } = useSetupStore();
   
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -74,9 +75,25 @@ export const SourceUploader: React.FC<SourceUploaderProps> = ({ compact = false 
             if (result.characters && result.characters.length > 0) {
                 setParsedCharacters(prev => [...prev, ...result.characters]);
             }
-            if (result.plot_hook) {
-                const hookStr = typeof result.plot_hook === 'string' ? result.plot_hook : JSON.stringify(result.plot_hook);
+            
+            if (result) {
+                let hookStr = result.plot_hook || "";
+                
+                // RPP: Inject Prose Calibration
+                if (result.rpp_voice_manifesto) {
+                    hookStr += `\n\n[VOICE MANIFESTO]: ${result.rpp_voice_manifesto}`;
+                }
+                // RPP: Inject Vector Mapping
+                if (result.rpp_primary_vectors && result.rpp_primary_vectors.length > 0) {
+                    hookStr += `\n\n[PSYCHOLOGICAL VECTORS]: Focus narrative friction specifically on the user's ${result.rpp_primary_vectors.join(' and ')}.`;
+                }
+                
                 setPlotHook(prev => prev ? `${prev}\n\n[SOURCE LORE]: ${hookStr}` : `[SOURCE LORE]: ${hookStr}`);
+                
+                // RPP: Save the Act 1 Transition Gate
+                if (result.rpp_transition_gate) {
+                    setTransitionGate(result.rpp_transition_gate);
+                }
             }
 
             // Add a more significant delay between files to respect rate limits

@@ -140,9 +140,12 @@ export const parseSourceAnalysis = (text: string): SourceAnalysisResult => {
         characters: [],
         location: "", // Changed from "Unknown" to prevent UI pollution
         visual_motif: "",
-        theme_cluster: "",
+        theme_cluster: "Unknown",
         intensity: "",
-        plot_hook: ""
+        plot_hook: "",
+        rpp_transition_gate: "",
+        rpp_voice_manifesto: "",
+        rpp_primary_vectors: []
     };
     return cleanAndParse(text, SourceAnalysisResultSchema, fallback);
 };

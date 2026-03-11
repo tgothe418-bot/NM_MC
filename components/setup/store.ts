@@ -24,6 +24,7 @@ export const useSetupStore = create<SetupState & SetupActions>((set) => ({
 
   parsedCharacters: [],
   plotHook: '',
+  transitionGate: '',
 
   setPerspective: (v) => set({ perspective: v }),
   setMode: (v) => set({ mode: v }),
@@ -56,4 +57,5 @@ export const useSetupStore = create<SetupState & SetupActions>((set) => ({
   setPlotHook: (v) => set((state) => ({ 
     plotHook: typeof v === 'function' ? v(state.plotHook) : v 
   })),
+  setTransitionGate: (v) => set({ transitionGate: v }),
 }));

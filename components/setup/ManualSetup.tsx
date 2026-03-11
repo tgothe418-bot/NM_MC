@@ -61,6 +61,7 @@ export const ManualSetup: React.FC<Props> = ({ onComplete, onBack }) => {
               survivor_traits: store.survivorTraits,
               parsed_characters: store.parsedCharacters,
               plot_hook: store.plotHook,
+              transition_gate: store.transitionGate,
           });
       }, 2000);
   };

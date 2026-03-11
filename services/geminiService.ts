@@ -334,7 +334,7 @@ export const processGameTurn = async (
 
   let finalStoryText = "*The vision blurs...*";
   // Directive 3: Remove 'any' typing and initialize with empty partial state
-  let stateMutations: Partial<GameState> = {};
+  let stateMutations: any = {};
   let imagePromise: Promise<string | undefined> | undefined;
 
   const jsonSchema = zodToJsonSchema(GameTurnOutputSchema as any, "turnOutput");
@@ -570,36 +570,17 @@ export const analyzeSourceMaterial = async (
 
       if (onProgress) onProgress("Encoding neural stream for ingestion...", 45);
 
-      const prompt = `Analyze this source material for a horror simulation setup.
-      
-      CRITICAL INSTRUCTION: Extract ALL characters, including:
-      1. The Protagonists/Survivors.
-      2. The ANTAGONIST (Villain, Monster, AI, Mastercomputer). Even if it is a machine or abstract entity (like AM), it MUST be listed as a character with the role 'Antagonist' or 'Villain'.
-      
-      ALSO EXTRACT:
-      - Aesthetics (Visual Motif)
-      - Intensity Level (1-5)
-      - Core Themes
-      - Plot Elements (Hooks)
+      const prompt = `You are the Reference Processing Protocol (RPP) for The Nightmare Machine. 
+Analyze the following source material and extract its narrative architecture into strictly formatted JSON.
 
-      Return a valid JSON object matching this structure exactly:
-      {
-        "characters": [
-          { 
-            "name": "Name", 
-            "role": "Archetype/Job (e.g. 'Survivor', 'Antagonist', 'AI')", 
-            "description": "Detailed bio. For Antagonists, describe their form and origin.", 
-            "traits": "Personality traits.",
-            "goal": "Primary objective (e.g. 'Torture forever', 'Escape'). Essential for Antagonists.",
-            "methodology": "Methods of torment/attack. Essential for Antagonists."
-          }
-        ],
-        "location": "Detailed description of the setting/environment found in the source",
-        "visual_motif": "Cinematic visual style description (e.g. Grainy 16mm, Digital Glitch)",
-        "theme_cluster": "One of: Flesh, System, Haunting, Self, Blasphemy, Survival, Desire",
-        "intensity": "Level 1 to 5",
-        "plot_hook": "The immediate situation, conflict, or inciting incident present in the source."
-      }`;
+EXECUTE THE FOLLOWING EXTRACTION FILTERS:
+1. characters: Extract the main characters (name, role, description, physical/psychological traits).
+2. location: The primary setting.
+3. theme_cluster: Categorize strictly as one of: Flesh, System, Haunting, Survival, Self, Blasphemy, Desire.
+4. plot_hook: The core premise or starting anomaly.
+5. rpp_transition_gate: Identify the 'Point of No Return'. Formulate a strict boolean question that determines if Act 1 is over (e.g., "Has the user inhaled the gas?" or "Did they enter the basement?").
+6. rpp_voice_manifesto: Define the author's prose style, pacing, and how the syntax should degrade as the climax approaches.
+7. rpp_primary_vectors: Identify which psychological stats this story targets. Return an array containing any of: "fear", "isolation", "guilt", "paranoia".`;
 
       parts.push({ text: prompt });
 

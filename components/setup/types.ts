@@ -46,6 +46,7 @@ export interface SetupState {
   // Parsed Data
   parsedCharacters: ParsedCharacter[];
   plotHook: string;
+  transitionGate: string;
 }
 
 export interface SetupActions {
@@ -67,4 +68,5 @@ export interface SetupActions {
   setSurvivorTraits: (v: string) => void;
   setParsedCharacters: (v: ParsedCharacter[] | ((prev: ParsedCharacter[]) => ParsedCharacter[])) => void;
   setPlotHook: (v: string | ((prev: string) => string)) => void;
+  setTransitionGate: (v: string) => void;
 }

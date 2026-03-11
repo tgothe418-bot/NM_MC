@@ -29,7 +29,33 @@ import {
 } from './schemas';
 
 // Re-export Schema-Derived Types
-export type GameState = z.infer<typeof GameStateSchema>;
+export interface GameState {
+  meta: {
+    turn: number;
+    perspective: string;
+    mode: 'Survivor' | 'Villain';
+    intensity_level: string;
+    active_cluster: string;
+    player_profile?: {
+        name: string;
+        background: string;
+        traits: string | string[];
+        fracture_state?: number;
+    };
+  };
+  lore_context?: LoreContext;
+  villain_state: VillainState;
+  npc_states: NpcState[];
+  location_state: LocationState;
+  narrative: {
+    visual_motif: string;
+    illustration_request: string | null;
+    past_summary: string;
+    transition_gate?: string;
+  };
+  narrative_state?: NarrativeState;
+  suggested_actions: string[];
+}
 export type NpcState = z.infer<typeof NpcStateSchema>;
 export type VillainState = z.infer<typeof VillainStateSchema>;
 export type LocationState = z.infer<typeof LocationStateSchema>;
@@ -87,6 +113,7 @@ export interface SimulationConfig {
   pre_generated_npcs?: NpcState[];
   parsed_characters?: ParsedCharacter[];
   plot_hook?: string;
+  transition_gate?: string;
   // Phase 1: Context Injection
   lore_context?: LoreContext;
 }

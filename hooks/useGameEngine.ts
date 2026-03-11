@@ -190,7 +190,8 @@ export const useGameEngine = () => {
                 visual_motif: config.visual_motif || "Standard Cinematic",
                 illustration_request: "Establishing Shot",
                 // CRITICAL: Inject the Source Material Plot Hook directly into the narrative engine's memory
-                past_summary: config.plot_hook ? `[CORE DIRECTIVE / LORE]:\n${config.plot_hook}\n\n` : ""
+                past_summary: config.plot_hook ? `[CORE DIRECTIVE / LORE]:\n${config.plot_hook}\n\n` : "",
+                transition_gate: config.transition_gate
             },
             narrative_state: {
                 currentPhase: 'Act1_Setup',
@@ -233,7 +234,8 @@ export const useGameEngine = () => {
 
             switch (metronome.currentPhase) {
                 case 'Act1_Setup':
-                    condition = "Has the user clearly committed to investigating the anomaly or been trapped by the nightmare? (The Inciting Incident is fully engaged; user cannot walk away).";
+                    // RPP: Use the custom transition gate if available, otherwise fallback to the default
+                    condition = gameState.narrative.transition_gate || "Has the user clearly committed to investigating the anomaly or been trapped by the nightmare? (The Inciting Incident is fully engaged; user cannot walk away).";
                     nextPhase = 'Act2_RisingAction';
                     break;
                 case 'Act2_RisingAction':
