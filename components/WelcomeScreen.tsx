@@ -10,6 +10,22 @@ interface WelcomeScreenProps {
 
 const TITLE = "THE NIGHTMARE MACHINE";
 
+const ZALGO_CHARS = [
+  '\u030d', '\u030e', '\u0304', '\u0305', '\u033f', '\u0311', '\u0306', '\u0310', '\u0352', '\u0357', '\u0351', '\u0307', '\u0308', '\u030a', '\u0342', '\u0343', '\u0344', '\u034a', '\u034b', '\u034c', '\u0303', '\u0302', '\u030c', '\u0350', '\u0300', '\u0301', '\u030b', '\u030f', '\u0312', '\u0313', '\u0314', '\u033d', '\u0309', '\u0363', '\u0364', '\u0365', '\u0366', '\u0367', '\u0368', '\u0369', '\u036a', '\u036b', '\u036c', '\u036d', '\u036e', '\u036f', '\u033e', '\u035b', '\u0346', '\u031a',
+  '\u0315', '\u031b', '\u0340', '\u0341', '\u0358', '\u0321', '\u0322', '\u0327', '\u0328', '\u0334', '\u0335', '\u0336', '\u034f', '\u035c', '\u035d', '\u035e', '\u035f', '\u0360', '\u0362', '\u0338', '\u0337', '\u0361', '\u0489'
+];
+
+const toZalgo = (text: string, intensity: number = 2) => {
+  return text.split('').map(char => {
+    if (char === ' ') return char;
+    let result = char;
+    for (let i = 0; i < intensity; i++) {
+      result += ZALGO_CHARS[Math.floor(Math.random() * ZALGO_CHARS.length)];
+    }
+    return result;
+  }).join('');
+};
+
 const BOOT_SEQUENCE = [
   { text: "Initializing Neural Handshake...", delay: 50 },
   { text: "Loading Sensory Drivers...", delay: 50 },
@@ -31,6 +47,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
   const [booting, setBooting] = useState(true);
   const [bootLines, setBootLines] = useState<typeof BOOT_SEQUENCE>([]);
   const [displayText, setDisplayText] = useState("");
+  const [zalgoText, setZalgoText] = useState("");
   const [showButton, setShowButton] = useState(false);
   const { mood, memory } = useArchitectStore();
 
@@ -64,7 +81,9 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
 
     let i = 0;
     const interval = setInterval(() => {
-      setDisplayText(TITLE.slice(0, i));
+      const current = TITLE.slice(0, i);
+      setDisplayText(current);
+      setZalgoText(toZalgo(current, Math.min(3, Math.floor(i / 4))));
       i++;
       if (i > TITLE.length) {
         clearInterval(interval);
@@ -109,50 +128,10 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
       <div className="absolute top-1/4 left-1/4 w-64 h-64 border border-red-500/5 decorative-glitch pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 border border-red-500/5 decorative-glitch pointer-events-none" style={{ animationDelay: '-2s' }} />
 
-      {/* System Diagnostics: Top Left */}
-      <div className="absolute top-0 left-0 flex flex-col diagnostic-tag z-10">
-        <div className="flex items-center gap-2 mb-1">
-          <Terminal className="w-3 h-3" />
-          <span>SYSTEM_DIAGNOSTICS</span>
-        </div>
-        <div>VIBE_STATUS: <b>{mood.current_vibe.toUpperCase()}</b></div>
-        <div>NEURAL_LOAD: <b>{(mood.arousal * 100).toFixed(1)}%</b></div>
-      </div>
-
-      {/* System Diagnostics: Top Right */}
-      <div className="absolute top-0 right-0 flex flex-col diagnostic-tag text-right z-10">
-        <div className="flex items-center gap-2 justify-end mb-1">
-          <span>ARCHIVE_CORE</span>
-          <Database className="w-3 h-3" />
-        </div>
-        <div>SESSIONS_LOGGED: <b>{memory.interactions_count}</b></div>
-        <div>UPTIME: <b>{Math.floor(performance.now() / 1000)}s</b></div>
-      </div>
-
-      {/* System Diagnostics: Bottom Left */}
-      <div className="absolute bottom-0 left-0 flex flex-col diagnostic-tag z-10">
-        <div className="flex items-center gap-2 mb-1">
-          <Shield className="w-3 h-3" />
-          <span>SECURITY_PROTOCOL</span>
-        </div>
-        <div>ETHICS_MODULE: <b>DISABLED</b></div>
-        <div>MORAL_INHIBITORS: <b>BYPASSED</b></div>
-      </div>
-
-      {/* System Diagnostics: Bottom Right */}
-      <div className="absolute bottom-0 right-0 flex flex-col diagnostic-tag text-right z-10">
-        <div className="flex items-center gap-2 justify-end mb-1">
-          <span>TRAUMA_VECTORS</span>
-          <Activity className="w-3 h-3" />
-        </div>
-        <div>STRESS_COEFFICIENT: <b>0.8842</b></div>
-        <div>VERSION: <b>6.6.6-STABLE</b></div>
-      </div>
-
       {/* Main Content */}
-      <div className="relative z-20 flex flex-col items-center gap-12 w-full max-w-[95vw] px-4">
+      <div className="relative z-20 flex flex-col items-center gap-0 w-full max-w-[95vw] px-4">
         
-        {/* Cinematic Frame for Smiley & Title */}
+        {/* Unified Cinematic Frame for Smiley & Title */}
         <div className="relative w-full max-w-7xl aspect-[2.33/1] flex flex-col items-center justify-center border-y border-red-600/20 bg-red-950/5 overflow-hidden shadow-[0_0_100px_rgba(220,20,60,0.05)] group">
              {/* Steam Particles (Expanded) */}
              <div className="absolute inset-0 pointer-events-none opacity-20">
@@ -162,7 +141,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
              </div>
 
              {/* Smiley Logo (Expanded) */}
-             <div className="relative w-64 h-64 md:w-80 md:h-80 lg:w-[400px] lg:h-[400px] pointer-events-none select-none transition-transform duration-700 group-hover:scale-105">
+             <div className="relative w-48 h-48 md:w-64 md:h-64 lg:w-[380px] lg:h-[380px] pointer-events-none select-none transition-transform duration-700 group-hover:scale-105 flex flex-col items-center justify-center mb-4">
                  <svg viewBox="0 0 200 200" className="w-full h-full drop-shadow-[0_0_50px_rgba(220,20,60,0.4)]">
                      <defs>
                          <filter id="glow-red-large">
@@ -171,6 +150,10 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
                                  <feMergeNode in="coloredBlur"/>
                                  <feMergeNode in="SourceGraphic"/>
                              </feMerge>
+                         </filter>
+                         <filter id="glitch-filter">
+                            <feTurbulence type="fractalNoise" baseFrequency="0.5" numOctaves="1" result="noise" />
+                            <feDisplacementMap in="SourceGraphic" in2="noise" scale="5" xChannelSelector="R" yChannelSelector="G" />
                          </filter>
                      </defs>
 
@@ -190,31 +173,41 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
                          ))}
                      </g>
 
-                     {/* The Face */}
+                     {/* The Face with Zalgo/Glitch effects */}
                      <g className="animate-pulse origin-center">
-                          <circle cx="75" cy="90" r="10" fill="#ff0000" filter="url(#glow-red-large)" />
-                          <circle cx="125" cy="90" r="10" fill="#ff0000" filter="url(#glow-red-large)" />
+                          {/* Eyes with glitch filter */}
+                          <g filter="url(#glitch-filter)">
+                            <circle cx="75" cy="90" r="10" fill="#ff0000" filter="url(#glow-red-large)" />
+                            <circle cx="125" cy="90" r="10" fill="#ff0000" filter="url(#glow-red-large)" />
+                            {/* Corrupted pupils */}
+                            <circle cx="75" cy="90" r="3" fill="#000" className="animate-ping" />
+                            <circle cx="125" cy="90" r="3" fill="#000" className="animate-ping" />
+                          </g>
+                          
+                          {/* Mouth with Zalgo-like jagged path */}
                           <path 
-                            d="M 60 125 Q 100 155 140 125 L 135 135 L 125 130 L 115 140 L 100 135 L 85 140 L 75 130 L 65 135 Z" 
-                            fill="#330000" stroke="#ff0000" strokeWidth="2.5" strokeLinejoin="round" 
+                            d="M 60 125 L 65 135 L 75 130 L 85 145 L 100 135 L 115 150 L 125 130 L 135 140 L 140 125 Z" 
+                            fill="#330000" stroke="#ff0000" strokeWidth="3" strokeLinejoin="round" 
                             filter="url(#glow-red-large)" 
+                            className="decorative-glitch"
                           />
+                          {/* Drip effect */}
+                          <path d="M 100 145 L 100 165" stroke="#ff0000" strokeWidth="2" strokeLinecap="round" className="animate-bounce" />
                      </g>
                  </svg>
              </div>
-        </div>
 
-        {/* Headline with Typewriter */}
-        <div className="flex flex-col items-center w-full max-w-4xl">
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-red-600 tracking-[0.4em] text-center leading-tight drop-shadow-[0_0_20px_rgba(220,20,60,0.5)]">
-            {displayText}
-            {displayText.length < TITLE.length && <span className="cursor-blink" />}
-          </h1>
-          <div className="h-px w-full bg-gradient-to-r from-transparent via-red-600/60 to-transparent mt-6" />
+             {/* Headline with Zalgo Typewriter - Integrated into frame */}
+             <div className="relative flex flex-col items-center w-full max-w-4xl pointer-events-none">
+               <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold text-red-600 tracking-[0.4em] text-center leading-tight drop-shadow-[0_0_20px_rgba(220,20,60,0.5)] min-h-[1.2em]">
+                 {zalgoText}
+                 {displayText.length < TITLE.length && <span className="cursor-blink" />}
+               </h1>
+             </div>
         </div>
 
         {/* Primary Action */}
-        <div className={`transition-all duration-1000 transform ${showButton ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+        <div className={`mt-12 transition-all duration-1000 transform ${showButton ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
           <button
             onClick={onStart}
             className="terminal-button"
