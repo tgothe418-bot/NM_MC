@@ -605,11 +605,14 @@ export const analyzeSourceMaterial = async (
 
       if (onProgress) onProgress("SYNTHESIZING_ARCHETYPES", 75);
 
+      const jsonSchema = zodToJsonSchema(SourceAnalysisResultSchema as any, "analysis");
+
       const res = await withRetry(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview', 
         contents: [{ role: 'user', parts: parts }],
         config: { 
-            responseMimeType: 'application/json'
+            responseMimeType: 'application/json',
+            responseSchema: jsonSchema.definitions?.analysis as any
         }
       }));
 

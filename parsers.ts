@@ -138,11 +138,11 @@ export const parseGameTurnOutput = (text: string) => {
 export const parseSourceAnalysis = (text: string): SourceAnalysisResult => {
     const fallback: SourceAnalysisResult = {
         characters: [],
-        location: "Unknown",
-        visual_motif: "Dark",
-        theme_cluster: "Survival",
-        intensity: "Level 1",
-        plot_hook: "Unknown"
+        location: "", // Changed from "Unknown" to prevent UI pollution
+        visual_motif: "",
+        theme_cluster: "",
+        intensity: "",
+        plot_hook: ""
     };
     return cleanAndParse(text, SourceAnalysisResultSchema, fallback);
 };

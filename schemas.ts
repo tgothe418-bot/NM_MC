@@ -258,17 +258,19 @@ export const ParsedCharacterSchema = z.object({
   role: z.string(),
   description: z.string(),
   traits: z.string(),
-  goal: z.string().optional(),
-  methodology: z.string().optional(),
+  // Make these explicitly nullable/optional to prevent total rejection
+  goal: z.string().nullable().optional(),
+  methodology: z.string().nullable().optional(),
 });
 
 export const SourceAnalysisResultSchema = z.object({
-  characters: z.array(ParsedCharacterSchema).default([]),
-  location: z.string().default(""),
-  visual_motif: z.string().default(""),
-  theme_cluster: z.string().default(""),
-  intensity: z.string().default(""),
-  plot_hook: z.string().default(""),
+  // Remove .default() and make them gracefully optional
+  characters: z.array(ParsedCharacterSchema).optional(),
+  location: z.string().nullable().optional(),
+  visual_motif: z.string().nullable().optional(),
+  theme_cluster: z.string().nullable().optional(),
+  intensity: z.string().nullable().optional(),
+  plot_hook: z.string().nullable().optional(),
 });
 
 export const ScenarioConceptsSchema = z.object({
