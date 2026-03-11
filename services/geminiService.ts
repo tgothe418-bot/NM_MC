@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Part, FunctionDeclaration, Type } from "@google/genai";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { 
   GameStateSchema, 
@@ -47,15 +47,23 @@ const getAI = () => {
  * Utility to wrap Gemini API calls with exponential backoff for rate limits (429).
  */
 const withRetry = async <T>(fn: () => Promise<T>, maxRetries = 3, initialDelay = 1000): Promise<T> => {
-    let lastError: any;
+    let lastError: unknown; // [FIX: Directive 3]
     for (let i = 0; i < maxRetries; i++) {
         try {
             return await fn();
-        } catch (error: any) {
+        } catch (error: unknown) { // [FIX: Directive 3]
             lastError = error;
-            const isRateLimit = error?.message?.includes('429') || 
-                               error?.status === 'RESOURCE_EXHAUSTED' ||
-                               error?.code === 429;
+            
+            // [FIX: Directive 3] Implement proper type narrowing
+            let isRateLimit = false;
+            if (error instanceof Error) {
+                isRateLimit = error.message.includes('429');
+            } else if (typeof error === 'object' && error !== null) {
+                const e = error as Record<string, unknown>;
+                isRateLimit = String(e.message || '').includes('429') || 
+                             e.status === 'RESOURCE_EXHAUSTED' ||
+                             e.code === 429;
+            }
             
             if (isRateLimit && i < maxRetries - 1) {
                 const delay = initialDelay * Math.pow(2, i);
@@ -72,7 +80,6 @@ const withRetry = async <T>(fn: () => Promise<T>, maxRetries = 3, initialDelay =
 // --- ARCHITECT (Chat Companion) FUNCTIONS ---
 
 import { useArchitectStore } from '../store/architectStore';
-import { FunctionDeclaration, Type } from "@google/genai";
 
 const RECORD_FACT_TOOL: FunctionDeclaration = {
   name: "record_user_fact",
@@ -97,7 +104,7 @@ export const generateArchitectResponse = async (
     try {
         // Map history to Gemini "Content" format, handling mixed media
         const contents = history.map(h => {
-            const parts: any[] = [{ text: h.text }];
+            const parts: Part[] = [{ text: h.text }]; // [FIX: Directive 2]
             
             // If this message has an image attached, add it to the payload
             if (h.imageBase64) {
@@ -386,7 +393,7 @@ export const processGameTurn = async (
   // ROBUST NPC MERGE: Prevent the LLM from accidentally deleting NPCs
   let mergedNpcs = [...currentState.npc_states];
   if (Array.isArray(stateMutations.npc_states)) {
-      stateMutations.npc_states.forEach((newNpc: any) => {
+      stateMutations.npc_states.forEach((newNpc: Partial<NpcState>) => { // [FIX: Directive 1]
           const index = mergedNpcs.findIndex(n => n.name === newNpc.name);
           if (index !== -1) {
               // Merge existing NPC with updates
@@ -401,7 +408,7 @@ export const processGameTurn = async (
               };
           } else {
               // New NPC introduced by the machine
-              mergedNpcs.push(newNpc);
+              mergedNpcs.push(newNpc as NpcState); // [FIX: Directive 1] Cast to NpcState for push
           }
       });
   }
@@ -527,7 +534,7 @@ export const analyzeSourceMaterial = async (file: File): Promise<SourceAnalysisR
                  mime.includes('markdown') ||
                  file.name.endsWith('.md');
 
-  let parts: any[] = [];
+  let parts: Part[] = []; // [FIX: Directive 2]
 
   try {
       if (isText) {
