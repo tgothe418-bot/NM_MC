@@ -502,7 +502,10 @@ const getMimeType = (file: File): string => {
     }
 }
 
-export const analyzeSourceMaterial = async (file: File): Promise<SourceAnalysisResult> => {
+export const analyzeSourceMaterial = async (
+  file: File,
+  onProgress?: (stage: string, percent: number) => void
+): Promise<SourceAnalysisResult> => {
   const ai = getAI();
   const mime = getMimeType(file);
   const isText = mime.startsWith('text/') || 
@@ -511,9 +514,11 @@ export const analyzeSourceMaterial = async (file: File): Promise<SourceAnalysisR
                  mime.includes('markdown') ||
                  file.name.endsWith('.md');
 
-  let parts: Part[] = []; // [FIX: Directive 2]
+  let parts: Part[] = [];
 
   try {
+      if (onProgress) onProgress("READING_LOCAL_BUFFER", 15);
+      
       if (isText) {
           const textContent = await fileToText(file);
           parts = [{ text: `[SOURCE MATERIAL: ${file.name}]\n${textContent}` }];
@@ -522,6 +527,8 @@ export const analyzeSourceMaterial = async (file: File): Promise<SourceAnalysisR
           const base64Content = base64Data.split(',')[1];
           parts = [{ inlineData: { mimeType: mime, data: base64Content } }];
       }
+
+      if (onProgress) onProgress("ENCODING_NEURAL_STREAM", 45);
 
       const prompt = `Analyze this source material for a horror simulation setup.
       
@@ -556,6 +563,8 @@ export const analyzeSourceMaterial = async (file: File): Promise<SourceAnalysisR
 
       parts.push({ text: prompt });
 
+      if (onProgress) onProgress("SYNTHESIZING_ARCHETYPES", 75);
+
       const res = await withRetry(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview', 
         contents: [{ role: 'user', parts: parts }],
@@ -563,6 +572,8 @@ export const analyzeSourceMaterial = async (file: File): Promise<SourceAnalysisR
             responseMimeType: 'application/json'
         }
       }));
+
+      if (onProgress) onProgress("INGESTION_COMPLETE", 100);
 
       return parseSourceAnalysis(res.text || "{}");
   } catch (e) {

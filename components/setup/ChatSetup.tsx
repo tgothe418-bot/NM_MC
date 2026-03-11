@@ -58,6 +58,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false); 
+  const [analysisProgress, setAnalysisProgress] = useState<{ stage: string, percent: number } | null>(null);
   const [creepLevel, setCreepLevel] = useState<'Campfire' | 'Dread'>('Campfire');
   
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -288,8 +289,13 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
   // Legacy flow for huge documents (PDFs/Txt) that need specialized parsing
   const handleAnalysisUpload = async (file: File) => {
       setIsAnalyzing(true);
+      setAnalysisProgress({ stage: "INITIALIZING_UPLINK", percent: 5 });
+      
       try {
-          const analysis = await analyzeSourceMaterial(file);
+          const analysis = await analyzeSourceMaterial(file, (stage, percent) => {
+              setAnalysisProgress({ stage, percent });
+          });
+          
           const contextMsg = `[SYSTEM - REFERENCE MATERIAL UPLOADED]\nFILENAME: ${file.name}\n\nANALYSIS DATA:\n${JSON.stringify(analysis, null, 2)}\n\nINSTRUCTION: The user provided this training data. Absorb it.`;
           
           const newHistory = [...history, { role: 'user' as const, text: contextMsg }];
@@ -303,6 +309,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
           setHistory(prev => [...prev, { role: 'model', text: "Failed to parse that document." }]);
       } finally {
           setIsAnalyzing(false);
+          setAnalysisProgress(null);
           setIsLoading(false);
           if (fileInputRef.current) fileInputRef.current.value = '';
       }
@@ -448,10 +455,39 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
             ))}
             
             {isAnalyzing && (
-                <div className="flex justify-end animate-pulse">
-                    <div className="bg-gray-900 border border-gray-700 p-4 rounded-sm flex items-center gap-3">
-                        <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-                        <span className="text-xs uppercase tracking-widest text-gray-500">Reading your file...</span>
+                <div className="flex justify-end animate-fadeIn">
+                    <div className="bg-gray-900 border border-red-900/50 p-6 rounded-sm w-full max-w-md shadow-[0_0_30px_rgba(220,38,38,0.1)]">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                                <Loader2 className="w-4 h-4 animate-spin text-red-500" />
+                                <span className="text-xs uppercase tracking-[0.2em] text-red-500 font-bold">Neural Ingestion</span>
+                            </div>
+                            <span className="text-[10px] font-mono text-red-900/60">{analysisProgress?.percent || 0}%</span>
+                        </div>
+                        
+                        <div className="space-y-3">
+                            <div className="w-full h-1 bg-red-950 rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full bg-red-600 transition-all duration-500 shadow-[0_0_10px_rgba(220,38,38,0.5)]"
+                                    style={{ width: `${analysisProgress?.percent || 0}%` }}
+                                />
+                            </div>
+                            
+                            <div className="flex justify-between items-end">
+                                <div className="flex flex-col">
+                                    <span className="text-[9px] text-gray-600 uppercase tracking-widest font-bold mb-1">Current Protocol</span>
+                                    <span className="text-[11px] font-mono text-red-100 animate-pulse">
+                                        {analysisProgress?.stage || "WAITING..."}
+                                    </span>
+                                </div>
+                                <div className="text-right">
+                                    <span className="text-[9px] text-gray-600 uppercase tracking-widest font-bold mb-1 block">Target Buffer</span>
+                                    <span className="text-[10px] font-mono text-gray-400 truncate max-w-[150px] block">
+                                        {stagedFile?.name || "STREAM_DATA"}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
