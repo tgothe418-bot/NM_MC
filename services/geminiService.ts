@@ -133,7 +133,7 @@ export const generateArchitectResponse = async (
         // -----------------------------------------------------
 
         const response = await withRetry(() => ai.models.generateContent({
-            model: 'gemini-3.1-pro-preview', 
+            model: 'gemini-3-flash-preview', 
             contents: contents,
             config: {
                 systemInstruction: dynamicInstruction, // Use the new dynamic string
@@ -174,7 +174,7 @@ export const extractScenarioFromChat = async (history: { role: 'user' | 'model',
 
     try {
         const res = await withRetry(() => ai.models.generateContent({
-            model: 'gemini-3.1-pro-preview', 
+            model: 'gemini-3-flash-preview', 
             contents: [{ role: 'user', parts: [{ text: extractionPrompt }] }],
             config: { responseMimeType: 'application/json' }
         }));
@@ -451,7 +451,7 @@ export const generateAutoPlayerAction = async (state: GameState): Promise<string
     try {
         const prompt = `Current Situation: ${state.narrative.illustration_request || "Survival situation"}\nLast Narrative: (Implicit)\nGenerate a single sentence action for the player.`;
         const res = await withRetry(() => ai.models.generateContent({
-            model: 'gemini-3.1-pro-preview',
+            model: 'gemini-3-flash-preview',
             contents: [{ role: 'user', parts: [{ text: JSON.stringify(state) }, { text: prompt }] }],
             config: { systemInstruction: PLAYER_SYSTEM_INSTRUCTION }
         }));
@@ -609,7 +609,7 @@ export const generateCalibrationField = async (
     if (refinementInput) prompt += `\nRefine this existing value: "${refinementInput}"`;
     
     const res = await withRetry(() => ai.models.generateContent({
-        model: 'gemini-3.1-pro-preview', // Upgraded to Pro
+        model: 'gemini-3-flash-preview', // Downgraded to Flash
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
     }));
     return res.text?.trim() || "";
@@ -619,7 +619,7 @@ export const hydrateUserCharacter = async (description: string, cluster: string)
     const ai = getAI();
     const prompt = `Hydrate this character description into a partial JSON state. Cluster: ${cluster}. Input: "${description}"`;
     const res = await withRetry(() => ai.models.generateContent({
-        model: 'gemini-3.1-pro-preview', // Upgraded to Pro
+        model: 'gemini-3-flash-preview', // Downgraded to Flash
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         config: { responseMimeType: 'application/json' }
     }));
@@ -647,7 +647,7 @@ export const extractCharactersFromText = async (text: string, cluster: string): 
 
   try {
       const res = await withRetry(() => ai.models.generateContent({
-        model: 'gemini-3.1-pro-preview', // Upgraded to Pro
+        model: 'gemini-3-flash-preview', // Downgraded to Flash
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         config: { responseMimeType: 'application/json' }
       }));
@@ -671,7 +671,7 @@ export const analyzeImageContext = async (file: File, aspect: string): Promise<s
     }
 
     const res = await withRetry(() => ai.models.generateContent({
-        model: 'gemini-3.1-pro-preview',
+        model: 'gemini-3-flash-preview',
         contents: [{
             role: 'user',
             parts: [

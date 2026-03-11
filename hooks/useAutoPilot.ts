@@ -62,7 +62,7 @@ export const useAutoPilot = ({
         console.error("Auto-Pilot Execution Failed", e);
         onStop();
       }
-    }, 3500); // 3.5s delay for pacing
+    }, 5000); // 5s delay for pacing
 
     // 4. Cleanup on unmount or dependency change (e.g. user actions set isLoading=true)
     return () => {
