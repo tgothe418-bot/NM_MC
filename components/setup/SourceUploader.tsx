@@ -75,9 +75,17 @@ export const SourceUploader: React.FC<SourceUploaderProps> = ({ compact = false 
                 const hookStr = typeof result.plot_hook === 'string' ? result.plot_hook : JSON.stringify(result.plot_hook);
                 setSurvivorBackground(prev => prev ? `${prev}\n\n[SCENARIO CONTEXT / PLOT HOOK]: ${hookStr}` : `[SCENARIO CONTEXT / PLOT HOOK]: ${hookStr}`);
             }
+
+            // Add a more significant delay between files to respect rate limits
+            if (filesToProcess.indexOf(file) < filesToProcess.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Source analysis failed", err);
+        if (err?.message?.includes('429')) {
+            alert("The Machine is overwhelmed by this much data. Please wait a moment or try fewer/smaller files.");
+        }
       } finally {
         setIsAnalyzing(false);
         if (inputRef.current) inputRef.current.value = '';

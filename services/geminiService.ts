@@ -39,6 +39,32 @@ const getAI = () => {
     return aiInstance;
 };
 
+/**
+ * Utility to wrap Gemini API calls with exponential backoff for rate limits (429).
+ */
+const withRetry = async <T>(fn: () => Promise<T>, maxRetries = 3, initialDelay = 1000): Promise<T> => {
+    let lastError: any;
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            return await fn();
+        } catch (error: any) {
+            lastError = error;
+            const isRateLimit = error?.message?.includes('429') || 
+                               error?.status === 'RESOURCE_EXHAUSTED' ||
+                               error?.code === 429;
+            
+            if (isRateLimit && i < maxRetries - 1) {
+                const delay = initialDelay * Math.pow(2, i);
+                console.warn(`Gemini Rate Limit Hit. Retrying in ${delay}ms... (Attempt ${i + 1}/${maxRetries})`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                continue;
+            }
+            throw error;
+        }
+    }
+    throw lastError;
+};
+
 // --- ARCHITECT (Chat Companion) FUNCTIONS ---
 
 import { useArchitectStore } from '../store/architectStore';
@@ -95,14 +121,14 @@ export const generateArchitectResponse = async (
         If the user reveals a NEW personal preference or narrative history not listed above, call the \`record_user_fact\` tool.`;
         // -----------------------------------------------------
 
-        const response = await ai.models.generateContent({
+        const response = await withRetry(() => ai.models.generateContent({
             model: 'gemini-3.1-pro-preview', 
             contents: contents,
             config: {
                 systemInstruction: dynamicInstruction, // Use the new dynamic string
                 tools: [{ functionDeclarations: [RECORD_FACT_TOOL] }]
             }
-        });
+        }));
 
         // Intercept the Tool Call before returning text
         if (response.functionCalls && response.functionCalls.length > 0) {
@@ -136,11 +162,11 @@ export const extractScenarioFromChat = async (history: { role: 'user' | 'model',
     `;
 
     try {
-        const res = await ai.models.generateContent({
+        const res = await withRetry(() => ai.models.generateContent({
             model: 'gemini-3.1-pro-preview', 
             contents: [{ role: 'user', parts: [{ text: extractionPrompt }] }],
             config: { responseMimeType: 'application/json' }
-        });
+        }));
 
         const concepts = parseScenarioConcepts(res.text || "{}");
         
@@ -193,6 +219,25 @@ export const summarizeHistory = async (history: { role: 'user' | 'model', text: 
 
 // --- GAME LOOP ---
 
+/**
+ * Creates a minimized version of the NPC state for LLM context, stripping out heavy flavor text.
+ */
+const getSlimNpcState = (npc: NpcState) => {
+    return {
+        name: npc.name,
+        archetype: npc.archetype,
+        status: npc.consciousness,
+        stress: npc.psychology.stress_level,
+        sanity: npc.psychology.sanity_percentage,
+        thought: npc.psychology.current_thought,
+        intent: npc.current_intent.goal,
+        injuries: npc.active_injuries.map(i => `${i.location} (${i.type})`),
+        inventory: npc.resources_held,
+        // We omit background_origin and long_term_summary here to save tokens.
+        // The Dialogue Engine will provide specific acting notes instead.
+    };
+};
+
 // [OPTIMIZATION A] Parallel Pipeline Implementation -> NOW SINGLE PASS
 export const processGameTurn = async (
   currentState: GameState, 
@@ -208,12 +253,14 @@ export const processGameTurn = async (
 
   // [OPTIMIZATION] Slim Focus State Construction
   // We strip away the full room_map history and other heavy objects to save tokens.
+  const slimNpcs = currentState.npc_states.map(getSlimNpcState);
+
   const focusState = {
       // CURRENT CONTEXT (Crucial)
       location: currentState.location_state.room_map[currentState.location_state.current_room_id],
       
-      // Active entities in the scene (We send all for now as location_id is not strictly tracked in NpcState schema)
-      active_npcs: currentState.npc_states,
+      // Active entities in the scene (We send slim versions)
+      active_npcs: slimNpcs,
       
       threat: currentState.villain_state,
       
@@ -265,7 +312,7 @@ export const processGameTurn = async (
   let imagePromise: Promise<string | undefined> | undefined;
 
   try {
-      const response = await ai.models.generateContent({
+      const response = await withRetry(() => ai.models.generateContent({
           model: 'gemini-3.1-pro-preview',
           contents: [{
               role: 'user',
@@ -278,7 +325,7 @@ export const processGameTurn = async (
               systemInstruction: SINGLE_PASS_ENGINE_INSTRUCTION + `\n\n[LONG TERM MEMORY]: ${currentState.narrative.past_summary || "No prior history."}`, 
               responseMimeType: 'application/json' 
           }
-      });
+      }));
 
       const rawText = response.text || "{}";
       const parsedOutput = parseGameTurnOutput(rawText);
@@ -322,11 +369,33 @@ export const processGameTurn = async (
       }
   }
 
+  // ROBUST NPC MERGE: Prevent the LLM from accidentally deleting NPCs
+  let mergedNpcs = [...currentState.npc_states];
+  if (Array.isArray(stateMutations.npc_states)) {
+      stateMutations.npc_states.forEach((newNpc: any) => {
+          const index = mergedNpcs.findIndex(n => n.name === newNpc.name);
+          if (index !== -1) {
+              // Merge existing NPC with updates
+              mergedNpcs[index] = { 
+                  ...mergedNpcs[index], 
+                  ...newNpc,
+                  // Ensure we don't wipe out complex nested objects if the LLM only sent partials
+                  psychology: { ...mergedNpcs[index].psychology, ...(newNpc.psychology || {}) },
+                  physical: { ...mergedNpcs[index].physical, ...(newNpc.physical || {}) },
+                  personality: { ...mergedNpcs[index].personality, ...(newNpc.personality || {}) },
+                  dialogue_state: { ...mergedNpcs[index].dialogue_state, ...(newNpc.dialogue_state || {}) }
+              };
+          } else {
+              // New NPC introduced by the machine
+              mergedNpcs.push(newNpc);
+          }
+      });
+  }
+
   const updatedState: GameState = {
       ...currentState,
       ...stateMutations,
-      // CRITICAL: Ensure npc_states is always an array to prevent crashes in map/filter calls
-      npc_states: Array.isArray(stateMutations.npc_states) ? stateMutations.npc_states : currentState.npc_states,
+      npc_states: mergedNpcs,
       meta: { ...currentState.meta, ...(stateMutations.meta || {}) },
       villain_state: { ...currentState.villain_state, ...(stateMutations.villain_state || {}) },
       // Narrative state is mostly handled by the text return, but we merge any structural updates
@@ -360,11 +429,11 @@ export const generateAutoPlayerAction = async (state: GameState): Promise<string
     const ai = getAI();
     try {
         const prompt = `Current Situation: ${state.narrative.illustration_request || "Survival situation"}\nLast Narrative: (Implicit)\nGenerate a single sentence action for the player.`;
-        const res = await ai.models.generateContent({
+        const res = await withRetry(() => ai.models.generateContent({
             model: 'gemini-3.1-pro-preview',
             contents: [{ role: 'user', parts: [{ text: JSON.stringify(state) }, { text: prompt }] }],
             config: { systemInstruction: PLAYER_SYSTEM_INSTRUCTION }
-        });
+        }));
         return res.text || "Wait and watch.";
     } catch (e) {
         return "Wait.";
@@ -489,13 +558,13 @@ export const analyzeSourceMaterial = async (file: File): Promise<SourceAnalysisR
 
       parts.push({ text: prompt });
 
-      const res = await ai.models.generateContent({
-        model: 'gemini-3.1-pro-preview', // Upgraded to Pro
+      const res = await withRetry(() => ai.models.generateContent({
+        model: 'gemini-3-flash-preview', 
         contents: [{ role: 'user', parts: parts }],
         config: { 
             responseMimeType: 'application/json'
         }
-      });
+      }));
 
       return parseSourceAnalysis(res.text || "{}");
   } catch (e) {
@@ -518,21 +587,21 @@ export const generateCalibrationField = async (
     if (existingContext) prompt += `\nExisting Context: ${existingContext}`;
     if (refinementInput) prompt += `\nRefine this existing value: "${refinementInput}"`;
     
-    const res = await ai.models.generateContent({
+    const res = await withRetry(() => ai.models.generateContent({
         model: 'gemini-3.1-pro-preview', // Upgraded to Pro
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    });
+    }));
     return res.text?.trim() || "";
 };
 
 export const hydrateUserCharacter = async (description: string, cluster: string): Promise<Partial<NpcState>> => {
     const ai = getAI();
     const prompt = `Hydrate this character description into a partial JSON state. Cluster: ${cluster}. Input: "${description}"`;
-    const res = await ai.models.generateContent({
+    const res = await withRetry(() => ai.models.generateContent({
         model: 'gemini-3.1-pro-preview', // Upgraded to Pro
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         config: { responseMimeType: 'application/json' }
-    });
+    }));
     return parseHydratedCharacter(res.text || "{}");
 };
 
@@ -556,11 +625,11 @@ export const extractCharactersFromText = async (text: string, cluster: string): 
   "${text}"`;
 
   try {
-      const res = await ai.models.generateContent({
+      const res = await withRetry(() => ai.models.generateContent({
         model: 'gemini-3.1-pro-preview', // Upgraded to Pro
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         config: { responseMimeType: 'application/json' }
-      });
+      }));
       
       const json = JSON.parse(res.text || "[]");
       if (Array.isArray(json)) return json;
@@ -580,7 +649,7 @@ export const analyzeImageContext = async (file: File, aspect: string): Promise<s
         return "Analysis not supported for this file type.";
     }
 
-    const res = await ai.models.generateContent({
+    const res = await withRetry(() => ai.models.generateContent({
         model: 'gemini-3.1-pro-preview',
         contents: [{
             role: 'user',
@@ -589,7 +658,7 @@ export const analyzeImageContext = async (file: File, aspect: string): Promise<s
                 { text: `Analyze this image and describe the ${aspect} in 1-2 evocative sentences.` }
             ]
         }]
-    });
+    }));
     return res.text?.trim() || "";
 };
 
@@ -597,14 +666,14 @@ export const generateCharacterProfile = async (cluster: string, intensity: strin
     const ai = getAI();
     const jsonSchema = zodToJsonSchema(CharacterProfileSchema as any, "profile");
 
-    const res = await ai.models.generateContent({
-        model: 'gemini-3.1-pro-preview', // Upgraded to Pro
+    const res = await withRetry(() => ai.models.generateContent({
+        model: 'gemini-3-flash-preview', 
         contents: [{ role: 'user', parts: [{ text: `Generate a horror character profile. Role: ${role}. Cluster: ${cluster}. Intensity: ${intensity}.` }] }],
         config: { 
             responseMimeType: 'application/json',
             responseSchema: jsonSchema.definitions?.profile as any
         }
-    });
+    }));
     return parseCharacterProfile(res.text || "{}");
 };
 
@@ -612,14 +681,14 @@ export const generateScenarioConcepts = async (cluster: string, intensity: strin
     const ai = getAI();
     const jsonSchema = zodToJsonSchema(ScenarioConceptsSchema as any, "concepts");
 
-    const res = await ai.models.generateContent({
-        model: 'gemini-3.1-pro-preview', // Upgraded to Pro
+    const res = await withRetry(() => ai.models.generateContent({
+        model: 'gemini-3-flash-preview', 
         contents: [{ role: 'user', parts: [{ text: `Generate a full scenario concept JSON object. Cluster: ${cluster}, Mode: ${mode}, Intensity: ${intensity}.` }] }],
         config: {
              responseMimeType: 'application/json',
              responseSchema: jsonSchema.definitions?.concepts as any
         }
-    });
+    }));
     return parseScenarioConcepts(res.text || "{}");
 };
 
@@ -636,7 +705,15 @@ const fileToBase64 = (file: File): Promise<string> => {
 const fileToText = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
+        reader.onload = () => {
+            let text = reader.result as string;
+            // Truncate to ~150k characters (~40k tokens) to stay safe with TPM
+            if (text.length > 150000) {
+                console.warn(`Truncating large file: ${file.name}`);
+                text = text.slice(0, 150000) + "\n\n[TRUNCATED DUE TO SIZE]";
+            }
+            resolve(text);
+        };
         reader.onerror = reject;
         reader.readAsText(file);
     });
