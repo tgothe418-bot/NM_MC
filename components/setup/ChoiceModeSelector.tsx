@@ -26,29 +26,35 @@ export const ChoiceModeSelector: React.FC<Props> = ({ onSelect }) => (
     {/* MAIN DOMINANT AREA */}
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 w-full max-w-[1600px] flex-grow max-h-[600px]">
       
-      {/* 1. UPLOAD */}
-      <div className="group relative w-full h-full border border-gray-800 bg-black/60 p-10 backdrop-blur-sm flex flex-col hover:border-system-green/50 transition-colors duration-500">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-system-green to-transparent opacity-30 group-hover:opacity-100 transition-opacity duration-700"></div>
+      {/* 1. TEST / DEBUG MODE (Replaces Upload) */}
+      <button 
+        onClick={() => onSelect('simulation')}
+        className="group relative w-full h-full border border-gray-800 bg-black/80 hover:bg-gray-900/40 hover:border-amber-500/50 transition-all duration-500 flex flex-col p-10 text-left space-y-8 overflow-hidden"
+      >
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-amber-500 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
         
-        <div className="space-y-6 mb-8">
+        <div className="space-y-6">
              <div className="flex items-center gap-5 text-white">
-                 <div className="p-4 bg-system-green/10 rounded-full border border-system-green/30 text-system-green group-hover:scale-110 transition-transform duration-500">
-                    <Upload className="w-8 h-8" />
+                 <div className="p-4 bg-amber-900/20 rounded-full border border-amber-500/30 text-amber-500 group-hover:scale-110 transition-transform duration-500">
+                    <Bug className="w-8 h-8" />
                  </div>
-                 <h3 className="text-3xl font-bold uppercase tracking-widest group-hover:text-system-green transition-colors">Upload Reference</h3>
+                 <h3 className="text-3xl font-bold uppercase tracking-widest group-hover:text-amber-500 transition-colors">Test / Debug</h3>
              </div>
              <div>
-                <div className="text-xs font-mono font-bold text-system-green uppercase tracking-[0.3em] mb-3">Drag & Drop</div>
-                <p className="text-sm text-gray-500 uppercase leading-relaxed tracking-widest max-w-md">
-                    Have a script, story bible, or image? Upload it here. The system will analyze it and extract characters, themes, and settings automatically.
+                <div className="text-xs font-mono font-bold text-amber-500 uppercase tracking-[0.3em] mb-3">Logic Probe</div>
+                <p className="text-sm text-gray-500 uppercase leading-relaxed tracking-widest">
+                    Automated Stress-Test & Logic Probe. Run diagnostic simulations to verify narrative consistency, mechanical balance, and state-mutation integrity.
                 </p>
              </div>
         </div>
-        
-        <div className="flex-1 flex flex-col justify-center border-t border-gray-800/50 pt-6">
-            <SourceUploader />
+
+        <div className="mt-auto border-t border-gray-800/50 pt-6 opacity-60 group-hover:opacity-100 transition-opacity">
+            <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-amber-500 flex items-center gap-2">
+                <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
+                Diagnostic
+            </span>
         </div>
-      </div>
+      </button>
 
       {/* 2. CHAT */}
       <button 
@@ -109,26 +115,5 @@ export const ChoiceModeSelector: React.FC<Props> = ({ onSelect }) => (
         </div>
       </button>
     </div>
-
-    {/* FOOTER: DEBUG MODE */}
-    <div className="w-full flex justify-center pb-6 flex-shrink-0">
-        <button 
-            onClick={() => onSelect('simulation')}
-            className="group flex items-center gap-4 px-6 py-3 rounded-full border border-gray-900 hover:border-amber-900/50 bg-black hover:bg-amber-900/10 transition-all opacity-50 hover:opacity-100"
-        >
-            <div className="p-1.5 rounded-full bg-gray-900 group-hover:bg-amber-900/20 text-gray-600 group-hover:text-amber-500 transition-colors">
-                <Bug className="w-3 h-3" />
-            </div>
-            <div className="text-left">
-                <div className="text-[10px] font-mono font-bold text-gray-500 group-hover:text-amber-500 uppercase tracking-widest transition-colors">
-                    Test / Debug Mode
-                </div>
-                <div className="text-[8px] font-mono text-gray-700 uppercase tracking-wider">
-                    Automated Stress-Test & Logic Probe
-                </div>
-            </div>
-        </button>
-    </div>
-
   </div>
 );

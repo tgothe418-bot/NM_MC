@@ -165,10 +165,10 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 border border-red-500/5 decorative-glitch pointer-events-none" style={{ animationDelay: '-2s' }} />
 
       {/* Main Content */}
-      <div className="relative z-20 flex flex-col items-center gap-0 w-full max-w-[95vw] px-4">
+      <div className="relative z-20 flex flex-col items-center gap-0 w-full h-full">
         
         {/* Unified Cinematic Frame for Smiley & Title */}
-        <div className="relative w-full max-w-7xl aspect-[2.33/1] flex flex-col items-center justify-center border-y border-red-600/20 bg-red-950/5 overflow-hidden shadow-[0_0_100px_rgba(220,20,60,0.05)] group">
+        <div className="relative w-full flex-1 flex flex-col items-center justify-center border-y border-red-600/20 bg-red-950/5 overflow-hidden shadow-[0_0_100px_rgba(220,20,60,0.05)] group">
              {/* Steam Particles (Expanded) */}
              <div className="absolute inset-0 pointer-events-none opacity-20">
                 <div className="steam-particle steam-1 bg-red-900/40 left-[20%]"></div>

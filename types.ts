@@ -66,6 +66,7 @@ export interface SimulationConfig {
   cluster: string;
   intensity: string;
   cycles: number;
+  debug_mode?: boolean;
   victim_count?: number; 
   visual_motif?: string; 
   location_description?: string; 
@@ -82,6 +83,7 @@ export interface SimulationConfig {
   pre_generated_npcs?: NpcState[];
   // Phase 1: Context Injection
   lore_context?: LoreContext;
+  debug_mode_enabled?: boolean;
 }
 
 export interface KnowledgeNode {

@@ -25,6 +25,7 @@ export const SimulationModal: React.FC<SimulationModalProps> = ({
     const [mode, setMode] = useState<'Survivor' | 'Villain'>('Survivor');
     const [cycles, setCycles] = useState(10);
     const [intensity, setIntensity] = useState('Level 3');
+    const [debugModeEnabled, setDebugModeEnabled] = useState(false);
     
     // Villain Overrides
     const [villainName, setVillainName] = useState('');
@@ -75,7 +76,8 @@ export const SimulationModal: React.FC<SimulationModalProps> = ({
             starting_point: 'In Media Res',
             cluster: initialCluster,
             intensity: intensity,
-            cycles: cycles,
+            cycles: debugModeEnabled ? 1 : cycles,
+            debug_mode_enabled: debugModeEnabled,
             villain_name: villainName,
             villain_appearance: villainAppearance,
             villain_methods: villainMethods,
@@ -129,40 +131,23 @@ export const SimulationModal: React.FC<SimulationModalProps> = ({
                 {/* Content */}
                 <div className="overflow-y-auto p-6 space-y-8 custom-scrollbar">
                     
-                    {/* General Settings */}
+                    {/* Debug Mode Toggle */}
                     <div className="space-y-4">
                          <div className="flex items-center gap-3 text-gray-400 font-mono text-xs uppercase tracking-widest border-b border-gray-800 pb-2">
-                             <ShieldAlert className="w-4 h-4" /> Parameters
+                             <ShieldAlert className="w-4 h-4" /> System Control
                          </div>
                          
-                         <div className="grid grid-cols-2 gap-6">
-                             <div className="space-y-2">
-                                 <label className="text-[10px] text-gray-500 uppercase tracking-widest">Simulation Mode</label>
-                                 <div className="flex bg-black border border-gray-800 rounded-sm p-1">
-                                     <button 
-                                        onClick={() => setMode('Survivor')}
-                                        className={`flex-1 py-2 text-xs font-mono uppercase tracking-wider transition-all ${mode === 'Survivor' ? 'bg-gray-800 text-white' : 'text-gray-600 hover:text-gray-400'}`}
-                                     >
-                                        Survivor
-                                     </button>
-                                     <button 
-                                        onClick={() => setMode('Villain')}
-                                        className={`flex-1 py-2 text-xs font-mono uppercase tracking-wider transition-all ${mode === 'Villain' ? 'bg-red-900/30 text-red-500' : 'text-gray-600 hover:text-gray-400'}`}
-                                     >
-                                        Villain
-                                     </button>
-                                 </div>
+                         <div className="flex items-center justify-between p-4 bg-black border border-gray-800 rounded-sm">
+                             <div className="space-y-1">
+                                 <div className="text-xs font-mono text-gray-200 uppercase tracking-widest">Test/Debug Mode</div>
+                                 <div className="text-[10px] text-gray-600 uppercase tracking-wider">Bypass safety protocols and run single-cycle diagnostics</div>
                              </div>
-
-                             <div className="space-y-2">
-                                 <label className="text-[10px] text-gray-500 uppercase tracking-widest">Test Cycles</label>
-                                 <input 
-                                    type="number" 
-                                    value={cycles} 
-                                    onChange={e => setCycles(parseInt(e.target.value) || 10)} 
-                                    className="w-full bg-black border border-gray-800 py-2 px-3 text-gray-200 font-mono text-sm focus:border-red-500 outline-none"
-                                 />
-                             </div>
+                             <button 
+                                onClick={() => setDebugModeEnabled(!debugModeEnabled)}
+                                className={`w-12 h-6 rounded-full p-1 transition-all duration-300 ${debugModeEnabled ? 'bg-red-600' : 'bg-gray-800'}`}
+                             >
+                                <div className={`w-4 h-4 bg-white rounded-full transition-all duration-300 ${debugModeEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
+                             </button>
                          </div>
                     </div>
 
@@ -248,10 +233,14 @@ export const SimulationModal: React.FC<SimulationModalProps> = ({
                     <button 
                         onClick={handleRun}
                         disabled={isTesting}
-                        className="flex items-center gap-3 bg-red-600 hover:bg-red-500 text-black px-6 py-3 font-mono font-bold uppercase tracking-widest text-sm transition-colors rounded-sm disabled:opacity-50"
+                        className={`flex items-center gap-3 px-8 py-4 font-mono font-bold uppercase tracking-[0.3em] text-sm transition-all duration-300 rounded-sm shadow-[0_0_20px_rgba(220,38,38,0.1)] hover:shadow-[0_0_30px_rgba(220,38,38,0.3)] ${
+                            debugModeEnabled 
+                                ? 'bg-red-600 text-black hover:bg-red-500' 
+                                : 'bg-gray-900 text-red-600 border border-red-900/50 hover:border-red-500 hover:text-red-500'
+                        } disabled:opacity-50`}
                     >
-                        {isTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-black" />}
-                        {isTesting ? 'Running...' : 'Execute Protocol'}
+                        {isTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className={`w-4 h-4 ${debugModeEnabled ? 'fill-black' : 'fill-red-600'}`} />}
+                        {isTesting ? 'Executing...' : debugModeEnabled ? 'DEBUG_PROTOCOL' : 'EXECUTE_SIMULATION'}
                     </button>
                 </div>
             </div>
