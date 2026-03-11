@@ -246,7 +246,14 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
         imageBase64: base64Image 
     };
 
-    const newHistory = [...history, newHistoryEntry];
+    // [OPTIMIZATION] Prune imageBase64 from history to prevent memory bloat
+    // We keep the imageUrl for the UI, but remove the heavy base64
+    const historyWithoutOldImages = history.map(h => ({
+        ...h,
+        imageBase64: undefined 
+    }));
+
+    const newHistory = [...historyWithoutOldImages, newHistoryEntry];
     setHistory(newHistory);
     setIsLoading(true);
 
@@ -298,7 +305,12 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
           
           const contextMsg = `[SYSTEM - REFERENCE MATERIAL UPLOADED]\nFILENAME: ${file.name}\n\nANALYSIS DATA:\n${JSON.stringify(analysis, null, 2)}\n\nINSTRUCTION: The user provided this training data. Absorb it.`;
           
-          const newHistory = [...history, { role: 'user' as const, text: contextMsg }];
+          const historyWithoutOldImages = history.map(h => ({
+              ...h,
+              imageBase64: undefined 
+          }));
+
+          const newHistory = [...historyWithoutOldImages, { role: 'user' as const, text: contextMsg }];
           setHistory(newHistory);
           
           setIsLoading(true);

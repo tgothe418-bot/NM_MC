@@ -102,9 +102,12 @@ export const generateArchitectResponse = async (
 ): Promise<string> => {
     const ai = getAI();
     try {
+        // [OPTIMIZATION] Prune history to last 10 turns to prevent context bloat
+        const prunedHistory = history.slice(-10);
+
         // Map history to Gemini "Content" format, handling mixed media
-        const contents = history.map(h => {
-            const parts: Part[] = [{ text: h.text }];
+        const contents = prunedHistory.map(h => {
+            const parts: Part[] = [{ text: h.text || "..." }];
             
             // If this message has an image attached, add it to the payload
             if (h.imageBase64) {
@@ -119,13 +122,17 @@ export const generateArchitectResponse = async (
             return { role: h.role, parts };
         });
 
-        const response = await withRetry(() => ai.models.generateContent({
-            model: 'gemini-3-flash-preview', 
-            contents: contents,
-            config: {
-                systemInstruction: systemInstruction,
-            }
-        }));
+        // Add a 30s timeout to the request
+        const response = await Promise.race([
+            withRetry(() => ai.models.generateContent({
+                model: 'gemini-3-flash-preview', 
+                contents: contents,
+                config: {
+                    systemInstruction: systemInstruction,
+                }
+            })),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Architect Timeout")), 30000))
+        ]);
 
         return response.text || "The connection is flickering... I lost that thought. Say it again?";
     } catch (e) {
@@ -136,7 +143,9 @@ export const generateArchitectResponse = async (
 
 export const extractScenarioFromChat = async (history: { role: 'user' | 'model', text: string }[]): Promise<SimulationConfig> => {
     const ai = getAI();
-    const transcript = history.map(h => `${h.role.toUpperCase()}: ${h.text}`).join('\n');
+    // Only use the last 15 messages for extraction to avoid token limits
+    const recentHistory = history.slice(-15);
+    const transcript = recentHistory.map(h => `${h.role.toUpperCase()}: ${h.text}`).join('\n');
     const extractionPrompt = `Analyze the following creative conversation and extract a valid Horror Scenario Configuration JSON.
     
     Transcript:
@@ -150,11 +159,14 @@ export const extractScenarioFromChat = async (history: { role: 'user' | 'model',
     `;
 
     try {
-        const res = await withRetry(() => ai.models.generateContent({
-            model: 'gemini-3-flash-preview', 
-            contents: [{ role: 'user', parts: [{ text: extractionPrompt }] }],
-            config: { responseMimeType: 'application/json' }
-        }));
+        const res = await Promise.race([
+            withRetry(() => ai.models.generateContent({
+                model: 'gemini-3-flash-preview', 
+                contents: [{ role: 'user', parts: [{ text: extractionPrompt }] }],
+                config: { responseMimeType: 'application/json' }
+            })),
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Extraction Timeout")), 30000))
+        ]);
 
         const concepts = parseScenarioConcepts(res.text || "{}");
         
@@ -588,14 +600,17 @@ EXECUTE THE FOLLOWING EXTRACTION FILTERS:
 
       const jsonSchema = zodToJsonSchema(SourceAnalysisResultSchema as any, "analysis");
 
-      const res = await withRetry(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview', 
-        contents: [{ role: 'user', parts: parts }],
-        config: { 
-            responseMimeType: 'application/json',
-            responseSchema: jsonSchema.definitions?.analysis as any
-        }
-      }));
+      const res = await Promise.race([
+        withRetry(() => ai.models.generateContent({
+          model: 'gemini-3-flash-preview', 
+          contents: [{ role: 'user', parts: parts }],
+          config: { 
+              responseMimeType: 'application/json',
+              responseSchema: jsonSchema.definitions?.analysis as any
+          }
+        })),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Analysis Timeout")), 60000))
+      ]);
 
       if (onProgress) onProgress("Ingestion complete. Neural patterns stabilized.", 100);
 
