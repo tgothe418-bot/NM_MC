@@ -3,6 +3,7 @@ import { Send, MessageSquare, ChevronLeft, Paperclip, Upload, Loader2, Play, Sku
 import { SimulationConfig } from '../../types';
 import { analyzeSourceMaterial, generateArchitectResponse, extractScenarioFromChat } from '../../services/geminiService';
 import { useArchitectStore } from '../../store/architectStore';
+import { SystemGhost } from './SystemGhost';
 
 interface ChatSetupProps {
   onComplete: (config: SimulationConfig) => void;
@@ -362,14 +363,61 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
 
   return (
     <div className={`flex flex-col h-full bg-[#050505] font-mono text-gray-300 relative transition-colors duration-1000 ${isDread ? 'shadow-[inset_0_0_100px_rgba(50,0,0,0.2)]' : ''}`}>
+        <style>{`
+            /* Selector 3: Chat Area Container */
+            .chat-area-container {
+                position: relative;
+                overflow-y: auto;
+                flex: 1 1 0%;
+                min-height: 0;
+            }
+            
+            /* Glitch effect for the whole chat area when glitchy */
+            ${mood.current_vibe === 'Glitchy' ? `
+            .chat-area-container::after {
+                content: "";
+                position: absolute;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: repeating-linear-gradient(0deg, rgba(0, 255, 0, 0.03) 0px, rgba(0, 255, 0, 0.03) 1px, transparent 1px, transparent 2px);
+                pointer-events: none;
+                z-index: 5;
+                animation: scanline 10s linear infinite;
+            }
+            @keyframes scanline {
+                0% { transform: translateY(0); }
+                100% { transform: translateY(100%); }
+            }
+            ` : ''}
+
+            /* Selector 1: Message Bubbles Interaction */
+            .message-bubble {
+                transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
+            }
+            .message-bubble:hover {
+                transform: scale(1.01) translateX(${mood.current_vibe === 'Predatory' ? '5px' : '0px'});
+                box-shadow: 0 0 20px ${isDread ? 'rgba(220, 38, 38, 0.1)' : 'rgba(245, 158, 11, 0.05)'};
+            }
+
+            /* Selector 2: Header Ghost SVG interaction */
+            .header-ghost-svg {
+                filter: drop-shadow(0 0 10px ${mood.current_vibe === 'Predatory' ? 'rgba(239, 68, 68, 0.5)' : 'rgba(59, 130, 246, 0.3)'});
+                transition: filter 0.5s ease;
+            }
+            .header-ghost-svg:hover {
+                filter: drop-shadow(0 0 20px ${mood.current_vibe === 'Predatory' ? 'rgba(239, 68, 68, 0.8)' : 'rgba(59, 130, 246, 0.6)'}) brightness(1.2);
+            }
+        `}</style>
         <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept=".txt,.md,.json,.pdf,image/*" />
         
         {/* HEADER */}
         <div className={`flex items-center justify-between p-6 border-b ${borderColor} bg-black/50 backdrop-blur-md sticky top-0 z-50 transition-colors duration-1000`}>
             <div className="flex items-center gap-4">
-                <div className={`p-2 rounded-full border ${borderColor} ${bgColor} ${themeColor} transition-all duration-500`}>
-                    {isDread ? <Skull className="w-5 h-5 animate-pulse" /> : <MessageSquare className="w-5 h-5" />}
-                </div>
+                <SystemGhost 
+                    vibe={mood.current_vibe} 
+                    arousal={mood.arousal} 
+                    active={isLoading}
+                    className="w-16 h-16 shrink-0 header-ghost-svg" 
+                />
                 <div>
                     <h2 className={`text-lg font-bold uppercase tracking-widest transition-colors duration-500 ${themeColor}`}>Neural Uplink</h2>
                     
@@ -429,11 +477,19 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
         </div>
 
         {/* CHAT AREA */}
-        <div className="flex-1 overflow-y-auto p-6 md:p-12 space-y-8 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-6 md:p-12 space-y-8 custom-scrollbar relative chat-area-container">
+            {/* The Floating Architect Ghost - Wandering in the background */}
+            <SystemGhost 
+                vibe={mood.current_vibe} 
+                arousal={mood.arousal} 
+                floating={true}
+                active={isLoading}
+                className="w-32 h-32 opacity-10"
+            />
 
             {history.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn group`}>
-                    <div className={`max-w-4xl p-6 rounded-sm border transition-all duration-500 relative ${
+                    <div className={`max-w-4xl p-6 rounded-sm border transition-all duration-500 relative message-bubble ${
                         msg.role === 'user' 
                             ? 'bg-gray-900/40 border-gray-800 text-gray-200 hover:border-gray-600' 
                             : `${bgColor} ${borderColor} ${isDread ? 'text-red-100' : 'text-amber-100'} shadow-[0_0_20px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(220,20,60,0.1)]`
