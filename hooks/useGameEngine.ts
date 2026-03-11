@@ -1,5 +1,6 @@
 
 import { useState, useCallback, useEffect, useRef, useReducer } from 'react';
+import { get, set, del } from 'idb-keyval';
 import { GameState, ChatMessage, SimulationConfig, NpcState } from '../types';
 import { getDefaultLocationState } from '../services/locationEngine';
 import { generateProceduralNpc } from '../services/npcGenerator';
@@ -86,6 +87,12 @@ export const useGameEngine = () => {
 
     // Refs for safety (avoid stale closures in timeouts)
     const processingRef = useRef(false);
+    const turnRef = useRef(gameState.meta.turn);
+
+    // Sync turnRef with state
+    useEffect(() => {
+        turnRef.current = gameState.meta.turn;
+    }, [gameState.meta.turn]);
 
     // Initialize Service immediately
     useEffect(() => {
@@ -210,9 +217,14 @@ export const useGameEngine = () => {
                 // Optimistic visual update: Prune history immediately
                 setHistory([...historyToKeep, newMessage]);
                 
+                // Directive 2: Capture current turn to prevent race conditions during async summarization
+                const turnAtRequest = result.gameState.meta.turn;
+
                 // Trigger summary generation in background
                 summarizeHistory(historyToSummarize).then(summary => {
-                    if (summary) {
+                    // Directive 2: Verify state hasn't progressed significantly (or changed) before applying summary
+                    // We check if the turn is still the same as when we requested the summary
+                    if (summary && turnRef.current === turnAtRequest) {
                         dispatch({ type: 'APPEND_SUMMARY', payload: `[ARCHIVED MEMORY]: ${summary}` });
                     }
                 }).catch(err => console.error("Summary failed", err));
@@ -257,21 +269,21 @@ export const useGameEngine = () => {
         setIsInitialized(false);
     }, []);
 
-    // --- SAVE / LOAD SYSTEM ---
+    // --- SAVE / LOAD SYSTEM (Directive 1: Migrated to IndexedDB) ---
 
-    const getSaves = (): SaveSlot[] => {
+    const getSaves = async (): Promise<SaveSlot[]> => {
         try {
-            const data = localStorage.getItem('nightmare_machine_saves');
-            return data ? JSON.parse(data) : [];
+            const data = await get<SaveSlot[]>('nightmare_machine_saves');
+            return data || [];
         } catch (e) {
             console.error("Failed to read saves", e);
             return [];
         }
     };
 
-    const saveSession = (name: string) => {
+    const saveSession = async (name: string) => {
         try {
-            const saves = getSaves();
+            const saves = await getSaves();
             const newSlot: SaveSlot = {
                 id: crypto.randomUUID(),
                 timestamp: Date.now(),
@@ -281,7 +293,7 @@ export const useGameEngine = () => {
                 history: history
             };
             const updatedSaves = [newSlot, ...saves];
-            localStorage.setItem('nightmare_machine_saves', JSON.stringify(updatedSaves));
+            await set('nightmare_machine_saves', updatedSaves);
             return true;
         } catch (e) {
             console.error("Save failed", e);
@@ -289,8 +301,8 @@ export const useGameEngine = () => {
         }
     };
 
-    const loadSession = (slotId: string) => {
-        const saves = getSaves();
+    const loadSession = async (slotId: string) => {
+        const saves = await getSaves();
         const slot = saves.find(s => s.id === slotId);
         if (slot) {
             dispatch({ type: 'UPDATE_FULL_STATE', payload: slot.gameState });
@@ -301,10 +313,10 @@ export const useGameEngine = () => {
         return false;
     };
 
-    const deleteSave = (slotId: string) => {
-        const saves = getSaves();
+    const deleteSave = async (slotId: string) => {
+        const saves = await getSaves();
         const updated = saves.filter(s => s.id !== slotId);
-        localStorage.setItem('nightmare_machine_saves', JSON.stringify(updated));
+        await set('nightmare_machine_saves', updated);
     };
 
     // --- AUTO-PILOT SYSTEM ---

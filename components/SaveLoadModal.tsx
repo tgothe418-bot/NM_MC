@@ -6,10 +6,10 @@ import { SaveSlot } from '../hooks/useGameEngine';
 interface SaveLoadModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (name: string) => boolean;
-  onLoad: (id: string) => boolean;
-  onDelete: (id: string) => void;
-  getSaves: () => SaveSlot[];
+  onSave: (name: string) => Promise<boolean>;
+  onLoad: (id: string) => Promise<boolean>;
+  onDelete: (id: string) => Promise<void>;
+  getSaves: () => Promise<SaveSlot[]>;
 }
 
 export const SaveLoadModal: React.FC<SaveLoadModalProps> = ({ 
@@ -20,29 +20,35 @@ export const SaveLoadModal: React.FC<SaveLoadModalProps> = ({
     const [saves, setSaves] = useState<SaveSlot[]>([]);
 
     useEffect(() => {
-        if (isOpen) {
-            setSaves(getSaves());
-            setSaveName(`Protocol ${new Date().toLocaleTimeString()}`);
-        }
+        const fetchSaves = async () => {
+            if (isOpen) {
+                const data = await getSaves();
+                setSaves(data);
+                setSaveName(`Protocol ${new Date().toLocaleTimeString()}`);
+            }
+        };
+        fetchSaves();
     }, [isOpen, getSaves]);
 
-    const handleSave = () => {
-        if (onSave(saveName)) {
-            setSaves(getSaves()); // Refresh list
+    const handleSave = async () => {
+        if (await onSave(saveName)) {
+            const data = await getSaves();
+            setSaves(data); // Refresh list
             onClose();
         }
     };
 
-    const handleLoad = (id: string) => {
+    const handleLoad = async (id: string) => {
         if (window.confirm("Overwrite current reality? Unsaved progress will be lost.")) {
-            if (onLoad(id)) onClose();
+            if (await onLoad(id)) onClose();
         }
     };
 
-    const handleDelete = (id: string) => {
+    const handleDelete = async (id: string) => {
         if (window.confirm("Delete this timeline permanently?")) {
-            onDelete(id);
-            setSaves(getSaves());
+            await onDelete(id);
+            const data = await getSaves();
+            setSaves(data);
         }
     };
 

@@ -2,6 +2,14 @@
 import { GoogleGenAI } from "@google/genai";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { 
+  GameStateSchema, 
+  SourceAnalysisResultSchema,
+  ScenarioConceptsSchema,
+  CharacterProfileSchema,
+  NpcStateSchema,
+  GameTurnOutputSchema
+} from '../schemas';
+import { 
   GameState, 
   NpcState, 
   SourceAnalysisResult,
@@ -10,10 +18,6 @@ import {
   SimulationConfig,
   ChatMessage
 } from '../types';
-import {
-  ScenarioConceptsSchema,
-  CharacterProfileSchema
-} from '../schemas';
 import { 
   parseGameTurnOutput,
   parseSourceAnalysis, 
@@ -308,7 +312,8 @@ export const processGameTurn = async (
   if (onStreamLogic) onStreamLogic("processing neural turn...\n", 'logic');
 
   let finalStoryText = "*The vision blurs...*";
-  let stateMutations: any = {};
+  // Directive 3: Remove 'any' typing and initialize with empty partial state
+  let stateMutations: Partial<GameState> = {};
   let imagePromise: Promise<string | undefined> | undefined;
 
   try {
@@ -330,8 +335,17 @@ export const processGameTurn = async (
       const rawText = response.text || "{}";
       const parsedOutput = parseGameTurnOutput(rawText);
       
-      // Extract components
-      stateMutations = parsedOutput.state_mutations || {};
+      // Directive 3: Enforce strict typing via Zod validation on the raw mutations
+      if (parsedOutput.state_mutations) {
+          try {
+              // We use partial() because the LLM only returns what changed
+              stateMutations = GameStateSchema.partial().parse(parsedOutput.state_mutations);
+          } catch (validationError) {
+              console.warn("LLM State Mutation Validation Failed - Falling back to partial merge:", validationError);
+              stateMutations = parsedOutput.state_mutations as Partial<GameState>;
+          }
+      }
+      
       finalStoryText = parsedOutput.narrative_render.story_text || "...";
       
       // 3. IMAGE GENERATION (NON-BLOCKING)
