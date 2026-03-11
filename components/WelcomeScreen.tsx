@@ -132,7 +132,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
   if (booting) {
     return (
       <div className="fixed inset-0 w-screen h-screen bg-black flex flex-col items-start justify-start p-8 md:p-16 font-terminal text-sm md:text-lg overflow-hidden z-[300] select-none">
-          <div className="scanlines" />
           <div className="flex flex-col gap-1 md:gap-2 relative z-20 w-full max-w-4xl uppercase tracking-wider">
               {bootLines.map((line, i) => (
                   <div key={i} className={`opacity-90 flex items-start ${line.style || 'text-red-500'}`}>
@@ -156,7 +155,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
       
       {/* Layer 2: The Grid & Film Effects */}
       <div className="terminal-grid" />
-      <div className="scanlines" />
       <div className="film-grain" />
       <div className="projector-flicker" />
 

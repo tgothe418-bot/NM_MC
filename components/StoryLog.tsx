@@ -22,11 +22,16 @@ export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, classNam
     <div className={`flex-1 overflow-y-auto p-6 md:p-12 space-y-8 custom-scrollbar ${className}`}>
       {history.map((msg, idx) => (
         <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}>
-          <div className={`max-w-3xl p-6 rounded-sm border ${
+          <div className={`max-w-3xl p-6 rounded-sm border transition-all duration-700 ${
             msg.role === 'user' 
               ? 'bg-gray-900 border-gray-700 text-gray-200' 
-              : 'bg-indigo-950/10 border-indigo-500/30 text-indigo-100'
-          }`}>
+              : 'bg-black/40 text-gray-100'
+          }`}
+          style={msg.role !== 'user' ? {
+              borderColor: `rgba(var(--theme-color), calc(0.3 + (var(--ui-intensity) * 0.7)))`,
+              boxShadow: `0 0 calc(var(--ui-intensity) * 20px) rgba(var(--theme-color), calc(var(--ui-intensity) * 0.2))`
+          } : {}}
+          >
             <div className="text-[10px] uppercase tracking-widest mb-2 opacity-50 font-bold flex justify-between">
                 <span>{msg.role === 'user' ? 'YOU' : 'NARRATOR'}</span>
                 {msg.text.includes('[SYSTEM - REFERENCE MATERIAL') && <span className="flex items-center gap-1"><Upload className="w-3 h-3" /> DATA</span>}
@@ -49,9 +54,13 @@ export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, classNam
 
       {isLoading && (
         <div className="flex justify-start animate-pulse">
-            <div className="bg-indigo-950/10 border border-indigo-500/30 p-6 rounded-sm flex items-center gap-3">
-                <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
-                <span className="text-xs uppercase tracking-widest text-indigo-400">Dreaming...</span>
+            <div className="bg-black/40 border p-6 rounded-sm flex items-center gap-3"
+                 style={{
+                     borderColor: `rgba(var(--theme-color), calc(0.3 + (var(--ui-intensity) * 0.7)))`,
+                     boxShadow: `0 0 calc(var(--ui-intensity) * 20px) rgba(var(--theme-color), calc(var(--ui-intensity) * 0.2))`
+                 }}>
+                <Loader2 className="w-4 h-4 animate-spin" style={{ color: `rgb(var(--theme-color))` }} />
+                <span className="text-xs uppercase tracking-widest" style={{ color: `rgb(var(--theme-color))` }}>Dreaming...</span>
             </div>
         </div>
       )}

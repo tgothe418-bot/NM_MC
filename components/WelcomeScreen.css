@@ -19,9 +19,9 @@
     background: linear-gradient(
         to bottom,
         transparent 50%,
-        rgba(0, 0, 0, 0.2) 50%
+        rgba(0, 0, 0, calc(0.1 + (var(--ui-intensity, 0.3) * 0.3))) 50%
     );
-    background-size: 100% 4px;
+    background-size: 100% calc(4px - (var(--ui-intensity, 0.3) * 1px)); /* Scanlines get tighter as stress rises */
     pointer-events: none;
     z-index: 2;
 }
