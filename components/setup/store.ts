@@ -44,7 +44,9 @@ export const useSetupStore = create<SetupState & SetupActions>((set) => ({
   setVictimCount: (v) => set({ victimCount: v }),
 
   setSurvivorName: (v) => set({ survivorName: v }),
-  setSurvivorBackground: (v) => set({ survivorBackground: v }),
+  setSurvivorBackground: (v) => set((state) => ({ 
+    survivorBackground: typeof v === 'function' ? v(state.survivorBackground) : v 
+  })),
   setSurvivorTraits: (v) => set({ survivorTraits: v }),
 
   setParsedCharacters: (v) => set((state) => ({ 

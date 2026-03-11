@@ -170,7 +170,7 @@ export const constructVoiceManifesto = (npcs: NpcState[], activeCluster: string 
         // A. The Mask (Voice & Style)
         manifesto += `[ACTING PROFILE]\n`;
         manifesto += ` - TONE: ${voiceSig?.rhythm || "Neutral"}. ${linguisticRules}\n`;
-        manifesto += ` - QUIRKS: ${voiceSig?.ticks?.join(", ") || "None"}.\n`;
+        manifesto += ` - QUIRKS: ${(voiceSig?.ticks || []).join(", ") || "None"}.\n`;
         if (npc.origin?.native_language && npc.origin.native_language !== "English") {
             manifesto += ` - DIALECT: Subtle markers of ${npc.origin.native_language} origin, but fluent English.\n`;
         }
@@ -189,10 +189,10 @@ export const constructVoiceManifesto = (npcs: NpcState[], activeCluster: string 
         // Manual Physiological Context (Previously in synthesizeContextWindow)
         const stress = npc.psychology?.stress_level || 0;
         const injuries = npc.active_injuries || [];
-        if (stress > 60 || injuries.length > 0) {
+        if (stress > 60 || (injuries && injuries.length > 0)) {
             manifesto += `\n[PHYSIOLOGICAL STATUS]\n`;
             manifesto += ` - STRESS LEVEL: ${stress}% (Impacts speech stability)\n`;
-            if (injuries.length > 0) {
+            if (injuries && injuries.length > 0) {
                 manifesto += ` - ACTIVE INJURIES: ${injuries.map(i => `${i.location} (${i.type})`).join(", ")}\n`;
             }
         }

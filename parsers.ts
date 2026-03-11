@@ -100,11 +100,18 @@ const cleanAndParse = <T>(text: string, schema: z.ZodSchema<T>, fallback: T): T 
             return result.data;
         } else {
             console.warn("Schema Validation Failed:", result.error);
-            // Handle Array vs Object fallback merging
-            if (Array.isArray(fallback) && Array.isArray(json)) {
-                return [...fallback, ...json] as unknown as T;
+            
+            // Attempt to "heal" the object by merging with fallback and re-validating
+            // This allows partial success if the LLM returned mostly correct data
+            const merged = { ...fallback, ...json };
+            const secondAttempt = schema.safeParse(merged);
+            
+            if (secondAttempt.success) {
+                return secondAttempt.data;
             }
-            return { ...fallback, ...json }; 
+
+            // If healing fails, strictly return the fallback to prevent downstream crashes
+            return fallback;
         }
     } catch (e) {
         console.error("JSON Parse Error:", e);

@@ -42,7 +42,9 @@ export const useSetupState = create<SetupStore>((set) => ({
   setPrimaryGoal: (v) => set({ primaryGoal: v }),
   setVictimCount: (v) => set({ victimCount: v }),
   setSurvivorName: (v) => set({ survivorName: v }),
-  setSurvivorBackground: (v) => set({ survivorBackground: v }),
+  setSurvivorBackground: (v) => set((state) => ({ 
+    survivorBackground: typeof v === 'function' ? v(state.survivorBackground) : v 
+  })),
   setSurvivorTraits: (v) => set({ survivorTraits: v }),
   setParsedCharacters: (v) => set((state) => ({ 
     parsedCharacters: typeof v === 'function' ? v(state.parsedCharacters) : v 

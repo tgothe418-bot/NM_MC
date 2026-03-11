@@ -62,7 +62,7 @@ export interface SetupActions {
   setPrimaryGoal: (v: string) => void;
   setVictimCount: (v: number) => void;
   setSurvivorName: (v: string) => void;
-  setSurvivorBackground: (v: string) => void;
+  setSurvivorBackground: (v: string | ((prev: string) => string)) => void;
   setSurvivorTraits: (v: string) => void;
   setParsedCharacters: (v: ParsedCharacter[] | ((prev: ParsedCharacter[]) => ParsedCharacter[])) => void;
 }

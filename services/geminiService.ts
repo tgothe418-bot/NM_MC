@@ -12,8 +12,7 @@ import {
 } from '../types';
 import {
   ScenarioConceptsSchema,
-  CharacterProfileSchema,
-  SimulatorOutputSchema
+  CharacterProfileSchema
 } from '../schemas';
 import { 
   parseGameTurnOutput,
@@ -97,7 +96,7 @@ export const generateArchitectResponse = async (
         // -----------------------------------------------------
 
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview', 
+            model: 'gemini-3.1-pro-preview', 
             contents: contents,
             config: {
                 systemInstruction: dynamicInstruction, // Use the new dynamic string
@@ -138,7 +137,7 @@ export const extractScenarioFromChat = async (history: { role: 'user' | 'model',
 
     try {
         const res = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview', 
+            model: 'gemini-3.1-pro-preview', 
             contents: [{ role: 'user', parts: [{ text: extractionPrompt }] }],
             config: { responseMimeType: 'application/json' }
         });
@@ -267,13 +266,14 @@ export const processGameTurn = async (
 
   try {
       const response = await ai.models.generateContent({
-          model: 'gemini-3-pro-preview',
-          contents: {
+          model: 'gemini-3.1-pro-preview',
+          contents: [{
+              role: 'user',
               parts: [
                   { text: contextBlock },
                   { text: `USER ACTION: "${userAction}"` }
               ]
-          },
+          }],
           config: { 
               systemInstruction: SINGLE_PASS_ENGINE_INSTRUCTION + `\n\n[LONG TERM MEMORY]: ${currentState.narrative.past_summary || "No prior history."}`, 
               responseMimeType: 'application/json' 
@@ -325,6 +325,8 @@ export const processGameTurn = async (
   const updatedState: GameState = {
       ...currentState,
       ...stateMutations,
+      // CRITICAL: Ensure npc_states is always an array to prevent crashes in map/filter calls
+      npc_states: Array.isArray(stateMutations.npc_states) ? stateMutations.npc_states : currentState.npc_states,
       meta: { ...currentState.meta, ...(stateMutations.meta || {}) },
       villain_state: { ...currentState.villain_state, ...(stateMutations.villain_state || {}) },
       // Narrative state is mostly handled by the text return, but we merge any structural updates
@@ -359,8 +361,8 @@ export const generateAutoPlayerAction = async (state: GameState): Promise<string
     try {
         const prompt = `Current Situation: ${state.narrative.illustration_request || "Survival situation"}\nLast Narrative: (Implicit)\nGenerate a single sentence action for the player.`;
         const res = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
-            contents: { parts: [{ text: JSON.stringify(state) }, { text: prompt }] },
+            model: 'gemini-3.1-pro-preview',
+            contents: [{ role: 'user', parts: [{ text: JSON.stringify(state) }, { text: prompt }] }],
             config: { systemInstruction: PLAYER_SYSTEM_INSTRUCTION }
         });
         return res.text || "Wait and watch.";
@@ -488,7 +490,7 @@ export const analyzeSourceMaterial = async (file: File): Promise<SourceAnalysisR
       parts.push({ text: prompt });
 
       const res = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview', // Upgraded to Pro
+        model: 'gemini-3.1-pro-preview', // Upgraded to Pro
         contents: [{ role: 'user', parts: parts }],
         config: { 
             responseMimeType: 'application/json'
@@ -517,8 +519,8 @@ export const generateCalibrationField = async (
     if (refinementInput) prompt += `\nRefine this existing value: "${refinementInput}"`;
     
     const res = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview', // Upgraded to Pro
-        contents: { parts: [{ text: prompt }] },
+        model: 'gemini-3.1-pro-preview', // Upgraded to Pro
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
     });
     return res.text?.trim() || "";
 };
@@ -527,8 +529,8 @@ export const hydrateUserCharacter = async (description: string, cluster: string)
     const ai = getAI();
     const prompt = `Hydrate this character description into a partial JSON state. Cluster: ${cluster}. Input: "${description}"`;
     const res = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview', // Upgraded to Pro
-        contents: { parts: [{ text: prompt }] },
+        model: 'gemini-3.1-pro-preview', // Upgraded to Pro
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
         config: { responseMimeType: 'application/json' }
     });
     return parseHydratedCharacter(res.text || "{}");
@@ -555,8 +557,8 @@ export const extractCharactersFromText = async (text: string, cluster: string): 
 
   try {
       const res = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview', // Upgraded to Pro
-        contents: { parts: [{ text: prompt }] },
+        model: 'gemini-3.1-pro-preview', // Upgraded to Pro
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
         config: { responseMimeType: 'application/json' }
       });
       
@@ -579,13 +581,14 @@ export const analyzeImageContext = async (file: File, aspect: string): Promise<s
     }
 
     const res = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: {
+        model: 'gemini-3.1-pro-preview',
+        contents: [{
+            role: 'user',
             parts: [
                 { inlineData: { mimeType: mime, data: base64Data.split(',')[1] } },
                 { text: `Analyze this image and describe the ${aspect} in 1-2 evocative sentences.` }
             ]
-        }
+        }]
     });
     return res.text?.trim() || "";
 };
@@ -595,8 +598,8 @@ export const generateCharacterProfile = async (cluster: string, intensity: strin
     const jsonSchema = zodToJsonSchema(CharacterProfileSchema as any, "profile");
 
     const res = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview', // Upgraded to Pro
-        contents: { parts: [{ text: `Generate a horror character profile. Role: ${role}. Cluster: ${cluster}. Intensity: ${intensity}.` }] },
+        model: 'gemini-3.1-pro-preview', // Upgraded to Pro
+        contents: [{ role: 'user', parts: [{ text: `Generate a horror character profile. Role: ${role}. Cluster: ${cluster}. Intensity: ${intensity}.` }] }],
         config: { 
             responseMimeType: 'application/json',
             responseSchema: jsonSchema.definitions?.profile as any
@@ -610,8 +613,8 @@ export const generateScenarioConcepts = async (cluster: string, intensity: strin
     const jsonSchema = zodToJsonSchema(ScenarioConceptsSchema as any, "concepts");
 
     const res = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview', // Upgraded to Pro
-        contents: { parts: [{ text: `Generate a full scenario concept JSON object. Cluster: ${cluster}, Mode: ${mode}, Intensity: ${intensity}.` }] },
+        model: 'gemini-3.1-pro-preview', // Upgraded to Pro
+        contents: [{ role: 'user', parts: [{ text: `Generate a full scenario concept JSON object. Cluster: ${cluster}, Mode: ${mode}, Intensity: ${intensity}.` }] }],
         config: {
              responseMimeType: 'application/json',
              responseSchema: jsonSchema.definitions?.concepts as any

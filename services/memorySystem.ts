@@ -62,8 +62,8 @@ export const constructMemoryContext = (npc: NpcState): string => {
   if (!npc.dialogue_state || !npc.dialogue_state.memory) return "";
 
   const mem = npc.dialogue_state.memory;
-  const logs = mem.episodic_logs.map(m => `[Turn ${m.turn}]: ${m.description}`).join('\n');
-  const facts = mem.known_facts.join('; ');
+  const logs = (mem.episodic_logs || []).map(m => `[Turn ${m.turn}]: ${m.description}`).join('\n');
+  const facts = (mem.known_facts || []).join('; ');
   
   return `
   [MEMORY MODULE: ${npc.name}]
