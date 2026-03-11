@@ -45,6 +45,7 @@ export interface SetupState {
   survivorTraits: string;
   // Parsed Data
   parsedCharacters: ParsedCharacter[];
+  plotHook: string;
 }
 
 export interface SetupActions {
@@ -65,4 +66,5 @@ export interface SetupActions {
   setSurvivorBackground: (v: string | ((prev: string) => string)) => void;
   setSurvivorTraits: (v: string) => void;
   setParsedCharacters: (v: ParsedCharacter[] | ((prev: ParsedCharacter[]) => ParsedCharacter[])) => void;
+  setPlotHook: (v: string | ((prev: string) => string)) => void;
 }

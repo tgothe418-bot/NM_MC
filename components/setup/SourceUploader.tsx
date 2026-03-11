@@ -19,10 +19,11 @@ export const SourceUploader: React.FC<SourceUploaderProps> = ({ compact = false 
     setSelectedClusters, 
     setParsedCharacters,
     setIntensity,
-    setSurvivorBackground
+    setPlotHook
   } = useSetupStore();
   
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisStatus, setAnalysisStatus] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -43,7 +44,9 @@ export const SourceUploader: React.FC<SourceUploaderProps> = ({ compact = false 
       
       try {
         for (const file of filesToProcess) {
-            const result = await analyzeSourceMaterial(file);
+            const result = await analyzeSourceMaterial(file, (stage) => {
+                setAnalysisStatus(stage);
+            });
             
             if (result.location) {
                  setLocationDescription(prev => prev ? `${prev}\n\n[Location Context from ${file.name}]:\n${result.location}` : result.location);
@@ -73,7 +76,7 @@ export const SourceUploader: React.FC<SourceUploaderProps> = ({ compact = false 
             }
             if (result.plot_hook) {
                 const hookStr = typeof result.plot_hook === 'string' ? result.plot_hook : JSON.stringify(result.plot_hook);
-                setSurvivorBackground(prev => prev ? `${prev}\n\n[SCENARIO CONTEXT / PLOT HOOK]: ${hookStr}` : `[SCENARIO CONTEXT / PLOT HOOK]: ${hookStr}`);
+                setPlotHook(prev => prev ? `${prev}\n\n[SOURCE LORE]: ${hookStr}` : `[SOURCE LORE]: ${hookStr}`);
             }
 
             // Add a more significant delay between files to respect rate limits
@@ -103,8 +106,9 @@ export const SourceUploader: React.FC<SourceUploaderProps> = ({ compact = false 
         <div className={`w-full ${compact ? '' : 'h-full min-h-[100px]'}`}>
             {/* Standard Upload Area */}
             <div 
-                className={`w-full border-2 border-dashed transition-all relative group cursor-pointer bg-gray-900/20 rounded-sm
+                className={`w-full border-2 border-dashed transition-all relative group cursor-pointer rounded-sm
                     ${compact ? 'p-3 border-gray-800 hover:border-gray-600' : 'h-full p-6 md:p-8 border-gray-700 hover:border-gray-500 hover:bg-gray-900/40'}
+                    ${isAnalyzing ? 'border-fresh-blood/40 bg-fresh-blood/5 shadow-[inset_0_0_20px_rgba(136,8,8,0.1)]' : 'bg-gray-900/20'}
                     ${files.length >= MAX_SOURCE_FILES ? 'opacity-50 cursor-not-allowed' : ''}
                 `}
                 onClick={() => {
@@ -113,10 +117,20 @@ export const SourceUploader: React.FC<SourceUploaderProps> = ({ compact = false 
             >
                 <div className={`flex items-center justify-center text-center ${compact ? 'flex-row gap-4' : 'flex-col gap-3'}`}>
                     {isAnalyzing ? (
-                        <>
-                            <Loader2 className={`${compact ? 'w-4 h-4' : 'w-8 h-8'} text-fresh-blood animate-spin`} />
-                            <div className="text-xs font-mono uppercase tracking-widest text-fresh-blood animate-pulse">Extracting Data...</div>
-                        </>
+                        <div className={`flex items-center justify-center gap-4 ${compact ? 'flex-row py-2' : 'flex-col py-4'}`}>
+                            <div className="relative">
+                                <Loader2 className={`${compact ? 'w-5 h-5' : 'w-12 h-12'} text-fresh-blood animate-spin`} />
+                                <div className="absolute inset-0 bg-fresh-blood/20 blur-xl animate-pulse rounded-full" />
+                            </div>
+                            <div className={`space-y-1 ${compact ? 'text-left' : 'text-center'}`}>
+                                <div className="text-[10px] font-mono uppercase tracking-[0.3em] text-fresh-blood animate-pulse">
+                                    Neural Ingestion Active
+                                </div>
+                                <div className="text-[9px] font-mono text-gray-500 uppercase tracking-widest max-w-[250px] leading-relaxed">
+                                    {analysisStatus || "Initializing neural bridge..."}
+                                </div>
+                            </div>
+                        </div>
                     ) : (
                         <>
                             <FileUp className={`${compact ? 'w-4 h-4' : 'w-8 h-8'} text-gray-500 group-hover:text-gray-300 transition-colors`} />

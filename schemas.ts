@@ -286,6 +286,8 @@ export const ScenarioConceptsSchema = z.object({
   survivor_traits: z.string().nullable().optional(),
   location_description: z.string().nullable().optional(),
   visual_motif: z.string().nullable().optional(),
+  plot_hook: z.string().nullable().optional(),
+  parsed_characters: z.array(ParsedCharacterSchema).optional(),
 });
 
 export const CharacterProfileSchema = z.object({

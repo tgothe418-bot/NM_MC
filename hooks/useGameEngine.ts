@@ -108,19 +108,50 @@ export const useGameEngine = () => {
     const initializeGame = useCallback((config: SimulationConfig) => {
         // 1. DETERMINISTIC GENERATION
         let initialNpcs: NpcState[] = [];
-        
+        const usedNames = new Set<string>();
+        const takenRoles = new Set<string>();
+
+        const isVillainMode = config.mode === 'Villain';
+        const playerName = isVillainMode ? config.villain_name : config.survivor_name;
+
         if (config.pre_generated_npcs && config.pre_generated_npcs.length > 0) {
             initialNpcs = config.pre_generated_npcs;
+        } else if (config.parsed_characters && config.parsed_characters.length > 0) {
+            // Filter out the active player so they aren't duplicated as an NPC
+            const npcCharacters = config.parsed_characters.filter(c => c.name !== playerName);
+            
+            initialNpcs = npcCharacters.map(c => {
+                // Generate a procedural base for stats/mechanics
+                const base = generateProceduralNpc(config.cluster, config.intensity, usedNames, config.lore_context, takenRoles);
+                
+                // Overwrite with High-Fidelity Source Lore
+                const deepLore = `[SOURCE MATERIAL]: ${c.name} is a ${c.role}. ${c.description}. Traits: ${c.traits}`;
+                
+                return {
+                    ...base,
+                    name: c.name,
+                    archetype: c.role,
+                    background_origin: deepLore,
+                    personality: {
+                        ...base.personality,
+                        dominant_trait: c.traits || base.personality.dominant_trait
+                    },
+                    dialogue_state: {
+                        ...base.dialogue_state,
+                        memory: {
+                            ...base.dialogue_state.memory,
+                            long_term_summary: deepLore
+                        }
+                    }
+                };
+            });
         } else {
             const victimCount = config.victim_count || 3;
-            const usedNames = new Set<string>();
-            const takenRoles = new Set<string>(); // Ensure unique roles
             initialNpcs = Array.from({ length: victimCount }).map(() => 
                 generateProceduralNpc(config.cluster, config.intensity, usedNames, config.lore_context, takenRoles)
             );
         }
 
-        const isVillainMode = config.mode === 'Villain';
         const playerProfile = isVillainMode 
             ? {
                 name: config.villain_name || "The Entity",
@@ -158,7 +189,8 @@ export const useGameEngine = () => {
             narrative: {
                 visual_motif: config.visual_motif || "Standard Cinematic",
                 illustration_request: "Establishing Shot",
-                past_summary: ""
+                // CRITICAL: Inject the Source Material Plot Hook directly into the narrative engine's memory
+                past_summary: config.plot_hook ? `[CORE DIRECTIVE / LORE]:\n${config.plot_hook}\n\n` : ""
             },
             narrative_state: {
                 currentPhase: 'Act1_Setup',
@@ -177,7 +209,6 @@ export const useGameEngine = () => {
             setAutoMode({ active: true, remainingCycles: config.cycles });
         }
         
-        // Initial Trigger
         handleSendMessage("BEGIN SIMULATION. ESTABLISH CONTEXT.", [], newState);
     }, []);
 

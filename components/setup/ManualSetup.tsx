@@ -59,6 +59,8 @@ export const ManualSetup: React.FC<Props> = ({ onComplete, onBack }) => {
               survivor_name: store.survivorName,
               survivor_background: store.survivorBackground,
               survivor_traits: store.survivorTraits,
+              parsed_characters: store.parsedCharacters,
+              plot_hook: store.plotHook,
           });
       }, 2000);
   };

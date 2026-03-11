@@ -73,6 +73,7 @@ export interface SimulationConfig {
   victim_count?: number; 
   visual_motif?: string; 
   location_description?: string; 
+  debug_mode_enabled?: boolean;
   villain_name?: string;
   villain_appearance?: string;
   villain_methods?: string;
@@ -84,6 +85,8 @@ export interface SimulationConfig {
   survivor_traits?: string;
   // New: Pre-selected NPCs from setup
   pre_generated_npcs?: NpcState[];
+  parsed_characters?: ParsedCharacter[];
+  plot_hook?: string;
   // Phase 1: Context Injection
   lore_context?: LoreContext;
 }

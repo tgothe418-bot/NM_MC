@@ -155,6 +155,8 @@ export const GuidedSetup: React.FC<Props> = ({ onComplete, onBack }) => {
               survivor_background: store.survivorBackground,
               survivor_name: store.survivorName,
               victim_description: store.victimDescription, // Pass companions to NpcSelector
+              parsed_characters: store.parsedCharacters,
+              plot_hook: store.plotHook,
           });
       }, 2000);
   };

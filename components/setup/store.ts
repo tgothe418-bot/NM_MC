@@ -23,6 +23,7 @@ export const useSetupStore = create<SetupState & SetupActions>((set) => ({
   survivorTraits: '',
 
   parsedCharacters: [],
+  plotHook: '',
 
   setPerspective: (v) => set({ perspective: v }),
   setMode: (v) => set({ mode: v }),
@@ -51,5 +52,8 @@ export const useSetupStore = create<SetupState & SetupActions>((set) => ({
 
   setParsedCharacters: (v) => set((state) => ({ 
     parsedCharacters: typeof v === 'function' ? v(state.parsedCharacters) : v 
+  })),
+  setPlotHook: (v) => set((state) => ({ 
+    plotHook: typeof v === 'function' ? v(state.plotHook) : v 
   })),
 }));

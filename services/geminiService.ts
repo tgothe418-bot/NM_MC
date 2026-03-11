@@ -557,7 +557,7 @@ export const analyzeSourceMaterial = async (
   let parts: Part[] = [];
 
   try {
-      if (onProgress) onProgress("READING_LOCAL_BUFFER", 15);
+      if (onProgress) onProgress("Reading local memory buffer...", 15);
       
       if (isText) {
           const textContent = await fileToText(file);
@@ -568,7 +568,7 @@ export const analyzeSourceMaterial = async (
           parts = [{ inlineData: { mimeType: mime, data: base64Content } }];
       }
 
-      if (onProgress) onProgress("ENCODING_NEURAL_STREAM", 45);
+      if (onProgress) onProgress("Encoding neural stream for ingestion...", 45);
 
       const prompt = `Analyze this source material for a horror simulation setup.
       
@@ -603,7 +603,7 @@ export const analyzeSourceMaterial = async (
 
       parts.push({ text: prompt });
 
-      if (onProgress) onProgress("SYNTHESIZING_ARCHETYPES", 75);
+      if (onProgress) onProgress("Synthesizing character archetypes and environmental data...", 75);
 
       const jsonSchema = zodToJsonSchema(SourceAnalysisResultSchema as any, "analysis");
 
@@ -616,7 +616,7 @@ export const analyzeSourceMaterial = async (
         }
       }));
 
-      if (onProgress) onProgress("INGESTION_COMPLETE", 100);
+      if (onProgress) onProgress("Ingestion complete. Neural patterns stabilized.", 100);
 
       return parseSourceAnalysis(res.text || "{}");
   } catch (e) {
