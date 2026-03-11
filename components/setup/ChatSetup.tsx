@@ -413,11 +413,22 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
         <div className="flex-1 overflow-y-auto p-6 md:p-12 space-y-8 custom-scrollbar">
 
             {history.map((msg, i) => (
-                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}>
-                    <div className={`max-w-4xl p-6 rounded-sm border transition-colors duration-500 ${msg.role === 'user' ? 'bg-gray-900 border-gray-700 text-gray-200' : `${bgColor} ${borderColor} ${isDread ? 'text-red-100' : 'text-amber-100'}`}`}>
-                        <div className="text-[10px] uppercase tracking-widest mb-2 opacity-50 font-bold flex justify-between">
-                            <span>{msg.role === 'user' ? 'YOU' : 'ENTITY'}</span>
-                            {msg.text.includes('[SYSTEM - REFERENCE MATERIAL') && <span className={`${themeColor} flex items-center gap-1`}><Upload className="w-3 h-3" /> DATA INGESTED</span>}
+                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn group`}>
+                    <div className={`max-w-4xl p-6 rounded-sm border transition-all duration-500 relative ${
+                        msg.role === 'user' 
+                            ? 'bg-gray-900/40 border-gray-800 text-gray-200 hover:border-gray-600' 
+                            : `${bgColor} ${borderColor} ${isDread ? 'text-red-100' : 'text-amber-100'} shadow-[0_0_20px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(220,20,60,0.1)]`
+                    }`}>
+                        {/* Decorative Corner Accents */}
+                        <div className={`absolute top-0 left-0 w-2 h-2 border-t border-l ${msg.role === 'user' ? 'border-gray-700' : borderColor} opacity-50`} />
+                        <div className={`absolute bottom-0 right-0 w-2 h-2 border-b border-r ${msg.role === 'user' ? 'border-gray-700' : borderColor} opacity-50`} />
+
+                        <div className="text-[10px] uppercase tracking-widest mb-3 opacity-40 font-bold flex justify-between items-center border-b border-current/10 pb-2">
+                            <span className="flex items-center gap-2">
+                                {msg.role === 'user' ? 'USER_ID: 0x7F' : 'ENTITY_ID: ARCHITECT'}
+                                {msg.role === 'model' && <div className={`w-1 h-1 rounded-full ${isDread ? 'bg-red-500 animate-ping' : 'bg-amber-500 animate-pulse'}`} />}
+                            </span>
+                            {msg.text.includes('[SYSTEM - REFERENCE MATERIAL') && <span className={`${themeColor} flex items-center gap-1`}><Upload className="w-3 h-3" /> DATA_INGESTED</span>}
                         </div>
                         
                         {msg.imageUrl && (

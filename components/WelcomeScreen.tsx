@@ -49,7 +49,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
   const [displayText, setDisplayText] = useState("");
   const [zalgoText, setZalgoText] = useState("");
   const [showButton, setShowButton] = useState(false);
-  const { mood, memory } = useArchitectStore();
+  const [confirmPurge, setConfirmPurge] = useState(false);
+  const { mood, memory, resetMemory } = useArchitectStore();
 
   // Boot Sequence Effect
   useEffect(() => {
@@ -92,6 +93,41 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
     }, 100);
     return () => clearInterval(interval);
   }, [booting]);
+
+  const handlePurge = async () => {
+    if (!confirmPurge) {
+      setConfirmPurge(true);
+      return;
+    }
+
+    try {
+      // 1. Reset Zustand Store
+      resetMemory();
+      
+      // 2. Clear LocalStorage directly just in case
+      localStorage.removeItem('nm-architect-blackbox');
+      
+      // 3. Clear IndexedDB Saves (using idb-keyval if possible, or direct delete)
+      // We'll try to import del from idb-keyval or just use the global indexedDB API
+      const request = indexedDB.deleteDatabase('keyval-store'); // default for idb-keyval
+      
+      request.onsuccess = () => {
+        console.log("IDB Cleared");
+        window.location.reload();
+      };
+      request.onerror = () => {
+        console.error("IDB Clear Failed");
+        window.location.reload();
+      };
+      
+      // Fallback if IDB delete is blocked or slow
+      setTimeout(() => window.location.reload(), 1000);
+
+    } catch (e) {
+      console.error("Purge failed", e);
+      window.location.reload();
+    }
+  };
 
   if (booting) {
     return (
@@ -191,8 +227,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
                             filter="url(#glow-red-large)" 
                             className="decorative-glitch"
                           />
-                          {/* Drip effect */}
-                          <path d="M 100 145 L 100 165" stroke="#ff0000" strokeWidth="2" strokeLinecap="round" className="animate-bounce" />
+                          
+                          {/* Corrupted Static Lines (Remix) */}
+                          <g stroke="#ff0000" strokeWidth="1" opacity="0.4">
+                            <line x1="40" y1="80" x2="60" y2="80" className="decorative-glitch" />
+                            <line x1="140" y1="100" x2="160" y2="100" className="decorative-glitch" style={{ animationDelay: '-1s' }} />
+                            <line x1="90" y1="160" x2="110" y2="160" className="decorative-glitch" style={{ animationDelay: '-0.5s' }} />
+                          </g>
                      </g>
                  </svg>
              </div>
@@ -207,13 +248,32 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
         </div>
 
         {/* Primary Action */}
-        <div className={`mt-12 transition-all duration-1000 transform ${showButton ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+        <div className={`mt-12 transition-all duration-1000 transform ${showButton ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'} flex flex-col items-center gap-4`}>
           <button
             onClick={onStart}
             className="terminal-button"
           >
             INITIALIZE_SIMULATION
           </button>
+          
+          <button
+            onClick={handlePurge}
+            className={`text-[10px] tracking-[0.3em] font-bold transition-all uppercase px-4 py-1 border border-transparent ${
+              confirmPurge 
+                ? 'text-white bg-red-600 border-red-600 animate-pulse' 
+                : 'text-red-900/40 hover:text-red-600'
+            }`}
+          >
+            {confirmPurge ? '[ CONFIRM_PURGE_NOW ]' : '[ PURGE_MEMORY_CORE ]'}
+          </button>
+          {confirmPurge && (
+            <button 
+              onClick={() => setConfirmPurge(false)}
+              className="text-[8px] text-gray-600 hover:text-white uppercase tracking-widest"
+            >
+              Abort Purge
+            </button>
+          )}
         </div>
 
         {/* Warning (Static) */}

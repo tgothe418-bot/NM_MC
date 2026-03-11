@@ -70,7 +70,8 @@ export default function App() {
         </div>
 
         {/* RIGHT COLUMN: Input Sidebar */}
-        <div className="w-full lg:w-[450px] xl:w-[500px] border-t lg:border-t-0 lg:border-l border-gray-800 bg-[#080808]/95 z-20 flex flex-col p-6 shadow-2xl relative pb-24 lg:pb-24">
+        <div className="w-full lg:w-[450px] xl:w-[500px] border-t lg:border-t-0 lg:border-l border-red-900/30 bg-[#080000] z-20 flex flex-col p-6 shadow-[0_0_50px_rgba(0,0,0,1)] relative pb-24 lg:pb-24">
+            <div className="absolute inset-0 pointer-events-none opacity-5 bg-[radial-gradient(circle_at_center,rgba(220,38,38,0.1)_0%,transparent_70%)]" />
             <InputArea 
                 onSend={(text, files) => sendMessage(text, files)} 
                 isLoading={isLoading} 

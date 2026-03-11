@@ -104,15 +104,14 @@ export const generateArchitectResponse = async (
     try {
         // Map history to Gemini "Content" format, handling mixed media
         const contents = history.map(h => {
-            const parts: Part[] = [{ text: h.text }]; // [FIX: Directive 2]
+            const parts: Part[] = [{ text: h.text }];
             
             // If this message has an image attached, add it to the payload
             if (h.imageBase64) {
-                // Strip the data:image/png;base64, prefix if present
                 const cleanBase64 = h.imageBase64.split(',')[1] || h.imageBase64;
                 parts.push({
                     inlineData: {
-                        mimeType: 'image/png', // Gemini is smart enough to handle most image types with this or generic
+                        mimeType: 'image/png',
                         data: cleanBase64
                     }
                 });
@@ -120,37 +119,15 @@ export const generateArchitectResponse = async (
             return { role: h.role, parts };
         });
 
-        // --- THE FIX: PULL MEMORY FROM STORE AND INJECT IT ---
-        const allFacts = useArchitectStore.getState().memory.facts;
-        // Only grab the last 5 to prevent context dilution
-        const recentFacts = allFacts.slice(-5).join(" | "); 
-        
-        const dynamicInstruction = `${systemInstruction}
-        
-        [KNOWN USER FACTS]: ${recentFacts || "None yet."}
-        
-        If the user reveals a NEW personal preference or narrative history not listed above, call the \`record_user_fact\` tool.`;
-        // -----------------------------------------------------
-
         const response = await withRetry(() => ai.models.generateContent({
             model: 'gemini-3-flash-preview', 
             contents: contents,
             config: {
-                systemInstruction: dynamicInstruction, // Use the new dynamic string
-                tools: [{ functionDeclarations: [RECORD_FACT_TOOL] }]
+                systemInstruction: systemInstruction,
             }
         }));
 
-        // Intercept the Tool Call before returning text
-        if (response.functionCalls && response.functionCalls.length > 0) {
-            const call = response.functionCalls.find(fc => fc.name === 'record_user_fact');
-            if (call && call.args && typeof (call.args as any).fact === 'string') {
-                // Inject directly into the Zustand store
-                useArchitectStore.getState().addFact((call.args as any).fact);
-            }
-        }
-
-        return response.text || "...";
+        return response.text || "The connection is flickering... I lost that thought. Say it again?";
     } catch (e) {
         console.error("Architect Error:", e);
         return "I can't see that... the static is too thick. Try again?";
@@ -325,7 +302,7 @@ export const processGameTurn = async (
 
   try {
       const response = await withRetry(() => ai.models.generateContent({
-          model: 'gemini-3.1-pro-preview',
+          model: 'gemini-3-flash-preview',
           contents: [{
               role: 'user',
               parts: [

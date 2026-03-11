@@ -22,7 +22,8 @@ interface ArchitectState {
   addFact: (fact: string) => void;
   recordInteraction: () => void;
   setUserName: (name: string) => void;
-  setContextualMood: (vibe: ArchitectMood['current_vibe']) => void; // New Action
+  setContextualMood: (vibe: ArchitectMood['current_vibe']) => void;
+  resetMemory: () => void;
 }
 
 export const useArchitectStore = create<ArchitectState>()(
@@ -53,6 +54,20 @@ export const useArchitectStore = create<ArchitectState>()(
           ...state.memory, 
           interactions_count: state.memory.interactions_count + 1,
           last_seen: Date.now() 
+        }
+      })),
+
+      resetMemory: () => set(() => ({
+        memory: {
+          userName: null,
+          facts: [],
+          interactions_count: 0,
+          last_seen: Date.now(),
+        },
+        mood: {
+          valence: 0.8,
+          arousal: 0.5,
+          current_vibe: 'Helpful'
         }
       })),
 

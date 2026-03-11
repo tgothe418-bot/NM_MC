@@ -96,7 +96,9 @@ export const useGameEngine = () => {
 
     // Initialize Service immediately
     useEffect(() => {
-        initializeGemini(process.env.API_KEY || "");
+        // Use GEMINI_API_KEY as primary, fallback to API_KEY (selected via dialog)
+        const key = process.env.GEMINI_API_KEY || process.env.API_KEY || "";
+        initializeGemini(key);
     }, []);
 
     // --- ACTIONS ---
