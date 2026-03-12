@@ -412,12 +412,16 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
         {/* HEADER */}
         <div className={`flex items-center justify-between p-6 border-b ${borderColor} bg-black/50 backdrop-blur-md sticky top-0 z-50 transition-colors duration-1000`}>
             <div className="flex items-center gap-4">
+                {/* The ghost starts here but wanders the screen */}
                 <SystemGhost 
                     vibe={mood.current_vibe} 
                     arousal={mood.arousal} 
                     active={isLoading}
-                    className="w-16 h-16 shrink-0 header-ghost-svg" 
+                    floating={true}
+                    className="w-16 h-16 shrink-0 header-ghost-svg opacity-80 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)] transition-all duration-1000" 
                 />
+                {/* Placeholder to keep layout stable when ghost floats away */}
+                <div className="w-16 h-16 shrink-0" />
                 <div>
                     <h2 className={`text-lg font-bold uppercase tracking-widest transition-colors duration-500 ${themeColor}`}>Neural Uplink</h2>
                     
@@ -478,15 +482,6 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
 
         {/* CHAT AREA */}
         <div className="flex-1 overflow-y-auto p-6 md:p-12 space-y-8 custom-scrollbar relative chat-area-container">
-            {/* The Floating Architect Ghost - Wandering in the background */}
-            <SystemGhost 
-                vibe={mood.current_vibe} 
-                arousal={mood.arousal} 
-                floating={true}
-                active={isLoading}
-                className="w-32 h-32 opacity-10"
-            />
-
             {history.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn group`}>
                     <div className={`max-w-4xl p-6 rounded-sm border transition-all duration-500 relative message-bubble ${

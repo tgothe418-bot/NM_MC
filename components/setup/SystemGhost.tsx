@@ -44,7 +44,7 @@ export const SystemGhost: React.FC<SystemGhostProps> = ({ vibe, arousal, classNa
   const isSad = vibe === 'Melancholy';
 
   return (
-    <div className={`${floating ? 'absolute pointer-events-none z-0 opacity-20' : 'relative'} flex items-center justify-center ${className}`}>
+    <div className={`${floating ? 'fixed pointer-events-none z-50' : 'relative'} flex items-center justify-center ${className}`}>
       {/* CSS Animations injected via style block for dynamic timing */}
       <style>{`
         @keyframes ghost-float {
@@ -54,7 +54,7 @@ export const SystemGhost: React.FC<SystemGhostProps> = ({ vibe, arousal, classNa
           75% { transform: translateY(-15px) rotate(1deg); }
         }
         @keyframes ghost-wander {
-          0%, 100% { left: 10%; top: 20%; }
+          0%, 100% { left: 24px; top: 24px; }
           25% { left: 80%; top: 40%; }
           50% { left: 30%; top: 70%; }
           75% { left: 70%; top: 10%; }
