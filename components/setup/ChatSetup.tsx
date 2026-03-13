@@ -412,16 +412,10 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
         {/* HEADER */}
         <div className={`flex items-center justify-between p-6 border-b ${borderColor} bg-black/50 backdrop-blur-md sticky top-0 z-50 transition-colors duration-1000`}>
             <div className="flex items-center gap-4">
-                {/* The ghost starts here but wanders the screen */}
-                <SystemGhost 
-                    vibe={mood.current_vibe} 
-                    arousal={mood.arousal} 
-                    active={isLoading}
-                    floating={true}
-                    className="w-16 h-16 shrink-0 header-ghost-svg opacity-80 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)] transition-all duration-1000" 
-                />
                 {/* Placeholder to keep layout stable when ghost floats away */}
-                <div className="w-16 h-16 shrink-0" />
+                <div className="w-16 h-16 shrink-0 flex items-center justify-center border border-gray-800 rounded-full bg-gray-900/50">
+                    <span className="text-[10px] text-gray-500 font-mono animate-pulse">UPLINK</span>
+                </div>
                 <div>
                     <h2 className={`text-lg font-bold uppercase tracking-widest transition-colors duration-500 ${themeColor}`}>Neural Uplink</h2>
                     
@@ -480,14 +474,23 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
             </div>
         </div>
 
+        {/* The Ghost - Wandering in the background */}
+        <SystemGhost 
+            vibe={mood.current_vibe} 
+            arousal={mood.arousal} 
+            active={isLoading}
+            floating={true}
+            className="w-[576px] h-[576px] opacity-20 drop-shadow-[0_0_30px_rgba(59,130,246,0.3)] transition-all duration-1000" 
+        />
+
         {/* CHAT AREA */}
-        <div className="flex-1 overflow-y-auto p-6 md:p-12 space-y-8 custom-scrollbar relative chat-area-container">
+        <div className="flex-1 overflow-y-auto p-6 md:p-12 space-y-8 custom-scrollbar relative chat-area-container z-10">
             {history.map((msg, i) => (
-                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn group`}>
-                    <div className={`max-w-4xl p-6 rounded-sm border transition-all duration-500 relative message-bubble ${
+                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn group relative z-10`}>
+                    <div className={`max-w-4xl p-6 rounded-sm border transition-all duration-500 relative message-bubble backdrop-blur-md ${
                         msg.role === 'user' 
-                            ? 'bg-gray-900/40 border-gray-800 text-gray-200 hover:border-gray-600' 
-                            : `${bgColor} ${borderColor} ${isDread ? 'text-red-100' : 'text-amber-100'} shadow-[0_0_20px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(220,20,60,0.1)]`
+                            ? 'bg-gray-900/80 border-gray-800 text-gray-200 hover:border-gray-600' 
+                            : `${bgColor.replace('/10', '/80').replace('/20', '/80')} ${borderColor} ${isDread ? 'text-red-100' : 'text-amber-100'} shadow-[0_0_20px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(220,20,60,0.1)]`
                     }`}>
                         {/* Decorative Corner Accents */}
                         <div className={`absolute top-0 left-0 w-2 h-2 border-t border-l ${msg.role === 'user' ? 'border-gray-700' : borderColor} opacity-50`} />
@@ -569,7 +572,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
         </div>
 
         {/* INPUT AREA with STAGING */}
-        <div className={`p-6 border-t ${borderColor} bg-black z-20 transition-colors duration-1000`}>
+        <div className={`p-6 border-t ${borderColor} bg-black z-20 transition-colors duration-1000 relative`}>
             <div className="max-w-4xl mx-auto relative flex flex-col gap-2">
                 
                 {/* STAGED IMAGE PREVIEW */}
