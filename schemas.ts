@@ -230,16 +230,20 @@ export const GameStateSchema = z.object({
   suggested_actions: z.array(z.string()),
 });
 
+export const StateCommandSchema = z.object({
+  action: z.enum(['DAMAGE_ENTITY', 'HEAL_ENTITY', 'UPDATE_STRESS', 'MOVE_ROOM', 'ADD_INVENTORY', 'CONSUME_ITEM', 'ADVANCE_VILLAIN_AGENDA']),
+  target_id: z.string(),
+  value: z.union([z.number(), z.string()]),
+  reason: z.string()
+});
+
 export const GameTurnOutputSchema = z.object({
-  state_mutations: z.object({
-    location_state: LocationStateSchema.partial().optional(),
-    villain_state: VillainStateSchema.partial().optional(),
-    meta: z.object({
-      turn: z.number()
-    }).optional(),
-    npc_states: z.any().optional(),
-    suggested_actions: z.array(z.string()).optional(),
-  }).optional().default({}),
+  state_commands: z.array(StateCommandSchema),
+  narrative_metadata: z.object({
+    entities_addressed: z.array(z.string()),
+    tension_delta: z.number().min(-5).max(5),
+    narrative_escalation: z.boolean()
+  }),
   narrative_render: z.object({
     story_text: z.string(),
     illustration_request: z.string().nullable().optional(),

@@ -4,9 +4,10 @@ import { get, set, del } from 'idb-keyval';
 import { GameState, ChatMessage, SimulationConfig, NpcState, NarrativePhase } from '../types';
 import { getDefaultLocationState } from '../services/locationEngine';
 import { generateProceduralNpc } from '../services/npcGenerator';
-import { processGameTurn, generateAutoPlayerAction, initializeGemini, summarizeHistory, evaluateNarrativeTransition } from '../services/geminiService';
+import { processGameTurn, generateAutoPlayerAction, initializeGemini, summarizeHistory, evaluateNarrativeTransition, classifyUserIntent, generateArchitectResponse } from '../services/geminiService';
 import { useAutoPilot } from './useAutoPilot';
 import { useArchitectStore } from '../store/architectStore';
+import { updateNpcMemories } from '../services/memorySystem';
 
 export interface SaveSlot {
     id: string;
@@ -67,6 +68,61 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         default:
             return state;
     }
+};
+
+const applyStateCommands = (currentState: GameState, commands: any[]): GameState => {
+    let newState = { ...currentState };
+    newState.npc_states = [...newState.npc_states];
+    
+    for (const cmd of commands) {
+        const { action, target_id, value, reason } = cmd;
+        const npcIndex = newState.npc_states.findIndex(n => n.name === target_id);
+        const isPlayer = target_id === currentState.meta.player_profile?.name || target_id === 'player';
+        
+        let targetNpc = npcIndex !== -1 ? { ...newState.npc_states[npcIndex] } : null;
+        
+        switch (action) {
+            case 'DAMAGE_ENTITY':
+                if (targetNpc) {
+                    targetNpc.active_injuries = [...targetNpc.active_injuries, { location: 'Unknown', type: 'Damage', description: String(value) }];
+                }
+                break;
+            case 'HEAL_ENTITY':
+                if (targetNpc && targetNpc.active_injuries.length > 0) {
+                    targetNpc.active_injuries = targetNpc.active_injuries.slice(1);
+                }
+                break;
+            case 'UPDATE_STRESS':
+                if (targetNpc) {
+                    targetNpc.psychology = { ...targetNpc.psychology, stress_level: targetNpc.psychology.stress_level + Number(value) };
+                }
+                break;
+            case 'MOVE_ROOM':
+                newState.location_state = { ...newState.location_state, current_room_id: String(value) };
+                break;
+            case 'ADD_INVENTORY':
+                if (targetNpc) {
+                    targetNpc.resources_held = [...targetNpc.resources_held, String(value)];
+                }
+                break;
+            case 'CONSUME_ITEM':
+                if (targetNpc) {
+                    targetNpc.resources_held = targetNpc.resources_held.filter(i => i !== String(value));
+                }
+                break;
+            case 'ADVANCE_VILLAIN_AGENDA':
+                newState.villain_state = { ...newState.villain_state, threat_scale: newState.villain_state.threat_scale + Number(value) };
+                break;
+            default:
+                console.warn(`Unknown command action: ${action} for target ${target_id}`);
+        }
+        
+        if (targetNpc && npcIndex !== -1) {
+            newState.npc_states[npcIndex] = targetNpc;
+        }
+    }
+    
+    return newState;
 };
 
 export const useGameEngine = () => {
@@ -222,56 +278,20 @@ export const useGameEngine = () => {
         setNarrativeStream("");
         setStreamPhase('logic');
 
+        // Phase 1: Intent Routing
+        const intent = await classifyUserIntent(text);
+        if (intent === 'SYSTEM_COMMAND' || intent === 'OOC_CLARIFICATION') {
+            const architectResponse = await generateArchitectResponse(history.concat({ role: 'user', text, timestamp: Date.now() }), "You are the Architect, a helpful AI companion.");
+            setHistory(prev => [...prev, { role: 'user', text, timestamp: Date.now() }, { role: 'model', text: architectResponse, timestamp: Date.now() }]);
+            setIsLoading(false);
+            processingRef.current = false;
+            return;
+        }
+
         // --- NARRATIVE METRONOME (Step 1 & 3) ---
         const { narrative: metronome, incrementTurnCount, advancePhase } = useArchitectStore.getState();
         incrementTurnCount();
         
-        // Semantic Trigger (Step 3 & 4)
-        // We evaluate every 3 turns to save on API calls
-        if (metronome.turnCount % 3 === 0 && metronome.currentPhase !== 'Resolution') {
-            let condition = "";
-            let nextPhase: NarrativePhase | null = null;
-
-            switch (metronome.currentPhase) {
-                case 'Act1_Setup':
-                    // RPP: Use the custom transition gate if available, otherwise fallback to the default
-                    condition = gameState.narrative.transition_gate || "Has the user clearly committed to investigating the anomaly or been trapped by the nightmare? (The Inciting Incident is fully engaged; user cannot walk away).";
-                    nextPhase = 'Act2_RisingAction';
-                    break;
-                case 'Act2_RisingAction':
-                    condition = "Has the user faced significant escalating resistance and reached a 'Midpoint' or 'All-Is-Lost' moment where they must confront the primary antagonist or concept?";
-                    nextPhase = 'Act3_Climax';
-                    break;
-                case 'Act3_Climax':
-                    condition = "Has the user made a definitive choice or has the core tension been resolved?";
-                    nextPhase = 'Resolution';
-                    break;
-            }
-
-            if (nextPhase && condition) {
-                evaluateNarrativeTransition(history, condition).then(async (result) => {
-                    if (result.conditionMet) {
-                        console.log(`[NARRATIVE ARCHITECT]: Advancing to ${nextPhase}. Reason: ${result.reason}`);
-                        
-                        // --- EPISODIC COMPRESSION (Step 4) ---
-                        if (nextPhase === 'Act3_Climax') {
-                            console.log("[NARRATIVE ARCHITECT]: Executing Episodic Compression for Climax...");
-                            const summary = await summarizeHistory(history);
-                            if (summary) {
-                                // Update GameState with the new summary and purge history
-                                dispatch({ type: 'APPEND_SUMMARY', payload: summary });
-                                // Purge old messages from the active context array to free up tokens
-                                // We keep the last 2 messages for immediate continuity
-                                setHistory(prev => prev.slice(-2));
-                            }
-                        }
-
-                        advancePhase(nextPhase);
-                    }
-                }).catch(err => console.error("Narrative evaluation failed", err));
-            }
-        }
-
         // Get updated metronome state (for CURRENT turn context)
         const updatedMetronome = useArchitectStore.getState().narrative;
 
@@ -292,25 +312,82 @@ export const useGameEngine = () => {
         };
 
         try {
-            // processGameTurn now returns { gameState, storyText, imagePromise }
+            // processGameTurn now returns { stateCommands, narrativeMetadata, storyText, imagePromise }
             const result = await processGameTurn(stateWithNarrative, text, files, (chunk, phase) => {
                 setStreamPhase(phase);
                 if (phase === 'logic') setLogicStream(prev => prev + chunk);
                 else setNarrativeStream(prev => prev + chunk);
             });
             
-            // 1. Immediate Update: State and Text
-            dispatch({ type: 'UPDATE_FULL_STATE', payload: result.gameState });
+            // Apply commands
+            let newState = applyStateCommands(stateWithNarrative, result.stateCommands);
             
             const messageTimestamp = Date.now();
             const newMessage: ChatMessage = {
                 role: 'model',
                 text: result.storyText,
-                gameState: result.gameState,
+                gameState: newState,
                 imageUrl: undefined, // Initially undefined
                 timestamp: messageTimestamp
             };
+            
+            const userMessage: ChatMessage = {
+                role: 'user',
+                text,
+                timestamp: Date.now()
+            };
+            
+            const recentHistory = [...history, userMessage, newMessage];
+            newState = updateNpcMemories(newState, recentHistory, result.narrativeMetadata.entities_addressed);
+            
+            // Semantic Trigger (Step 3 & 4)
+            if ((result.narrativeMetadata.narrative_escalation || Math.abs(result.narrativeMetadata.tension_delta) >= 3) && metronome.currentPhase !== 'Resolution') {
+                let condition = "";
+                let nextPhase: NarrativePhase | null = null;
 
+                switch (metronome.currentPhase) {
+                    case 'Act1_Setup':
+                        // RPP: Use the custom transition gate if available, otherwise fallback to the default
+                        condition = gameState.narrative.transition_gate || "Has the user clearly committed to investigating the anomaly or been trapped by the nightmare? (The Inciting Incident is fully engaged; user cannot walk away).";
+                        nextPhase = 'Act2_RisingAction';
+                        break;
+                    case 'Act2_RisingAction':
+                        condition = "Has the user faced significant escalating resistance and reached a 'Midpoint' or 'All-Is-Lost' moment where they must confront the primary antagonist or concept?";
+                        nextPhase = 'Act3_Climax';
+                        break;
+                    case 'Act3_Climax':
+                        condition = "Has the user made a definitive choice or has the core tension been resolved?";
+                        nextPhase = 'Resolution';
+                        break;
+                }
+
+                if (nextPhase && condition) {
+                    evaluateNarrativeTransition(history, condition).then(async (evalResult) => {
+                        if (evalResult.conditionMet) {
+                            console.log(`[NARRATIVE ARCHITECT]: Advancing to ${nextPhase}. Reason: ${evalResult.reason}`);
+                            
+                            // --- EPISODIC COMPRESSION (Step 4) ---
+                            if (nextPhase === 'Act3_Climax') {
+                                console.log("[NARRATIVE ARCHITECT]: Executing Episodic Compression for Climax...");
+                                const summary = await summarizeHistory(history);
+                                if (summary) {
+                                    // Update GameState with the new summary and purge history
+                                    dispatch({ type: 'APPEND_SUMMARY', payload: summary });
+                                    // Purge old messages from the active context array to free up tokens
+                                    // We keep the last 2 messages for immediate continuity
+                                    setHistory(prev => prev.slice(-2));
+                                }
+                            }
+
+                            advancePhase(nextPhase);
+                        }
+                    }).catch(err => console.error("Narrative evaluation failed", err));
+                }
+            }
+            
+            // 1. Immediate Update: State and Text
+            dispatch({ type: 'UPDATE_FULL_STATE', payload: newState });
+            
             // CONTEXT WINDOW HYGIENE (Rolling Summary)
             // If history gets too long (e.g. > 20 turns), trim it and summarize the oldest chunk.
             if (history.length > 20) {
@@ -322,7 +399,7 @@ export const useGameEngine = () => {
                 setHistory([...historyToKeep, newMessage]);
                 
                 // Directive 2: Capture current turn to prevent race conditions during async summarization
-                const turnAtRequest = result.gameState.meta.turn;
+                const turnAtRequest = newState.meta.turn;
 
                 // Trigger summary generation in background
                 summarizeHistory(historyToSummarize).then(summary => {

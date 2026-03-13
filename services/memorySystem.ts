@@ -6,32 +6,36 @@ import { GameState, NpcState, ChatMessage } from '../types';
  */
 export const updateNpcMemories = (
   gameState: GameState, 
-  recentHistory: ChatMessage[]
+  recentHistory: ChatMessage[],
+  entitiesAddressed: string[] = []
 ): GameState => {
   const updatedNpcs = gameState.npc_states.map(npc => {
     // Defensive check: If dialogue state is missing, we can't update memory.
     if (!npc.dialogue_state || !npc.dialogue_state.memory) return npc;
 
-    // 1. Filter history for this NPC's name (case-insensitive)
-    const relevantChats = recentHistory.filter(msg => 
-      msg.text.toLowerCase().includes(npc.name.toLowerCase()) || 
-      (msg.role === 'model' && msg.text.includes(npc.name))
-    );
+    // 1. Check if the NPC is addressed in this turn
+    const isAddressed = entitiesAddressed.includes(npc.name) || entitiesAddressed.includes('all');
+
+    if (!isAddressed) return npc;
+
+    // 2. Filter history for the relevant chats (usually just the latest turn)
+    // We'll just take the last message (the user's action) and the model's response
+    const relevantChats = recentHistory.slice(-2);
 
     if (relevantChats.length === 0) return npc;
 
-    // 2. Create new memory logs from these interactions
+    // 3. Create new memory logs from these interactions
     const newMemories = relevantChats.map(chat => ({
       id: crypto.randomUUID(),
       turn: gameState.meta.turn,
       description: chat.role === 'user' 
-        ? `Player said: "${chat.text.slice(0, 100)}..."` 
+        ? `Player said/did: "${chat.text.slice(0, 100)}..."` 
         : `I acted/said: "${chat.text.slice(0, 100)}..."`,
       emotional_impact: 1, // Default impact, can be enhanced with sentiment analysis later
       involved_actors: ['Player']
     }));
 
-    // 3. Append to existing episodic logs, keeping only the last 10 significant ones
+    // 4. Append to existing episodic logs, keeping only the last 10 significant ones
     const existingLogs = npc.dialogue_state.memory.episodic_logs || [];
     const updatedLogs = [...existingLogs, ...newMemories]
       .slice(-10); // Prune old memories to save tokens

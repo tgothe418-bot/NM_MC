@@ -96,6 +96,40 @@ const RECORD_FACT_TOOL: FunctionDeclaration = {
   }
 };
 
+export const classifyUserIntent = async (userInput: string): Promise<'NARRATIVE_ACTION' | 'SYSTEM_COMMAND' | 'OOC_CLARIFICATION'> => {
+    const ai = getAI();
+    const prompt = `Classify the following user input into one of three categories:
+    - NARRATIVE_ACTION: The user is taking an action in the game world, speaking to a character, or describing their character's behavior.
+    - SYSTEM_COMMAND: The user is asking to change game settings, save/load, or perform a meta-action.
+    - OOC_CLARIFICATION: The user is asking a question out-of-character, asking for clarification about the rules, or talking to the AI directly.
+    
+    User Input: "${userInput}"`;
+
+    try {
+        const res = await withRetry(() => ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            config: {
+                responseMimeType: 'application/json',
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        intent: {
+                            type: Type.STRING,
+                            enum: ['NARRATIVE_ACTION', 'SYSTEM_COMMAND', 'OOC_CLARIFICATION']
+                        }
+                    },
+                    required: ['intent']
+                }
+            }
+        }));
+        const parsed = JSON.parse(res.text || "{}");
+        return parsed.intent || 'NARRATIVE_ACTION';
+    } catch (e) {
+        return 'NARRATIVE_ACTION';
+    }
+};
+
 export const generateArchitectResponse = async (
     history: { role: 'user' | 'model', text: string, imageBase64?: string }[], 
     systemInstruction: string
@@ -280,7 +314,7 @@ export const processGameTurn = async (
   userAction: string, 
   files: File[] = [],
   onStreamLogic?: (chunk: string, phase: 'logic' | 'narrative') => void
-): Promise<{ gameState: GameState, storyText: string, imagePromise?: Promise<string | undefined> }> => {
+): Promise<{ stateCommands: any[], narrativeMetadata: any, storyText: string, imagePromise?: Promise<string | undefined> }> => {
   const ai = getAI();
 
   // Find Player NPC to include in the Slim State
@@ -339,14 +373,16 @@ export const processGameTurn = async (
   ${voiceManifesto}
   ${locationManifesto}
   ${roomRules}
+  
+  INSTRUCTION: You must output an array of discrete atomic commands in 'state_commands' to mutate the game state, rather than partial state merges.
   `;
 
   // 2. SINGLE PASS GENERATION
   if (onStreamLogic) onStreamLogic("processing neural turn...\n", 'logic');
 
   let finalStoryText = "*The vision blurs...*";
-  // Directive 3: Remove 'any' typing and initialize with empty partial state
-  let stateMutations: any = {};
+  let stateCommands: any[] = [];
+  let narrativeMetadata: any = { entities_addressed: [], tension_delta: 0, narrative_escalation: false };
   let imagePromise: Promise<string | undefined> | undefined;
 
   const jsonSchema = zodToJsonSchema(GameTurnOutputSchema as any, "turnOutput");
@@ -371,16 +407,8 @@ export const processGameTurn = async (
       const rawText = response.text || "{}";
       const parsedOutput = parseGameTurnOutput(rawText);
       
-      // Directive 3: Enforce strict typing via Zod validation on the raw mutations
-      if (parsedOutput.state_mutations) {
-          try {
-              // We use partial() because the LLM only returns what changed
-              stateMutations = GameStateSchema.partial().parse(parsedOutput.state_mutations);
-          } catch (validationError) {
-              console.warn("LLM State Mutation Validation Failed - Falling back to partial merge:", validationError);
-              stateMutations = parsedOutput.state_mutations as Partial<GameState>;
-          }
-      }
+      stateCommands = parsedOutput.state_commands || [];
+      narrativeMetadata = parsedOutput.narrative_metadata || narrativeMetadata;
       
       finalStoryText = parsedOutput.narrative_render.story_text || "...";
       
@@ -409,68 +437,12 @@ export const processGameTurn = async (
       finalStoryText = "The machine screams in binary. (Engine Failure)";
   }
   
-  // MERGE STATE
-  let newLocationState = { ...currentState.location_state };
-  if (stateMutations.location_state) {
-      newLocationState = { ...newLocationState, ...stateMutations.location_state };
-      if (stateMutations.location_state.room_map) {
-          // Robust Merge: Keep old map, apply new rooms/updates from simulator
-          newLocationState.room_map = { ...currentState.location_state.room_map, ...stateMutations.location_state.room_map };
-      }
-  }
-
-  // ROBUST NPC MERGE: Prevent the LLM from accidentally deleting NPCs
-  let mergedNpcs = [...currentState.npc_states];
-  if (Array.isArray(stateMutations.npc_states)) {
-      stateMutations.npc_states.forEach((newNpc: Partial<NpcState>) => { // [FIX: Directive 1]
-          const index = mergedNpcs.findIndex(n => n.name === newNpc.name);
-          if (index !== -1) {
-              // Merge existing NPC with updates
-              mergedNpcs[index] = { 
-                  ...mergedNpcs[index], 
-                  ...newNpc,
-                  // Ensure we don't wipe out complex nested objects if the LLM only sent partials
-                  psychology: { ...mergedNpcs[index].psychology, ...(newNpc.psychology || {}) },
-                  physical: { ...mergedNpcs[index].physical, ...(newNpc.physical || {}) },
-                  personality: { ...mergedNpcs[index].personality, ...(newNpc.personality || {}) },
-                  dialogue_state: { ...mergedNpcs[index].dialogue_state, ...(newNpc.dialogue_state || {}) }
-              };
-          } else {
-              // New NPC introduced by the machine
-              mergedNpcs.push(newNpc as NpcState); // [FIX: Directive 1] Cast to NpcState for push
-          }
-      });
-  }
-
-  const updatedState: GameState = {
-      ...currentState,
-      ...stateMutations,
-      npc_states: mergedNpcs,
-      meta: { ...currentState.meta, ...(stateMutations.meta || {}) },
-      villain_state: { ...currentState.villain_state, ...(stateMutations.villain_state || {}) },
-      // Narrative state is mostly handled by the text return, but we merge any structural updates
-      narrative: { 
-          ...currentState.narrative, 
-          illustration_request: null // Always clear the request after handling
-      },
-      location_state: newLocationState, 
-  };
-
-  // 4. MEMORY CONSOLIDATION
-  // Create a temporary history object for the current turn to update memory immediately
-  const turnHistory = [
-      { role: 'user', text: userAction, timestamp: Date.now() },
-      { role: 'model', text: finalStoryText, timestamp: Date.now() }
-  ] as ChatMessage[];
-
-  // Run the memory update on the full state
-  const stateWithMemory = updateNpcMemories(updatedState, turnHistory);
-
   return {
-      gameState: stateWithMemory,
+      stateCommands,
+      narrativeMetadata,
       storyText: finalStoryText,
       imagePromise // Return the promise to the UI
-  };
+  } as any; // Temporary cast, will be handled in useGameEngine
 };
 
 // --- HELPER FUNCTIONS ---
@@ -566,23 +538,90 @@ export const analyzeSourceMaterial = async (
                  mime.includes('markdown') ||
                  file.name.endsWith('.md');
 
-  let parts: Part[] = [];
-
   try {
       if (onProgress) onProgress("Reading local memory buffer...", 15);
       
+      let textContent = "";
       if (isText) {
-          const textContent = await fileToText(file);
-          parts = [{ text: `[SOURCE MATERIAL: ${file.name}]\n${textContent}` }];
+          textContent = await fileToText(file);
       } else {
+          // For non-text, we can't easily chunk, so we just pass it as is
           const base64Data = await fileToBase64(file);
           const base64Content = base64Data.split(',')[1];
-          parts = [{ inlineData: { mimeType: mime, data: base64Content } }];
+          return await processSourceChunk([{ inlineData: { mimeType: mime, data: base64Content } }], onProgress);
       }
 
       if (onProgress) onProgress("Encoding neural stream for ingestion...", 45);
 
-      const prompt = `You are the Reference Processing Protocol (RPP) for The Nightmare Machine. 
+      // Chunking logic
+      const chunkSize = 80000;
+      if (textContent.length > 100000) {
+          const chunks: string[] = [];
+          for (let i = 0; i < textContent.length; i += chunkSize) {
+              chunks.push(textContent.slice(i, i + chunkSize));
+          }
+          
+          const results: SourceAnalysisResult[] = [];
+          for (let i = 0; i < chunks.length; i++) {
+              if (onProgress) onProgress(`Processing chunk ${i + 1} of ${chunks.length}...`, 45 + Math.floor((i / chunks.length) * 30));
+              const chunkResult = await processSourceChunk([{ text: `[SOURCE MATERIAL CHUNK ${i + 1}/${chunks.length}]\n${chunks[i]}` }]);
+              results.push(chunkResult);
+          }
+          
+          if (onProgress) onProgress("Synthesizing character archetypes and environmental data...", 75);
+          
+          // Merge results
+          const mergedResult: SourceAnalysisResult = {
+              characters: [],
+              location: results[0]?.location,
+              visual_motif: results[0]?.visual_motif,
+              theme_cluster: results[0]?.theme_cluster,
+              intensity: results[0]?.intensity,
+              plot_hook: results[0]?.plot_hook,
+              rpp_transition_gate: results[0]?.rpp_transition_gate,
+              rpp_voice_manifesto: results[0]?.rpp_voice_manifesto,
+              rpp_primary_vectors: []
+          };
+          
+          const seenCharacters = new Set<string>();
+          const seenVectors = new Set<string>();
+          
+          for (const res of results) {
+              if (res.characters) {
+                  for (const char of res.characters) {
+                      if (!seenCharacters.has(char.name)) {
+                          seenCharacters.add(char.name);
+                          mergedResult.characters!.push(char);
+                      }
+                  }
+              }
+              if (res.rpp_primary_vectors) {
+                  for (const vec of res.rpp_primary_vectors) {
+                      if (!seenVectors.has(vec)) {
+                          seenVectors.add(vec);
+                          mergedResult.rpp_primary_vectors!.push(vec);
+                      }
+                  }
+              }
+          }
+          
+          if (onProgress) onProgress("Ingestion complete. Neural patterns stabilized.", 100);
+          return mergedResult;
+      } else {
+          const result = await processSourceChunk([{ text: `[SOURCE MATERIAL: ${file.name}]\n${textContent}` }], onProgress);
+          if (onProgress) onProgress("Ingestion complete. Neural patterns stabilized.", 100);
+          return result;
+      }
+
+  } catch (e) {
+      console.error("Analysis Failed:", e);
+      throw e;
+  }
+};
+
+const processSourceChunk = async (parts: Part[], onProgress?: (stage: string, percent: number) => void): Promise<SourceAnalysisResult> => {
+    const ai = getAI();
+    const prompt = `You are the Reference Processing Protocol (RPP) for The Nightmare Machine. 
 Analyze the following source material and extract its narrative architecture into strictly formatted JSON.
 
 EXECUTE THE FOLLOWING EXTRACTION FILTERS:
@@ -594,31 +633,22 @@ EXECUTE THE FOLLOWING EXTRACTION FILTERS:
 6. rpp_voice_manifesto: Define the author's prose style, pacing, and how the syntax should degrade as the climax approaches.
 7. rpp_primary_vectors: Identify which psychological stats this story targets. Return an array containing any of: "fear", "isolation", "guilt", "paranoia".`;
 
-      parts.push({ text: prompt });
+    const fullParts = [...parts, { text: prompt }];
+    const jsonSchema = zodToJsonSchema(SourceAnalysisResultSchema as any, "analysis");
 
-      if (onProgress) onProgress("Synthesizing character archetypes and environmental data...", 75);
+    const res = await Promise.race([
+      withRetry(() => ai.models.generateContent({
+        model: 'gemini-3-flash-preview', 
+        contents: [{ role: 'user', parts: fullParts }],
+        config: { 
+            responseMimeType: 'application/json',
+            responseSchema: jsonSchema.definitions?.analysis as any
+        }
+      })),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Analysis Timeout")), 60000))
+    ]);
 
-      const jsonSchema = zodToJsonSchema(SourceAnalysisResultSchema as any, "analysis");
-
-      const res = await Promise.race([
-        withRetry(() => ai.models.generateContent({
-          model: 'gemini-3-flash-preview', 
-          contents: [{ role: 'user', parts: parts }],
-          config: { 
-              responseMimeType: 'application/json',
-              responseSchema: jsonSchema.definitions?.analysis as any
-          }
-        })),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Analysis Timeout")), 60000))
-      ]);
-
-      if (onProgress) onProgress("Ingestion complete. Neural patterns stabilized.", 100);
-
-      return parseSourceAnalysis(res.text || "{}");
-  } catch (e) {
-      console.error("Analysis Failed:", e);
-      throw e;
-  }
+    return parseSourceAnalysis(res.text || "{}");
 };
 
 export const generateCalibrationField = async (
@@ -755,11 +785,6 @@ const fileToText = (file: File): Promise<string> => {
         const reader = new FileReader();
         reader.onload = () => {
             let text = reader.result as string;
-            // Truncate to ~150k characters (~40k tokens) to stay safe with TPM
-            if (text.length > 150000) {
-                console.warn(`Truncating large file: ${file.name}`);
-                text = text.slice(0, 150000) + "\n\n[TRUNCATED DUE TO SIZE]";
-            }
             resolve(text);
         };
         reader.onerror = reject;
