@@ -45,7 +45,7 @@ export const SystemGhost: React.FC<SystemGhostProps> = ({ className = "", floati
   const isHostile = vibe === 'Predatory' || vibe === 'Glitchy';
   const isSad = vibe === 'Melancholy';
 
-  const baseClasses = floating ? 'fixed pointer-events-none z-0 ghost-animate-wander' : 'pointer-events-none z-0';
+  const baseClasses = floating ? 'absolute pointer-events-none z-0 ghost-animate-wander' : 'pointer-events-none z-0';
   const positionClass = className.includes('absolute') || className.includes('fixed') || className.includes('relative') ? '' : 'relative';
 
   return (
@@ -59,10 +59,10 @@ export const SystemGhost: React.FC<SystemGhostProps> = ({ className = "", floati
           75% { transform: translateY(-15px) rotate(1deg); }
         }
         @keyframes ghost-wander {
-          0%, 100% { left: 50%; top: -5%; transform: translateX(-50%); }
-          25% { left: 85%; top: 20%; transform: translateX(-50%); }
-          50% { left: 15%; top: 50%; transform: translateX(-50%); }
-          75% { left: 80%; top: 15%; transform: translateX(-50%); }
+          0%, 100% { left: 50%; top: 5%; transform: translateX(-50%); }
+          25% { left: 75%; top: 25%; transform: translateX(-50%); }
+          50% { left: 25%; top: 55%; transform: translateX(-50%); }
+          75% { left: 70%; top: 20%; transform: translateX(-50%); }
         }
         @keyframes ghost-orbit {
           0% { left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(0deg) translateX(250px) rotate(0deg); }
