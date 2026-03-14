@@ -1,14 +1,17 @@
 import React from 'react';
+import { useArchitectStore } from '../../store/architectStore';
 
 interface SystemGhostProps {
-  vibe: 'Helpful' | 'Glitchy' | 'Predatory' | 'Melancholy' | 'Analytical';
-  arousal: number; // 0.0 to 1.0
   className?: string;
   floating?: boolean;
   active?: boolean;
 }
 
-export const SystemGhost: React.FC<SystemGhostProps> = ({ vibe, arousal, className = "", floating = false, active = false }) => {
+export const SystemGhost: React.FC<SystemGhostProps> = ({ className = "", floating = true, active = false }) => {
+  // The Ghost is now self-aware. It pulls its own mood from the global store.
+  const { mood } = useArchitectStore();
+  const { current_vibe: vibe, arousal } = mood;
+
   // 1. Determine Colors based on Vibe
   let coreColor = "#3b82f6"; // Default Blue (Helpful)
   let glowColor = "rgba(59, 130, 246, 0.5)";
@@ -33,7 +36,6 @@ export const SystemGhost: React.FC<SystemGhostProps> = ({ vibe, arousal, classNa
   }
 
   // 2. Determine Animation Speed based on Arousal and Active state
-  // Higher arousal = faster float and faster tail wag
   const speedBoost = active ? 2 : 1;
   const floatDuration = Math.max(0.5, (4 - (arousal * 3)) / speedBoost) + "s";
   const tailDuration = Math.max(0.2, (2 - (arousal * 1.5)) / speedBoost) + "s";
@@ -43,9 +45,12 @@ export const SystemGhost: React.FC<SystemGhostProps> = ({ vibe, arousal, classNa
   const isHostile = vibe === 'Predatory' || vibe === 'Glitchy';
   const isSad = vibe === 'Melancholy';
 
+  const baseClasses = floating ? 'fixed pointer-events-none z-0 ghost-animate-wander' : 'pointer-events-none z-0';
+  const positionClass = className.includes('absolute') || className.includes('fixed') || className.includes('relative') ? '' : 'relative';
+
   return (
-    <div className={`${floating ? 'fixed pointer-events-none z-0 ghost-animate-wander' : 'relative'} flex items-center justify-center ${className}`}>
-      {/* CSS Animations injected via style block for dynamic timing */}
+    // Z-index set to strictly stay behind modal text but over background colors
+    <div className={`${baseClasses} ${positionClass} flex items-center justify-center ${className}`}>
       <style>{`
         @keyframes ghost-float {
           0%, 100% { transform: translateY(0) rotate(0deg); }
@@ -101,9 +106,7 @@ export const SystemGhost: React.FC<SystemGhostProps> = ({ vibe, arousal, classNa
           </linearGradient>
         </defs>
 
-        {/* Default / Predatory / Melancholy Form */}
         <g className="transition-all duration-700">
-          {/* Body & Tail */}
           <path 
             className="ghost-animate-tail transition-colors duration-700"
             fill="url(#ghostGrad)" 
@@ -115,7 +118,6 @@ export const SystemGhost: React.FC<SystemGhostProps> = ({ vibe, arousal, classNa
             className="transition-all duration-700"
           />
 
-          {/* Circuitry Details */}
           <g stroke="white" strokeWidth="1" opacity={0.1 + (arousal * 0.4)} fill="none">
              <path d="M 40 40 L 40 60 L 50 60" />
              <circle cx="50" cy="60" r="1.5" fill="white" />
@@ -123,14 +125,12 @@ export const SystemGhost: React.FC<SystemGhostProps> = ({ vibe, arousal, classNa
              <circle cx="90" cy="70" r="1.5" fill="white" />
           </g>
 
-          {/* Eyes */}
           <g className="transition-all duration-500">
             <ellipse cx="60" cy="40" rx={isHostile ? 4 : 5} ry={isHostile ? 3 : 6} fill="white" />
             <ellipse cx="80" cy="40" rx={isHostile ? 4 : 5} ry={isHostile ? 3 : 6} fill="white" />
             <circle cx={isSad ? 59 : 61} cy={isHostile ? 40 : 41} r="2" fill="#0f172a" />
             <circle cx={isSad ? 79 : 81} cy={isHostile ? 40 : 41} r="2" fill="#0f172a" />
             
-            {/* Eyebrows */}
             {isHostile && (
                <path d="M 55 33 L 65 37 M 85 33 L 75 37" stroke="white" strokeWidth="2" strokeLinecap="round" />
             )}
@@ -139,7 +139,6 @@ export const SystemGhost: React.FC<SystemGhostProps> = ({ vibe, arousal, classNa
             )}
           </g>
 
-          {/* Mouth */}
           <path 
             d={isHostile ? "M 65 52 Q 70 50 75 52" : isSad ? "M 65 52 Q 70 48 75 52" : "M 65 50 Q 70 55 75 50"} 
             stroke="white" 

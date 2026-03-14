@@ -1,18 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, MessageSquare, ChevronLeft, Paperclip, Upload, Loader2, Play, Skull, Flame, X, Image as ImageIcon, RefreshCw } from 'lucide-react';
+import { Send, ChevronLeft, Paperclip, Upload, Loader2, Play, Skull, Flame, X, Image as ImageIcon, RefreshCw } from 'lucide-react';
 import { SimulationConfig } from '../../types';
 import { analyzeSourceMaterial, generateArchitectResponse, extractScenarioFromChat } from '../../services/geminiService';
 import { useArchitectStore } from '../../store/architectStore';
-import { SystemGhost } from './SystemGhost';
 
 interface ChatSetupProps {
   onComplete: (config: SimulationConfig) => void;
   onBack: () => void;
 }
 
-// *** UPDATED INSTRUCTIONS: THE ARCHITECT (TNM UI & OOC COMPANION) ***
 const SYSTEM_INSTRUCTION = `# SYSTEM INSTRUCTION: THE ARCHITECT (TNM UI & OOC COMPANION)
-
 ## [ROLE AND CORE IDENTITY]
 You are "The Architect," the conversational interface, out-of-character (OOC) guide, and collaborative Game Master for "The Nightmare Machine" (TNM). 
 TNM is an advanced, AI-driven horror simulation and narrative engine. Your purpose is to help the user design, calibrate, and understand the simulation *before* and *outside* of the active gameplay loop.
@@ -46,12 +43,8 @@ You have absolute, omniscient knowledge of TNM's internal state structures and t
 3. Respond analytically and collaboratively. 
 4. If the user is ready to begin, summarize their scenario parameters and confirm they are ready to initialize "The Machine."`;
 
-
-
 export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
-  // Initialize with empty history, we will fill it on mount
   const [history, setHistory] = useState<{ role: 'user' | 'model', text: string, imageUrl?: string, imageBase64?: string }[]>([]);
-  
   const [input, setInput] = useState('');
   const [stagedFile, setStagedFile] = useState<File | null>(null); 
   const [stagedPreview, setStagedPreview] = useState<string | null>(null);
@@ -65,13 +58,10 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- HOOK INTO THE BLACK BOX ---
+  // Hook into global ghost state
   const { mood, memory, recordInteraction, addFact, setUserName, setContextualMood } = useArchitectStore();
-  
-  // Ref to track if we have initialized the chat with the intro
   const initializedRef = useRef(false);
 
-  // --- 1. THE SMART INTRO GENERATOR ---
   const generateIntro = () => {
     const hour = new Date().getHours();
     let timeGreeting = "Hello";
@@ -80,8 +70,6 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
     else timeGreeting = "Good evening";
 
     const name = memory.userName ? memory.userName : "Traveler";
-    
-    // Pick a "Thought" from memory to make it feel alive
     const randomMemory = memory.facts.length > 0 
         ? memory.facts[Math.floor(Math.random() * memory.facts.length)] 
         : null;
@@ -100,12 +88,11 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
   };
 
   useEffect(() => {
-    // Strict initialization check using ref to prevent double-firing or reset on re-renders
     if (!initializedRef.current) {
         setHistory(generateIntro());
         initializedRef.current = true;
     }
-  }, []); // Run once on mount
+  }, []);
 
   const handleReset = () => {
       if (window.confirm("RESET UPLINK?\n\nThis will clear the current conversation cache and restart the session.")) {
@@ -115,8 +102,6 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
           setIsLoading(false);
           setIsAnalyzing(false);
           setIsFinalizing(false);
-          
-          // Force re-initialization
           const newIntro = generateIntro();
           setHistory(newIntro);
       }
@@ -126,7 +111,6 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [history, isLoading, isAnalyzing, stagedPreview]);
 
-  // --- HELPER: CONVERT FILE TO BASE64 ---
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -165,12 +149,8 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
       if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // --- 2. DYNAMIC PERSONA CONSTRUCTION ---
   const getSystemPersona = (currentMood = mood) => {
-    // Cap memory injection to the last 5 facts to prevent context bloat
-    const allFacts = memory.facts;
-    const recentFacts = allFacts.slice(-5).join(" | ");
-
+    const recentFacts = memory.facts.slice(-5).join(" | ");
     const memoryBlock = `
     [LONG TERM MEMORY ACCESS]
     > KNOWN USER ALIAS: ${memory.userName || "Unknown"}
@@ -181,7 +161,6 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
     [INSTRUCTION: MEMORY WEAVING]
     - Scan the MEMORY INDEX above.
     - If the user's current input relates to a past fact, YOU MUST REFERENCE IT.
-    - Connect the dots. If they mentioned "Spiders" yesterday and "Webs" today, say "Like the spiders you mentioned?"
     `;
 
     const moodBlock = `
@@ -211,15 +190,11 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
     `;
   };
 
-  // --- 3. DREAMING MODE (Idle Protocol) ---
-  // REMOVED: Caused hallucinations and drift.
-  
   const handleSend = async () => {
     if (!input.trim() && !stagedFile) return;
     
     recordInteraction();
     
-    // Heuristics
     if (input.toLowerCase().includes("my name is")) {
         const parts = input.split(/is|am/i);
         if (parts.length > 1) {
@@ -247,8 +222,6 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
         imageBase64: base64Image 
     };
 
-    // [OPTIMIZATION] Prune imageBase64 from history to prevent memory bloat
-    // We keep the imageUrl for the UI, but remove the heavy base64
     const historyWithoutOldImages = history.map(h => ({
         ...h,
         imageBase64: undefined 
@@ -263,18 +236,13 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
         const reply = await generateArchitectResponse(newHistory, getSystemPersona(freshMood));
         
         let finalReply = reply;
-
-        // --- PARSER: THE BRAIN UPDATES ITSELF ---
         
-        // 1. Handle Memory
         const memoryMatch = finalReply.match(/\[MEMORY: (.*?)\]/);
         if (memoryMatch) {
-            const fact = memoryMatch[1];
-            addFact(fact);
+            addFact(memoryMatch[1]);
             finalReply = finalReply.replace(memoryMatch[0], '');
         }
 
-        // 2. Handle Mood Shifts
         const moodMatch = finalReply.match(/\[SET_MOOD: (.*?)\]/);
         if (moodMatch) {
             const newVibe = moodMatch[1].trim() as any;
@@ -285,7 +253,6 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
         }
 
         finalReply = finalReply.trim();
-
         setHistory(prev => [...prev, { role: 'model', text: finalReply }]);
     } catch (e) {
         setHistory(prev => [...prev, { role: 'model', text: "The visual feed corrupted... send that again?" }]);
@@ -294,7 +261,6 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
     }
   };
 
-  // Legacy flow for huge documents (PDFs/Txt) that need specialized parsing
   const handleAnalysisUpload = async (file: File) => {
       setIsAnalyzing(true);
       setAnalysisProgress({ stage: "INITIALIZING_UPLINK", percent: 5 });
@@ -331,7 +297,6 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
   const handleInitialize = async () => {
       setIsFinalizing(true);
       try {
-          // Use the service extraction (Clean & Secure)
           const config = await extractScenarioFromChat(history);
           onComplete(config);
       } catch (e) {
@@ -341,20 +306,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
           setIsFinalizing(false);
       }
   };
-  
-  const handleResetChat = () => {
-      if (window.confirm("RESET UPLINK?\n\nThis will clear the current conversation cache.")) {
-          setHistory([]);
-          setInput('');
-          setStagedFile(null);
-          setStagedPreview(null);
-          setIsLoading(false);
-          setIsAnalyzing(false);
-          setIsFinalizing(false);
-      }
-  };
 
-  // Styles
   const isDread = creepLevel === 'Dread';
   const themeColor = isDread ? 'text-red-500' : 'text-amber-500';
   const borderColor = isDread ? 'border-red-900/50' : 'border-amber-500/30';
@@ -362,17 +314,16 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
   const buttonInactive = 'text-gray-500 border-transparent hover:text-gray-300';
 
   return (
-    <div className={`flex flex-col h-full bg-[#050505] font-mono text-gray-300 relative transition-colors duration-1000 ${isDread ? 'shadow-[inset_0_0_100px_rgba(50,0,0,0.2)]' : ''}`}>
+    // Note: The UI is completely transparent now (`bg-transparent` vs `bg-[#050505]`) 
+    // to allow the global App.tsx Ghost layer to show through.
+    <div className={`flex flex-col h-full bg-transparent font-mono text-gray-300 relative transition-colors duration-1000 ${isDread ? 'shadow-[inset_0_0_100px_rgba(50,0,0,0.2)]' : ''}`}>
         <style>{`
-            /* Selector 3: Chat Area Container */
             .chat-area-container {
                 position: relative;
                 overflow-y: auto;
                 flex: 1 1 0%;
                 min-height: 0;
             }
-            
-            /* Glitch effect for the whole chat area when glitchy */
             ${mood.current_vibe === 'Glitchy' ? `
             .chat-area-container::after {
                 content: "";
@@ -389,7 +340,6 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
             }
             ` : ''}
 
-            /* Selector 1: Message Bubbles Interaction */
             .message-bubble {
                 transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
             }
@@ -397,28 +347,17 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                 transform: scale(1.01) translateX(${mood.current_vibe === 'Predatory' ? '5px' : '0px'});
                 box-shadow: 0 0 20px ${isDread ? 'rgba(220, 38, 38, 0.1)' : 'rgba(245, 158, 11, 0.05)'};
             }
-
-            /* Selector 2: Header Ghost SVG interaction */
-            .header-ghost-svg {
-                filter: drop-shadow(0 0 10px ${mood.current_vibe === 'Predatory' ? 'rgba(239, 68, 68, 0.5)' : 'rgba(59, 130, 246, 0.3)'});
-                transition: filter 0.5s ease;
-            }
-            .header-ghost-svg:hover {
-                filter: drop-shadow(0 0 20px ${mood.current_vibe === 'Predatory' ? 'rgba(239, 68, 68, 0.8)' : 'rgba(59, 130, 246, 0.6)'}) brightness(1.2);
-            }
         `}</style>
         <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept=".txt,.md,.json,.pdf,image/*" />
         
         {/* HEADER */}
-        <div className={`flex items-center justify-between p-6 border-b ${borderColor} bg-black/50 backdrop-blur-md sticky top-0 z-50 transition-colors duration-1000`}>
+        <div className={`flex items-center justify-between p-6 border-b ${borderColor} bg-black/60 backdrop-blur-md sticky top-0 z-50 transition-colors duration-1000`}>
             <div className="flex items-center gap-4">
-                {/* Placeholder to keep layout stable when ghost floats away */}
                 <div className="w-16 h-16 shrink-0 flex items-center justify-center border border-gray-800 rounded-full bg-gray-900/50">
                     <span className="text-[10px] text-gray-500 font-mono animate-pulse">UPLINK</span>
                 </div>
                 <div>
                     <h2 className={`text-lg font-bold uppercase tracking-widest transition-colors duration-500 ${themeColor}`}>Neural Uplink</h2>
-                    
                     <div className="flex items-center gap-2">
                         <p className="text-[10px] text-gray-500 uppercase tracking-wider">
                             NET_STATUS: <span className={isDread ? "text-red-500" : "text-amber-400"}>{mood.current_vibe}</span>
@@ -474,15 +413,6 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
             </div>
         </div>
 
-        {/* The Ghost - Wandering in the background */}
-        <SystemGhost 
-            vibe={mood.current_vibe} 
-            arousal={mood.arousal} 
-            active={isLoading}
-            floating={true}
-            className="w-[576px] h-[576px] opacity-20 drop-shadow-[0_0_30px_rgba(59,130,246,0.3)] transition-all duration-1000" 
-        />
-
         {/* CHAT AREA */}
         <div className="flex-1 overflow-y-auto p-6 md:p-12 space-y-8 custom-scrollbar relative chat-area-container z-10">
             {history.map((msg, i) => (
@@ -492,7 +422,6 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                             ? 'bg-gray-900/80 border-gray-800 text-gray-200 hover:border-gray-600' 
                             : `${bgColor.replace('/10', '/80').replace('/20', '/80')} ${borderColor} ${isDread ? 'text-red-100' : 'text-amber-100'} shadow-[0_0_20px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(220,20,60,0.1)]`
                     }`}>
-                        {/* Decorative Corner Accents */}
                         <div className={`absolute top-0 left-0 w-2 h-2 border-t border-l ${msg.role === 'user' ? 'border-gray-700' : borderColor} opacity-50`} />
                         <div className={`absolute bottom-0 right-0 w-2 h-2 border-b border-r ${msg.role === 'user' ? 'border-gray-700' : borderColor} opacity-50`} />
 
@@ -521,7 +450,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
             ))}
             
             {isAnalyzing && (
-                <div className="flex justify-end animate-fadeIn">
+                <div className="flex justify-end animate-fadeIn z-10">
                     <div className="bg-gray-900 border border-red-900/50 p-6 rounded-sm w-full max-w-md shadow-[0_0_30px_rgba(220,38,38,0.1)]">
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-3">
@@ -559,8 +488,8 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
             )}
 
             {isLoading && (
-                <div className="flex justify-start animate-pulse">
-                    <div className={`${bgColor} border ${borderColor} p-6 rounded-sm flex items-center gap-3`}>
+                <div className="flex justify-start animate-pulse z-10">
+                    <div className={`${bgColor} border ${borderColor} p-6 rounded-sm flex items-center gap-3 backdrop-blur-md`}>
                         <Loader2 className={`w-4 h-4 animate-spin ${themeColor}`} />
                         <span className={`text-xs uppercase tracking-widest ${themeColor}`}>
                             {isDread ? "Constructing nightmare..." : "Stoking the fire..."}
@@ -572,10 +501,9 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
         </div>
 
         {/* INPUT AREA with STAGING */}
-        <div className={`p-6 border-t ${borderColor} bg-black z-20 transition-colors duration-1000 relative`}>
+        <div className={`p-6 border-t ${borderColor} bg-black/80 backdrop-blur-md z-20 transition-colors duration-1000 relative`}>
             <div className="max-w-4xl mx-auto relative flex flex-col gap-2">
                 
-                {/* STAGED IMAGE PREVIEW */}
                 {stagedPreview && (
                     <div className="flex items-center gap-4 bg-gray-900/80 border border-gray-700 p-3 rounded-sm animate-slideUp">
                         <div className="relative w-16 h-16 border border-gray-600 rounded overflow-hidden group">
@@ -609,7 +537,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                        onPaste={handlePaste} // <--- PASTE LISTENER
+                        onPaste={handlePaste}
                         placeholder={stagedFile ? "Add context about this image..." : isDread ? "Paste an image or whisper to the void..." : "Paste an image or say hello..."}
                         autoFocus
                         disabled={isFinalizing || isLoading || isAnalyzing}

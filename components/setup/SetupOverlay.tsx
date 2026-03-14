@@ -22,7 +22,7 @@ export const SetupOverlay: React.FC<SetupOverlayProps> = ({ onComplete }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] w-full h-full bg-[#030303] text-gray-200 font-sans overflow-hidden">
+    <div className={`fixed inset-0 z-[100] w-full h-full ${setupMode === 'chat' ? 'bg-transparent' : 'bg-[#030303]'} text-gray-200 font-sans overflow-hidden`}>
         {setupMode === 'choice' && (
             <ChoiceModeSelector onSelect={setSetupMode} />
         )}

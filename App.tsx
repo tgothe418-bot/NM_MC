@@ -9,6 +9,7 @@ import { SimulationModal } from './components/SimulationModal';
 import { SaveLoadModal } from './components/SaveLoadModal';
 import { useGameEngine } from './hooks/useGameEngine';
 import { NpcState } from './types';
+import { SystemGhost } from './components/setup/SystemGhost';
 
 export default function App() {
   const [showSetup, setShowSetup] = useState(false);
@@ -79,8 +80,9 @@ export default function App() {
   } as React.CSSProperties;
   
   return (
-    <div style={dynamicStyles} className={`theme-wrapper min-h-screen bg-[#050505] text-gray-200 font-sans relative transition-colors duration-1000 cluster-${gameState.meta.active_cluster.toLowerCase()}`}>
+    <div style={dynamicStyles} className={`theme-wrapper min-h-screen bg-[#050505] text-gray-200 font-sans relative overflow-hidden transition-colors duration-1000 cluster-${gameState.meta.active_cluster.toLowerCase()}`}>
         <div className="scanlines" />
+        <SystemGhost floating={false} className="w-[40vw] h-[40vw] max-w-[500px] max-h-[500px] opacity-20 fixed -bottom-[10%] -right-[5%] pointer-events-none z-0" />
         {!isInitialized && !showSetup && (
             <WelcomeScreen onStart={() => setShowSetup(true)} />
         )}
