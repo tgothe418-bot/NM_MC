@@ -43,6 +43,7 @@ export const LocationStateSchema = z.object({
   weather_state: z.string(),
   time_of_day: z.string(),
   architectural_notes: z.array(z.string()),
+  current_environment_image: z.string().optional(),
 });
 
 export const HiddenAgendaSchema = z.object({
@@ -68,7 +69,6 @@ export const MemoryEpisodeSchema = z.object({
 });
 
 export const DialogueMemorySchema = z.object({
-  short_term_buffer: z.array(DialogueEntrySchema),
   long_term_summary: z.string(),
   episodic_logs: z.array(MemoryEpisodeSchema),
   known_facts: z.array(z.string()),

@@ -24,7 +24,6 @@ const DEFAULT_GAME_STATE: GameState = {
     npc_states: [],
     location_state: getDefaultLocationState(),
     narrative: { visual_motif: '', illustration_request: null, past_summary: '' },
-    narrative_state: { currentPhase: 'Act1_Setup', turnCountInPhase: 0, totalTurns: 0 },
     suggested_actions: []
 };
 
@@ -35,7 +34,8 @@ export type GameAction =
   | { type: 'PATCH_STATE'; payload: Partial<GameState> }
   | { type: 'SET_TURN'; payload: number }
   | { type: 'UPDATE_NPC'; payload: { index: number; updates: Partial<NpcState> } }
-  | { type: 'APPEND_SUMMARY'; payload: string };
+  | { type: 'APPEND_SUMMARY'; payload: string }
+  | { type: 'UPDATE_LOCATION_IMAGE'; payload: string };
 
 const gameReducer = (state: GameState, action: GameAction): GameState => {
     switch (action.type) {
@@ -63,6 +63,14 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
                 narrative: {
                     ...state.narrative,
                     past_summary: (state.narrative.past_summary || "") + "\n\n" + action.payload
+                }
+            };
+        case 'UPDATE_LOCATION_IMAGE':
+            return {
+                ...state,
+                location_state: {
+                    ...state.location_state,
+                    current_environment_image: action.payload
                 }
             };
         default:
@@ -249,11 +257,6 @@ export const useGameEngine = () => {
                 past_summary: config.plot_hook ? `[CORE DIRECTIVE / LORE]:\n${config.plot_hook}\n\n` : "",
                 transition_gate: config.transition_gate
             },
-            narrative_state: {
-                currentPhase: 'Act1_Setup',
-                turnCountInPhase: 0,
-                totalTurns: 0
-            },
             lore_context: config.lore_context,
             suggested_actions: []
         };
@@ -301,26 +304,16 @@ export const useGameEngine = () => {
 
         const currentState = overrideState || gameState;
         
-        // Inject narrative state into currentState for the engine
-        const stateWithNarrative = {
-            ...currentState,
-            narrative_state: {
-                currentPhase: updatedMetronome.currentPhase,
-                turnCountInPhase: updatedMetronome.turnCount, // Simplified for Step 1
-                totalTurns: updatedMetronome.turnCount
-            }
-        };
-
         try {
             // processGameTurn now returns { stateCommands, narrativeMetadata, storyText, imagePromise }
-            const result = await processGameTurn(stateWithNarrative, text, files, (chunk, phase) => {
+            const result = await processGameTurn(currentState, updatedMetronome, text, files, (chunk, phase) => {
                 setStreamPhase(phase);
                 if (phase === 'logic') setLogicStream(prev => prev + chunk);
                 else setNarrativeStream(prev => prev + chunk);
             });
             
             // Apply commands
-            let newState = applyStateCommands(stateWithNarrative, result.stateCommands);
+            let newState = applyStateCommands(currentState, result.stateCommands);
             
             const messageTimestamp = Date.now();
             const newMessage: ChatMessage = {
@@ -369,13 +362,16 @@ export const useGameEngine = () => {
                             // --- EPISODIC COMPRESSION (Step 4) ---
                             if (nextPhase === 'Act3_Climax') {
                                 console.log("[NARRATIVE ARCHITECT]: Executing Episodic Compression for Climax...");
-                                const summary = await summarizeHistory(history);
+                                const historyToSummarize = [...history];
+                                const summarizedTimestamps = historyToSummarize.map(msg => msg.timestamp);
+                                const summary = await summarizeHistory(historyToSummarize);
                                 if (summary) {
                                     // Update GameState with the new summary and purge history
                                     dispatch({ type: 'APPEND_SUMMARY', payload: summary });
                                     // Purge old messages from the active context array to free up tokens
                                     // We keep the last 2 messages for immediate continuity
-                                    setHistory(prev => prev.slice(-2));
+                                    const timestampsToRemove = summarizedTimestamps.slice(0, -2);
+                                    setHistory(prev => prev.filter(msg => !timestampsToRemove.includes(msg.timestamp)));
                                 }
                             }
 
@@ -393,20 +389,18 @@ export const useGameEngine = () => {
             if (history.length > 20) {
                 const PRUNE_COUNT = 10;
                 const historyToSummarize = history.slice(0, PRUNE_COUNT);
-                const historyToKeep = history.slice(PRUNE_COUNT);
                 
-                // Optimistic visual update: Prune history immediately
-                setHistory([...historyToKeep, newMessage]);
+                // Keep history intact while summarizing
+                setHistory(prev => [...prev, newMessage]);
                 
-                // Directive 2: Capture current turn to prevent race conditions during async summarization
-                const turnAtRequest = newState.meta.turn;
+                const summarizedTimestamps = historyToSummarize.map(msg => msg.timestamp);
 
                 // Trigger summary generation in background
                 summarizeHistory(historyToSummarize).then(summary => {
-                    // Directive 2: Verify state hasn't progressed significantly (or changed) before applying summary
-                    // We check if the turn is still the same as when we requested the summary
-                    if (summary && turnRef.current === turnAtRequest) {
+                    if (summary) {
                         dispatch({ type: 'APPEND_SUMMARY', payload: `[ARCHIVED MEMORY]: ${summary}` });
+                        // Filter the state history against these specific timestamps
+                        setHistory(prev => prev.filter(msg => !summarizedTimestamps.includes(msg.timestamp)));
                     }
                 }).catch(err => console.error("Summary failed", err));
 
@@ -420,11 +414,7 @@ export const useGameEngine = () => {
             if (result.imagePromise) {
                 result.imagePromise.then(imageUrl => {
                     if (imageUrl) {
-                        setHistory(prev => prev.map(msg => 
-                            msg.timestamp === messageTimestamp 
-                                ? { ...msg, imageUrl: imageUrl }
-                                : msg
-                        ));
+                        dispatch({ type: 'UPDATE_LOCATION_IMAGE', payload: imageUrl });
                     }
                 }).catch(err => console.error("Background Image Generation Failed", err));
             }

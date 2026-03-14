@@ -19,7 +19,6 @@ export const getDefaultDialogueState = (background: string = ""): DialogueState 
         forbidden_topics: []
     },
     memory: {
-        short_term_buffer: [],
         long_term_summary: background || "No prior history recorded.",
         episodic_logs: [],
         known_facts: []
@@ -224,30 +223,14 @@ export const constructVoiceManifesto = (npcs: NpcState[], activeCluster: string 
 export const updateDialogueState = (npc: NpcState, speaker: string, text: string): NpcState => {
     const ds = npc.dialogue_state || getDefaultDialogueState(npc.background_origin);
 
-    const newEntry: DialogueEntry = {
-        speaker,
-        text,
-        sentiment: 'Neutral',
-        turn: 0,
-        timestamp: Date.now()
-    };
-
     // Calculate new intent based on the updated state of the NPC (which should be passed in via `npc`)
     // Note: In a real simulation loop, the NPC's stress/trust would update *before* this call.
     const { intent } = calculatePsychologicalStance(npc);
-
-    const MAX_BUFFER_SIZE = 10;
-    const buffer = [...(ds.memory.short_term_buffer || []), newEntry];
-    if (buffer.length > MAX_BUFFER_SIZE) buffer.shift();
 
     return {
         ...npc,
         dialogue_state: {
             ...ds,
-            memory: {
-                ...ds.memory,
-                short_term_buffer: buffer
-            },
             last_social_maneuver: ds.current_social_intent || 'OBSERVE',
             current_social_intent: intent
         }

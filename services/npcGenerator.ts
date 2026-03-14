@@ -838,7 +838,6 @@ SECRET: They are hiding the fact that they feel guilty about [Generate based on 
       },
       // SEED MEMORY: Ensure the long_term_summary is populated
       memory: {
-          short_term_buffer: [],
           long_term_summary: deepHistory,
           episodic_logs: [
               { id: "init_trauma", turn: 0, description: `Recalls: ${trauma}`, emotional_impact: -8, involved_actors: [] }

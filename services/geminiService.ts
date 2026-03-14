@@ -311,6 +311,7 @@ const getSlimNpcState = (npc: NpcState) => {
 // [OPTIMIZATION A] Parallel Pipeline Implementation -> NOW SINGLE PASS
 export const processGameTurn = async (
   currentState: GameState, 
+  metronome: { currentPhase: string; turnCount: number },
   userAction: string, 
   files: File[] = [],
   onStreamLogic?: (chunk: string, phase: 'logic' | 'narrative') => void
@@ -356,7 +357,7 @@ export const processGameTurn = async (
           mode: currentState.meta.mode,
           intensity: currentState.meta.intensity_level,
           cluster: currentState.meta.active_cluster,
-          narrative_phase: currentState.narrative_state?.currentPhase || 'Act1_Setup'
+          narrative_phase: metronome.currentPhase
       }
   };
 
@@ -398,7 +399,7 @@ export const processGameTurn = async (
               ]
           }],
           config: { 
-              systemInstruction: getSinglePassInstruction(currentState.narrative_state?.currentPhase) + `\n\n[LONG TERM MEMORY]: ${currentState.narrative.past_summary || "No prior history."}`, 
+              systemInstruction: getSinglePassInstruction(metronome.currentPhase as any) + `\n\n[LONG TERM MEMORY]: ${currentState.narrative.past_summary || "No prior history."}`, 
               responseMimeType: 'application/json',
               responseSchema: jsonSchema.definitions?.turnOutput as any
           }

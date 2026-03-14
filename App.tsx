@@ -11,10 +11,14 @@ import { useGameEngine } from './hooks/useGameEngine';
 import { NpcState } from './types';
 import { SystemGhost } from './components/setup/SystemGhost';
 
+import { useArchitectStore } from './store/architectStore';
+
 export default function App() {
   const [showSetup, setShowSetup] = useState(false);
   const [showSimModal, setShowSimModal] = useState(false);
   const [showSaveLoad, setShowSaveLoad] = useState(false);
+  
+  const currentPhase = useArchitectStore(state => state.narrative.currentPhase);
 
   const {
       gameState,
@@ -53,7 +57,7 @@ export default function App() {
       'Act2_RisingAction': 0.5,
       'Act3_Climax': 1.0,
       'Resolution': 0.0
-  }[gameState.narrative_state?.currentPhase || 'Act1_Setup'];
+  }[currentPhase || 'Act1_Setup'];
 
   // 2. Extract Player Stress (if available)
   const playerNpc = gameState.npc_states.find(n => n.name === gameState.meta.player_profile?.name);
@@ -106,6 +110,7 @@ export default function App() {
                     <StoryLog 
                         history={history} 
                         isLoading={isLoading} 
+                        currentImage={gameState.location_state.current_environment_image}
                         className="pb-24 relative z-10" 
                     />
                 </div>

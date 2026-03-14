@@ -53,7 +53,6 @@ export interface GameState {
     past_summary: string;
     transition_gate?: string;
   };
-  narrative_state?: NarrativeState;
   suggested_actions: string[];
 }
 export type NpcState = z.infer<typeof NpcStateSchema>;
