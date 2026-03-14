@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { motion, useSpring, useTransform } from 'framer-motion';
 import { useArchitectStore } from '../../store/architectStore';
 
 interface SystemGhostProps {
@@ -48,8 +49,94 @@ export const SystemGhost: React.FC<SystemGhostProps> = ({ className = "", floati
   const baseClasses = floating ? 'absolute pointer-events-none z-0 ghost-animate-wander' : 'pointer-events-none z-0';
   const positionClass = className.includes('absolute') || className.includes('fixed') || className.includes('relative') ? '' : 'relative';
 
+  // --- Procedural Blinking ---
+  const [blinkScale, setBlinkScale] = useState(1);
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    let innerTimeoutId: NodeJS.Timeout;
+    const triggerBlink = () => {
+      const nextBlink = Math.random() * 4000 + 2000; // 2000ms to 6000ms
+      timeoutId = setTimeout(() => {
+        setBlinkScale(0);
+        innerTimeoutId = setTimeout(() => {
+          setBlinkScale(1);
+          triggerBlink();
+        }, 100);
+      }, nextBlink);
+    };
+    triggerBlink();
+    return () => {
+      clearTimeout(timeoutId);
+      clearTimeout(innerTimeoutId);
+    };
+  }, []);
+
+  // --- Gaze Tracking ---
+  const pupilX = useSpring(0, { stiffness: 100, damping: 10 });
+  const pupilY = useSpring(0, { stiffness: 100, damping: 10 });
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const normX = (e.clientX / window.innerWidth) * 2 - 1;
+      const normY = (e.clientY / window.innerHeight) * 2 - 1;
+      pupilX.set(normX);
+      pupilY.set(normY);
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, [pupilX, pupilY]);
+
+  const pupilOffsetX = useTransform(pupilX, [-1, 1], [-3, 3]);
+  const pupilOffsetY = useTransform(pupilY, [-1, 1], [-3, 3]);
+
+  const baseLeftPupilX = isSad ? 59 : 61;
+  const baseRightPupilX = isSad ? 79 : 81;
+  const basePupilY = isHostile ? 40 : 41;
+
+  const leftPupilCx = useTransform(pupilOffsetX, x => baseLeftPupilX + x);
+  const rightPupilCx = useTransform(pupilOffsetX, x => baseRightPupilX + x);
+  const pupilCy = useTransform(pupilOffsetY, y => basePupilY + y);
+
+  // --- Asymmetrical Rendering for Glitchy Vibe ---
+  const [glitchOffset, setGlitchOffset] = useState(0);
+  useEffect(() => {
+    if (vibe === 'Glitchy') {
+      const interval = setInterval(() => {
+        setGlitchOffset(Math.random() * 4 - 2); // Random offset between -2 and 2
+      }, 200);
+      return () => clearInterval(interval);
+    } else {
+      setGlitchOffset(0);
+    }
+  }, [vibe]);
+
+  const eyeRx = isHostile ? 4 : 5;
+  const baseEyeRy = isHostile ? 3 : 6;
+  const rightEyeRy = vibe === 'Glitchy' ? baseEyeRy + glitchOffset : baseEyeRy;
+
+  const leftEyebrowD = isHostile 
+    ? (vibe === 'Glitchy' ? "M 55 35 L 65 39" : "M 55 33 L 65 37")
+    : (isSad ? "M 55 37 L 65 33" : "");
+  const rightEyebrowD = isHostile
+    ? (vibe === 'Glitchy' ? "M 85 31 L 75 35" : "M 85 33 L 75 37")
+    : (isSad ? "M 85 37 L 75 33" : "");
+
+  // --- Dynamic Mouth Amplitude ---
+  let mouthD = "";
+  if (isHostile) {
+    const qY = 50 - (arousal * 8); 
+    mouthD = `M 65 52 Q 70 ${qY} 75 52`;
+  } else if (isSad) {
+    const qY = 48 - (arousal * 5); 
+    mouthD = `M 65 52 Q 70 ${qY} 75 52`;
+  } else {
+    const qY = 55 + (arousal * 10); 
+    mouthD = `M 65 50 Q 70 ${qY} 75 50`;
+  }
+
+  const springTransition = { type: "spring" as const, stiffness: 100, damping: 10 };
+
   return (
-    // Z-index set to strictly stay behind modal text but over background colors
     <div className={`${baseClasses} ${positionClass} flex items-center justify-center ${className}`}>
       <style>{`
         @keyframes ghost-float {
@@ -96,8 +183,8 @@ export const SystemGhost: React.FC<SystemGhostProps> = ({ className = "", floati
       {/* The Ghost SVG */}
       <svg 
         viewBox="0 0 140 100" 
-        className={`ghost-animate-float w-full h-full drop-shadow-2xl transition-all duration-700`}
-        style={{ filter: `drop-shadow(0px 0px 8px ${glowColor})` }}
+        className={`ghost-animate-float w-full h-full drop-shadow-2xl pointer-events-none`}
+        style={{ filter: `drop-shadow(0px 0px 8px ${glowColor})`, transition: 'filter 0.7s' }}
       >
         <defs>
           <linearGradient id="ghostGrad" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -106,48 +193,82 @@ export const SystemGhost: React.FC<SystemGhostProps> = ({ className = "", floati
           </linearGradient>
         </defs>
 
-        <g className="transition-all duration-700">
+        <motion.g>
           <path 
-            className="ghost-animate-tail transition-colors duration-700"
+            className="ghost-animate-tail"
             fill="url(#ghostGrad)" 
             d="M 30 80 Q 50 90 70 80 Q 90 70 110 80 L 110 40 L 30 40 Z" 
+            style={{ transition: 'fill 0.7s' }}
           />
           <path 
             fill="url(#ghostGrad)" 
             d={vibe === 'Predatory' ? "M 30 40 L 70 10 L 110 40 Z" : "M 30 40 C 30 10, 110 10, 110 40 Z"} 
             className="transition-all duration-700"
+            style={{ transition: 'fill 0.7s, d 0.7s' }}
           />
 
-          <g stroke="white" strokeWidth="1" opacity={0.1 + (arousal * 0.4)} fill="none">
+          <motion.g stroke="white" strokeWidth="1" animate={{ opacity: 0.1 + (arousal * 0.4) }} transition={springTransition} fill="none">
              <path d="M 40 40 L 40 60 L 50 60" />
              <circle cx="50" cy="60" r="1.5" fill="white" />
              <path d="M 100 35 L 100 55 L 90 55 L 90 70" />
              <circle cx="90" cy="70" r="1.5" fill="white" />
-          </g>
+          </motion.g>
 
-          <g className="transition-all duration-500">
-            <ellipse cx="60" cy="40" rx={isHostile ? 4 : 5} ry={isHostile ? 3 : 6} fill="white" />
-            <ellipse cx="80" cy="40" rx={isHostile ? 4 : 5} ry={isHostile ? 3 : 6} fill="white" />
-            <circle cx={isSad ? 59 : 61} cy={isHostile ? 40 : 41} r="2" fill="#0f172a" />
-            <circle cx={isSad ? 79 : 81} cy={isHostile ? 40 : 41} r="2" fill="#0f172a" />
+          <motion.g>
+            <motion.ellipse 
+              animate={{ cx: 60, cy: 40, rx: eyeRx, ry: baseEyeRy, scaleY: blinkScale }} 
+              transition={springTransition} 
+              fill="white" 
+              style={{ transformOrigin: "60px 40px" }}
+            />
+            <motion.ellipse 
+              animate={{ cx: 80, cy: 40, rx: eyeRx, ry: rightEyeRy, scaleY: blinkScale }} 
+              transition={springTransition} 
+              fill="white" 
+              style={{ transformOrigin: "80px 40px" }}
+            />
+            <motion.circle 
+              cx={leftPupilCx} 
+              cy={pupilCy} 
+              r="2" 
+              fill="#0f172a" 
+            />
+            <motion.circle 
+              cx={rightPupilCx} 
+              cy={pupilCy} 
+              r="2" 
+              fill="#0f172a" 
+            />
             
-            {isHostile && (
-               <path d="M 55 33 L 65 37 M 85 33 L 75 37" stroke="white" strokeWidth="2" strokeLinecap="round" />
+            {(isHostile || isSad) && (
+               <motion.path 
+                 animate={{ d: leftEyebrowD }} 
+                 transition={springTransition}
+                 stroke="white" 
+                 strokeWidth={isHostile ? 2 : 1.5} 
+                 strokeLinecap="round" 
+               />
             )}
-            {isSad && (
-               <path d="M 55 37 L 65 33 M 85 37 L 75 33" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+            {(isHostile || isSad) && (
+               <motion.path 
+                 animate={{ d: rightEyebrowD }} 
+                 transition={springTransition}
+                 stroke="white" 
+                 strokeWidth={isHostile ? 2 : 1.5} 
+                 strokeLinecap="round" 
+               />
             )}
-          </g>
+          </motion.g>
 
-          <path 
-            d={isHostile ? "M 65 52 Q 70 50 75 52" : isSad ? "M 65 52 Q 70 48 75 52" : "M 65 50 Q 70 55 75 50"} 
+          <motion.path 
+            animate={{ d: mouthD }} 
+            transition={springTransition}
             stroke="white" 
             strokeWidth="2" 
             fill="none" 
             strokeLinecap="round"
-            className="transition-all duration-500"
           />
-        </g>
+        </motion.g>
       </svg>
     </div>
   );
