@@ -4,7 +4,6 @@ import { Users, RefreshCw, Check, AlertCircle, Play, User, Edit2, Save, X, Targe
 import { SimulationConfig, NpcState } from '../../types';
 import { createNpcFactory } from '../../services/npcGenerator';
 import { extractCharactersFromText, hydrateUserCharacter } from '../../services/geminiService';
-import { useSetupStore } from './store';
 
 interface NpcSelectorProps {
   config: SimulationConfig;
@@ -13,7 +12,6 @@ interface NpcSelectorProps {
 }
 
 export const NpcSelector: React.FC<NpcSelectorProps> = ({ config, onConfirm, onBack }) => {
-  const { parsedCharacters } = useSetupStore();
   const [candidates, setCandidates] = useState<NpcState[]>([]);
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
   const [isGenerating, setIsGenerating] = useState(true);
@@ -23,7 +21,8 @@ export const NpcSelector: React.FC<NpcSelectorProps> = ({ config, onConfirm, onB
   const [editForm, setEditForm] = useState<Partial<NpcState>>({});
 
   // Ensure pool size is at least enough to cover the requested count + some variety
-  const REQUESTED_COUNT = config.victim_count || 3;
+  // Cap the requested count to 10 to prevent API rate limits and performance issues
+  const REQUESTED_COUNT = Math.min(config.victim_count || 3, 10);
   const POOL_SIZE = Math.max(6, REQUESTED_COUNT + 3);
 
   useEffect(() => {
@@ -38,9 +37,9 @@ export const NpcSelector: React.FC<NpcSelectorProps> = ({ config, onConfirm, onB
     let seedObjects: Partial<NpcState>[] = [];
     
     // Priority A: Structured Training Data (ParsedCharacters)
-    if (parsedCharacters && parsedCharacters.length > 0) {
+    if (config.parsed_characters && config.parsed_characters.length > 0) {
         // Hydrate these in parallel to get deep stats (Trauma, Origin) from their descriptions
-        const hydrationPromises = parsedCharacters.map(async (pc) => {
+        const hydrationPromises = config.parsed_characters.map(async (pc) => {
             let hydrated: Partial<NpcState> = {};
             if (pc.description) {
                 try {

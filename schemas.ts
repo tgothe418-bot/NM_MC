@@ -277,6 +277,14 @@ export const SourceAnalysisResultSchema = z.object({
   intensity: z.string().nullable().optional(),
   plot_hook: z.string().nullable().optional(),
   
+  form_and_appearance: z.string().nullable().optional(),
+  modus_operandi: z.string().nullable().optional(),
+  aesthetics: z.string().nullable().optional(),
+  population_count: z.number().nullable().optional(),
+  objectives: z.string().nullable().optional(),
+  villains: z.array(z.string()).optional(),
+  victims: z.array(z.string()).optional(),
+
   // --- NEW RPP FIELDS ---
   rpp_transition_gate: z.string().nullable().optional(),
   rpp_voice_manifesto: z.string().nullable().optional(),
@@ -299,6 +307,14 @@ export const ScenarioConceptsSchema = z.object({
   visual_motif: z.string().nullable().optional(),
   plot_hook: z.string().nullable().optional(),
   parsed_characters: z.array(ParsedCharacterSchema).optional(),
+  
+  form_and_appearance: z.string().nullable().optional(),
+  modus_operandi: z.string().nullable().optional(),
+  aesthetics: z.string().nullable().optional(),
+  population_count: z.number().nullable().optional(),
+  objectives: z.string().nullable().optional(),
+  villains: z.array(z.string()).optional(),
+  victims: z.array(z.string()).optional(),
 });
 
 export const CharacterProfileSchema = z.object({

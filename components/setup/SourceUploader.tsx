@@ -20,7 +20,13 @@ export const SourceUploader: React.FC<SourceUploaderProps> = ({ compact = false 
     setParsedCharacters,
     setIntensity,
     setPlotHook,
-    setTransitionGate
+    setTransitionGate,
+    setVillainName,
+    setVillainAppearance,
+    setVillainMethods,
+    setVictimDescription,
+    setPrimaryGoal,
+    setVictimCount
   } = useSetupStore();
   
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -54,7 +60,10 @@ export const SourceUploader: React.FC<SourceUploaderProps> = ({ compact = false 
             }
             if (result.visual_motif && !visualMotif) {
                  setVisualMotif(String(result.visual_motif));
+            } else if (result.aesthetics && !visualMotif) {
+                 setVisualMotif(String(result.aesthetics));
             }
+            
             if (result.theme_cluster) {
                  const clusterStr = String(result.theme_cluster);
                  const match = KNOWN_CLUSTERS.find(c => clusterStr.toLowerCase().includes(c.toLowerCase()));
@@ -74,6 +83,25 @@ export const SourceUploader: React.FC<SourceUploaderProps> = ({ compact = false 
             }
             if (result.characters && result.characters.length > 0) {
                 setParsedCharacters(prev => [...prev, ...result.characters]);
+            }
+            
+            if (result.form_and_appearance) {
+                setVillainAppearance(result.form_and_appearance);
+            }
+            if (result.modus_operandi) {
+                setVillainMethods(result.modus_operandi);
+            }
+            if (result.objectives) {
+                setPrimaryGoal(result.objectives);
+            }
+            if (result.population_count) {
+                setVictimCount(Math.min(result.population_count, 10));
+            }
+            if (result.villains && result.villains.length > 0) {
+                setVillainName(result.villains.join(', '));
+            }
+            if (result.victims && result.victims.length > 0) {
+                setVictimDescription(result.victims.join(', '));
             }
             
             if (result) {

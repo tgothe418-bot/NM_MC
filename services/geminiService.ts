@@ -212,17 +212,18 @@ export const extractScenarioFromChat = async (history: { role: 'user' | 'model',
             intensity: concepts.intensity || 'Level 3',
             cycles: 0,
             ...concepts,
-            villain_name: concepts.villain_name || "Unknown Entity",
-            villain_appearance: concepts.villain_appearance || "Unknown",
-            villain_methods: concepts.villain_methods || "Unknown",
-            victim_description: concepts.victim_description || "",
+            villain_name: concepts.villain_name || (concepts.villains && concepts.villains.length > 0 ? concepts.villains.join(', ') : "Unknown Entity"),
+            villain_appearance: concepts.villain_appearance || concepts.form_and_appearance || "Unknown",
+            villain_methods: concepts.villain_methods || concepts.modus_operandi || "Unknown",
+            victim_description: concepts.victim_description || (concepts.victims && concepts.victims.length > 0 ? concepts.victims.join(', ') : ""),
             survivor_name: concepts.survivor_name || "Survivor",
             survivor_background: concepts.survivor_background || "Unknown",
             survivor_traits: concepts.survivor_traits || "Unknown",
             location_description: concepts.location_description || "Unknown Location",
-            visual_motif: concepts.visual_motif || "Cinematic",
-            primary_goal: concepts.primary_goal || "Survive",
-            victim_count: 3
+            visual_motif: concepts.visual_motif || concepts.aesthetics || "Cinematic",
+            primary_goal: concepts.primary_goal || concepts.objectives || "Survive",
+            victim_count: Math.min(concepts.population_count || 3, 10),
+            parsed_characters: concepts.parsed_characters || []
         } as SimulationConfig;
 
     } catch (e) {
@@ -579,6 +580,13 @@ export const analyzeSourceMaterial = async (
               theme_cluster: results[0]?.theme_cluster,
               intensity: results[0]?.intensity,
               plot_hook: results[0]?.plot_hook,
+              form_and_appearance: results[0]?.form_and_appearance,
+              modus_operandi: results[0]?.modus_operandi,
+              aesthetics: results[0]?.aesthetics,
+              population_count: results[0]?.population_count,
+              objectives: results[0]?.objectives,
+              villains: [],
+              victims: [],
               rpp_transition_gate: results[0]?.rpp_transition_gate,
               rpp_voice_manifesto: results[0]?.rpp_voice_manifesto,
               rpp_primary_vectors: []
@@ -586,6 +594,8 @@ export const analyzeSourceMaterial = async (
           
           const seenCharacters = new Set<string>();
           const seenVectors = new Set<string>();
+          const seenVillains = new Set<string>();
+          const seenVictims = new Set<string>();
           
           for (const res of results) {
               if (res.characters) {
@@ -601,6 +611,22 @@ export const analyzeSourceMaterial = async (
                       if (!seenVectors.has(vec)) {
                           seenVectors.add(vec);
                           mergedResult.rpp_primary_vectors!.push(vec);
+                      }
+                  }
+              }
+              if (res.villains) {
+                  for (const villain of res.villains) {
+                      if (!seenVillains.has(villain)) {
+                          seenVillains.add(villain);
+                          mergedResult.villains!.push(villain);
+                      }
+                  }
+              }
+              if (res.victims) {
+                  for (const victim of res.victims) {
+                      if (!seenVictims.has(victim)) {
+                          seenVictims.add(victim);
+                          mergedResult.victims!.push(victim);
                       }
                   }
               }
@@ -630,9 +656,16 @@ EXECUTE THE FOLLOWING EXTRACTION FILTERS:
 2. location: The primary setting.
 3. theme_cluster: Categorize strictly as one of: Flesh, System, Haunting, Survival, Self, Blasphemy, Desire.
 4. plot_hook: The core premise or starting anomaly.
-5. rpp_transition_gate: Identify the 'Point of No Return'. Formulate a strict boolean question that determines if Act 1 is over (e.g., "Has the user inhaled the gas?" or "Did they enter the basement?").
-6. rpp_voice_manifesto: Define the author's prose style, pacing, and how the syntax should degrade as the climax approaches.
-7. rpp_primary_vectors: Identify which psychological stats this story targets. Return an array containing any of: "fear", "isolation", "guilt", "paranoia".`;
+5. form_and_appearance: Describe the physical form and appearance of the primary threat or villain.
+6. modus_operandi: Describe how the threat operates, its methods, and patterns.
+7. aesthetics: Describe the visual motif, atmosphere, and aesthetic style of the material.
+8. population_count: Estimate the number of victims or people present in the location (number).
+9. objectives: What are the primary goals of the characters or the threat?
+10. villains: List the names or designations of the villains/threats.
+11. victims: List the names or descriptions of the victims.
+12. rpp_transition_gate: Identify the 'Point of No Return'. Formulate a strict boolean question that determines if Act 1 is over (e.g., "Has the user inhaled the gas?" or "Did they enter the basement?").
+13. rpp_voice_manifesto: Define the author's prose style, pacing, and how the syntax should degrade as the climax approaches.
+14. rpp_primary_vectors: Identify which psychological stats this story targets. Return an array containing any of: "fear", "isolation", "guilt", "paranoia".`;
 
     const fullParts = [...parts, { text: prompt }];
     const jsonSchema = zodToJsonSchema(SourceAnalysisResultSchema as any, "analysis");

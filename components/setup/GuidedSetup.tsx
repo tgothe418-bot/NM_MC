@@ -157,6 +157,11 @@ export const GuidedSetup: React.FC<Props> = ({ onComplete, onBack }) => {
               victim_description: store.victimDescription, // Pass companions to NpcSelector
               parsed_characters: store.parsedCharacters,
               plot_hook: store.plotHook,
+              villain_name: store.villainName,
+              villain_appearance: store.villainAppearance,
+              villain_methods: store.villainMethods,
+              primary_goal: store.primaryGoal,
+              victim_count: store.victimCount,
           });
       }, 2000);
   };
