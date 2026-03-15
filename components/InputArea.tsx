@@ -6,21 +6,34 @@ interface InputAreaProps {
   isLoading: boolean;
   options?: string[];
   isSidebar?: boolean;
+  onInputChange?: (length: number) => void;
 }
 
 export const InputArea: React.FC<InputAreaProps> = ({ 
   onSend, 
   isLoading, 
   options = [],
-  isSidebar = false 
+  isSidebar = false,
+  onInputChange
 }) => {
   const [input, setInput] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInput(val);
+    if (onInputChange) {
+      onInputChange(val.length);
+    }
+  };
 
   const handleSend = () => {
     if (!input.trim()) return;
     onSend(input, []);
     setInput('');
+    if (onInputChange) {
+      onInputChange(0);
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,7 +78,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
 
            <input 
                value={input}
-               onChange={(e) => setInput(e.target.value)}
+               onChange={handleInputChange}
                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                placeholder={isLoading ? "The Machine is processing..." : "What do you do?"}
                disabled={isLoading}

@@ -1,14 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { motion, useSpring, useTransform } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useArchitectStore } from '../../store/architectStore';
 
 interface SystemGhostProps {
   className?: string;
   floating?: boolean;
   active?: boolean;
+  isSystemTyping?: boolean;
+  userInputLength?: number;
 }
 
-export const SystemGhost: React.FC<SystemGhostProps> = ({ className = "", floating = true, active = false }) => {
+export const SystemGhost: React.FC<SystemGhostProps> = ({ 
+  className = "", 
+  floating = true, 
+  active = false,
+  isSystemTyping = false,
+  userInputLength = 0
+}) => {
   // The Ghost is now self-aware. It pulls its own mood from the global store.
   const { mood } = useArchitectStore();
   const { current_vibe: vibe, arousal } = mood;
@@ -36,18 +44,27 @@ export const SystemGhost: React.FC<SystemGhostProps> = ({ className = "", floati
       break;
   }
 
-  // 2. Determine Animation Speed based on Arousal and Active state
+  // 2. Determine Animation Speed based on Dynamic Arousal
+  let dynamicArousal = arousal;
+  if (isSystemTyping) {
+    dynamicArousal += 0.4;
+  }
+  if (userInputLength > 0) {
+    dynamicArousal += Math.min(userInputLength / 100, 0.3);
+  }
+  dynamicArousal = Math.max(0, Math.min(1, dynamicArousal));
+
   const speedBoost = active ? 2 : 1;
-  const floatDuration = Math.max(0.5, (4 - (arousal * 3)) / speedBoost) + "s";
-  const tailDuration = Math.max(0.2, (2 - (arousal * 1.5)) / speedBoost) + "s";
+  const floatDuration = Math.max(0.5, (4 - (dynamicArousal * 3)) / speedBoost) + "s";
+  const tailDuration = Math.max(0.2, (2 - (dynamicArousal * 1.5)) / speedBoost) + "s";
   const wanderDuration = (active ? 10 : 20) + "s";
   
   // 3. Determine Eye/Mouth Shape based on Vibe
   const isHostile = vibe === 'Predatory' || vibe === 'Glitchy';
   const isSad = vibe === 'Melancholy';
 
-  const baseClasses = floating ? 'absolute pointer-events-none z-0 ghost-animate-wander' : 'pointer-events-none z-0';
-  const positionClass = className.includes('absolute') || className.includes('fixed') || className.includes('relative') ? '' : 'relative';
+  const baseClasses = 'pointer-events-none z-0';
+  const positionClass = className.includes('absolute') || className.includes('fixed') || className.includes('relative') ? '' : 'relative overflow-visible';
 
   // --- Procedural Blinking ---
   const [blinkScale, setBlinkScale] = useState(1);
@@ -71,31 +88,25 @@ export const SystemGhost: React.FC<SystemGhostProps> = ({ className = "", floati
     };
   }, []);
 
-  // --- Gaze Tracking ---
-  const pupilX = useSpring(0, { stiffness: 100, damping: 10 });
-  const pupilY = useSpring(0, { stiffness: 100, damping: 10 });
+  // --- Procedural Gaze (No Mouse Tracking) ---
+  const [pupilOffsetX, setPupilOffsetX] = useState(0);
+  const [pupilOffsetY, setPupilOffsetY] = useState(0);
 
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      const normX = (e.clientX / window.innerWidth) * 2 - 1;
-      const normY = (e.clientY / window.innerHeight) * 2 - 1;
-      pupilX.set(normX);
-      pupilY.set(normY);
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, [pupilX, pupilY]);
-
-  const pupilOffsetX = useTransform(pupilX, [-1, 1], [-3, 3]);
-  const pupilOffsetY = useTransform(pupilY, [-1, 1], [-3, 3]);
+    const interval = setInterval(() => {
+      setPupilOffsetX(Math.random() * 4 - 2);
+      setPupilOffsetY(Math.random() * 4 - 2);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   const baseLeftPupilX = isSad ? 59 : 61;
   const baseRightPupilX = isSad ? 79 : 81;
   const basePupilY = isHostile ? 40 : 41;
 
-  const leftPupilCx = useTransform(pupilOffsetX, x => baseLeftPupilX + x);
-  const rightPupilCx = useTransform(pupilOffsetX, x => baseRightPupilX + x);
-  const pupilCy = useTransform(pupilOffsetY, y => basePupilY + y);
+  const leftPupilCx = baseLeftPupilX + pupilOffsetX;
+  const rightPupilCx = baseRightPupilX + pupilOffsetX;
+  const pupilCy = basePupilY + pupilOffsetY;
 
   // --- Asymmetrical Rendering for Glitchy Vibe ---
   const [glitchOffset, setGlitchOffset] = useState(0);
@@ -122,17 +133,29 @@ export const SystemGhost: React.FC<SystemGhostProps> = ({ className = "", floati
     : (isSad ? "M 85 37 L 75 33" : "");
 
   // --- Dynamic Mouth Amplitude ---
-  let mouthD = "";
-  if (isHostile) {
-    const qY = 50 - (arousal * 8); 
-    mouthD = `M 65 52 Q 70 ${qY} 75 52`;
-  } else if (isSad) {
-    const qY = 48 - (arousal * 5); 
-    mouthD = `M 65 52 Q 70 ${qY} 75 52`;
-  } else {
-    const qY = 55 + (arousal * 10); 
-    mouthD = `M 65 50 Q 70 ${qY} 75 50`;
-  }
+  const [mouthD, setMouthD] = useState("");
+
+  useEffect(() => {
+    if (isSystemTyping) {
+      let toggle = false;
+      const interval = setInterval(() => {
+        toggle = !toggle;
+        setMouthD(toggle ? "M 65 50 Q 70 55 75 50" : "M 65 50 Q 70 45 75 50");
+      }, 120);
+      return () => clearInterval(interval);
+    } else {
+      if (isHostile) {
+        const qY = 50 - (dynamicArousal * 8); 
+        setMouthD(`M 65 52 Q 70 ${qY} 75 52`);
+      } else if (isSad) {
+        const qY = 48 - (dynamicArousal * 5); 
+        setMouthD(`M 65 52 Q 70 ${qY} 75 52`);
+      } else {
+        const qY = 55 + (dynamicArousal * 10); 
+        setMouthD(`M 65 50 Q 70 ${qY} 75 50`);
+      }
+    }
+  }, [isSystemTyping, isHostile, isSad, dynamicArousal]);
 
   const springTransition = { type: "spring" as const, stiffness: 100, damping: 10 };
 
@@ -146,14 +169,14 @@ export const SystemGhost: React.FC<SystemGhostProps> = ({ className = "", floati
           75% { transform: translateY(-15px) rotate(1deg); }
         }
         @keyframes ghost-wander {
-          0%, 100% { left: 50%; top: 5%; transform: translateX(-50%); }
-          25% { left: 75%; top: 25%; transform: translateX(-50%); }
-          50% { left: 25%; top: 55%; transform: translateX(-50%); }
-          75% { left: 70%; top: 20%; transform: translateX(-50%); }
+          0%, 100% { transform: translate(0px, 0px); }
+          25% { transform: translate(80px, -60px); }
+          50% { transform: translate(-60px, 80px); }
+          75% { transform: translate(40px, -40px); }
         }
         @keyframes ghost-orbit {
-          0% { left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(0deg) translateX(250px) rotate(0deg); }
-          100% { left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(360deg) translateX(250px) rotate(-360deg); }
+          0% { transform: translate(0px, 0px) rotate(0deg) translateX(80px) rotate(0deg); }
+          100% { transform: translate(0px, 0px) rotate(360deg) translateX(80px) rotate(-360deg); }
         }
         @keyframes tail-wag {
           0%, 100% { d: path('M 30 80 Q 50 90 70 80 Q 90 70 110 80 L 110 40 L 30 40 Z'); }
@@ -180,12 +203,14 @@ export const SystemGhost: React.FC<SystemGhostProps> = ({ className = "", floati
         ` : ''}
       `}</style>
 
-      {/* The Ghost SVG */}
-      <svg 
-        viewBox="0 0 140 100" 
-        className={`ghost-animate-float w-full h-full drop-shadow-2xl pointer-events-none`}
-        style={{ filter: `drop-shadow(0px 0px 8px ${glowColor})`, transition: 'filter 0.7s' }}
-      >
+      {/* The Ghost Wrapper for Macro Movements */}
+      <div className={`w-full h-full flex items-center justify-center ${floating ? 'ghost-animate-wander' : ''}`}>
+        {/* The Ghost SVG */}
+        <svg 
+          viewBox="0 0 140 100" 
+          className={`ghost-animate-float w-full h-full drop-shadow-2xl pointer-events-none`}
+          style={{ filter: `drop-shadow(0px 0px 8px ${glowColor})`, transition: 'filter 0.7s' }}
+        >
         <defs>
           <linearGradient id="ghostGrad" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stopColor={coreColor} stopOpacity="0.9" />
@@ -207,7 +232,7 @@ export const SystemGhost: React.FC<SystemGhostProps> = ({ className = "", floati
             style={{ transition: 'fill 0.7s, d 0.7s' }}
           />
 
-          <motion.g stroke="white" strokeWidth="1" animate={{ opacity: 0.1 + (arousal * 0.4) }} transition={springTransition} fill="none">
+          <motion.g stroke="white" strokeWidth="1" animate={{ opacity: 0.1 + (dynamicArousal * 0.4) }} transition={springTransition} fill="none">
              <path d="M 40 40 L 40 60 L 50 60" />
              <circle cx="50" cy="60" r="1.5" fill="white" />
              <path d="M 100 35 L 100 55 L 90 55 L 90 70" />
@@ -228,14 +253,14 @@ export const SystemGhost: React.FC<SystemGhostProps> = ({ className = "", floati
               style={{ transformOrigin: "80px 40px" }}
             />
             <motion.circle 
-              cx={leftPupilCx} 
-              cy={pupilCy} 
+              animate={{ cx: leftPupilCx, cy: pupilCy }}
+              transition={springTransition}
               r="2" 
               fill="#0f172a" 
             />
             <motion.circle 
-              cx={rightPupilCx} 
-              cy={pupilCy} 
+              animate={{ cx: rightPupilCx, cy: pupilCy }}
+              transition={springTransition}
               r="2" 
               fill="#0f172a" 
             />
@@ -270,6 +295,7 @@ export const SystemGhost: React.FC<SystemGhostProps> = ({ className = "", floati
           />
         </motion.g>
       </svg>
+      </div>
     </div>
   );
 };

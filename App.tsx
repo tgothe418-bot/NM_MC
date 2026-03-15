@@ -17,6 +17,7 @@ export default function App() {
   const [showSetup, setShowSetup] = useState(false);
   const [showSimModal, setShowSimModal] = useState(false);
   const [showSaveLoad, setShowSaveLoad] = useState(false);
+  const [userInputLength, setUserInputLength] = useState(0);
   
   const currentPhase = useArchitectStore(state => state.narrative.currentPhase);
 
@@ -88,7 +89,12 @@ export default function App() {
         <div className="scanlines" />
         
         {(!isInitialized || showSetup) && (
-            <SystemGhost floating={true} className="w-[40vw] h-[40vw] max-w-[500px] max-h-[500px] opacity-20 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0" />
+            <SystemGhost 
+                floating={true} 
+                isSystemTyping={isLoading}
+                userInputLength={userInputLength}
+                className="w-[40vw] h-[40vw] max-w-[500px] max-h-[500px] opacity-20 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0" 
+            />
         )}
 
         {!isInitialized && !showSetup && (
@@ -106,7 +112,12 @@ export default function App() {
             <div className="flex flex-col lg:flex-row h-screen overflow-hidden relative">
                 {/* LEFT COLUMN: Narrative Log */}
                 <div className="flex-1 flex flex-col relative z-10 h-full overflow-hidden">
-                    <SystemGhost floating={true} className="w-[40vw] h-[40vw] max-w-[500px] max-h-[500px] opacity-10 absolute pointer-events-none z-0" />
+                    <SystemGhost 
+                        floating={true} 
+                        isSystemTyping={isLoading}
+                        userInputLength={userInputLength}
+                        className="w-[40vw] h-[40vw] max-w-[500px] max-h-[500px] opacity-10 absolute pointer-events-none z-0" 
+                    />
                     <StoryLog 
                         history={history} 
                         isLoading={isLoading} 
@@ -123,6 +134,7 @@ export default function App() {
                         isLoading={isLoading} 
                         options={gameState.suggested_actions}
                         isSidebar={true}
+                        onInputChange={setUserInputLength}
                     />
                 </div>
 
