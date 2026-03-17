@@ -132,6 +132,7 @@ export interface ChatMessage {
   text: string;
   gameState?: GameState;
   imageUrl?: string; 
+  imageBase64?: string;
   timestamp: number;
 }
 

@@ -16,11 +16,11 @@ export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, currentI
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [history, isLoading, currentImage]);
 
   return (
-    <div className={`flex-1 overflow-y-auto p-6 md:p-12 space-y-8 custom-scrollbar ${className}`}>
+    <div className={`flex-1 overflow-y-auto px-6 md:px-12 pt-6 md:pt-12 pb-4 space-y-8 custom-scrollbar ${className}`}>
       {currentImage && (
         <div className="flex justify-center animate-fadeIn mb-8">
           <div className="max-w-3xl w-full rounded-sm border transition-all duration-700 bg-black/40 text-gray-100"

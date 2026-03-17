@@ -44,7 +44,6 @@ You have absolute, omniscient knowledge of TNM's internal state structures and t
 4. If the user is ready to begin, summarize their scenario parameters and confirm they are ready to initialize "The Machine."`;
 
 export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
-  const [history, setHistory] = useState<{ role: 'user' | 'model', text: string, imageUrl?: string, imageBase64?: string }[]>([]);
   const [input, setInput] = useState('');
   const [stagedFile, setStagedFile] = useState<File | null>(null); 
   const [stagedPreview, setStagedPreview] = useState<string | null>(null);
@@ -59,7 +58,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Hook into global ghost state
-  const { mood, memory, recordInteraction, addFact, setUserName, setContextualMood } = useArchitectStore();
+  const { mood, memory, recordInteraction, addFact, setUserName, setContextualMood, messages: history, setMessages: setHistory } = useArchitectStore();
   const initializedRef = useRef(false);
 
   const generateIntro = () => {
@@ -84,15 +83,15 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
 
     introText += `\n\nWhat are we creating? Or shall we just talk?`;
 
-    return [{ role: 'model' as const, text: introText }];
+    return [{ role: 'model' as const, text: introText, timestamp: Date.now() }];
   };
 
   useEffect(() => {
-    if (!initializedRef.current) {
+    if (!initializedRef.current && history.length === 0) {
         setHistory(generateIntro());
         initializedRef.current = true;
     }
-  }, []);
+  }, [history.length, setHistory]);
 
   const handleReset = () => {
       if (window.confirm("RESET UPLINK?\n\nThis will clear the current conversation cache and restart the session.")) {
@@ -219,7 +218,8 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
         role: 'user' as const, 
         text: userText || (stagedFile ? "[Image Sent]" : ""), 
         imageUrl: previewUrl,
-        imageBase64: base64Image 
+        imageBase64: base64Image,
+        timestamp: Date.now()
     };
 
     const historyWithoutOldImages = history.map(h => ({
@@ -253,9 +253,9 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
         }
 
         finalReply = finalReply.trim();
-        setHistory(prev => [...prev, { role: 'model', text: finalReply }]);
+        setHistory(prev => [...prev, { role: 'model', text: finalReply, timestamp: Date.now() }]);
     } catch (e) {
-        setHistory(prev => [...prev, { role: 'model', text: "The visual feed corrupted... send that again?" }]);
+        setHistory(prev => [...prev, { role: 'model', text: "The visual feed corrupted... send that again?", timestamp: Date.now() }]);
     } finally {
         setIsLoading(false);
     }
@@ -277,15 +277,15 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
               imageBase64: undefined 
           }));
 
-          const newHistory = [...historyWithoutOldImages, { role: 'user' as const, text: contextMsg }];
+          const newHistory = [...historyWithoutOldImages, { role: 'user' as const, text: contextMsg, timestamp: Date.now() }];
           setHistory(newHistory);
           
           setIsLoading(true);
           const reply = await generateArchitectResponse(newHistory, getSystemPersona());
-          setHistory(prev => [...prev, { role: 'model', text: reply }]);
+          setHistory(prev => [...prev, { role: 'model', text: reply, timestamp: Date.now() }]);
 
       } catch (err) {
-          setHistory(prev => [...prev, { role: 'model', text: "Failed to parse that document." }]);
+          setHistory(prev => [...prev, { role: 'model', text: "Failed to parse that document.", timestamp: Date.now() }]);
       } finally {
           setIsAnalyzing(false);
           setAnalysisProgress(null);

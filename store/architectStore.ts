@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { NarrativePhase } from '../types';
+import { NarrativePhase, ChatMessage } from '../types';
 
 interface ArchitectMemory {
   userName: string | null;
@@ -25,11 +25,20 @@ interface ArchitectState {
   mood: ArchitectMood;
   narrative: NarrativeMetronome;
   
+  // NEW: Persisted Chat History
+  messages: ChatMessage[];
+  
   // Actions
   addFact: (fact: string) => void;
   recordInteraction: () => void;
   setUserName: (name: string) => void;
   setContextualMood: (vibe: ArchitectMood['current_vibe']) => void;
+  
+  // NEW: Message Actions
+  addMessage: (message: ChatMessage) => void;
+  setMessages: (updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
+  clearMessages: () => void;
+
   resetMemory: () => void;
   advancePhase: (newPhase: NarrativePhase) => void;
   incrementTurnCount: () => void;
@@ -53,9 +62,27 @@ export const useArchitectStore = create<ArchitectState>()(
         currentPhase: 'Act1_Setup',
         turnCount: 0,
       },
+      
+      // NEW: Initial state for messages
+      messages: [],
 
       addFact: (fact) => set((state) => ({
         memory: { ...state.memory, facts: [...state.memory.facts, fact] }
+      })),
+
+      // NEW: Append a message to the history
+      addMessage: (message) => set((state) => ({
+        messages: [...state.messages, message]
+      })),
+
+      // NEW: Update messages (supports functional updates)
+      setMessages: (updater) => set((state) => ({
+        messages: typeof updater === 'function' ? updater(state.messages) : updater
+      })),
+
+      // NEW: Clear history if needed
+      clearMessages: () => set(() => ({
+        messages: []
       })),
 
       setUserName: (name) => set((state) => ({
@@ -85,7 +112,8 @@ export const useArchitectStore = create<ArchitectState>()(
         narrative: {
           currentPhase: 'Act1_Setup',
           turnCount: 0,
-        }
+        },
+        messages: [] // Clear messages on full reset
       })),
 
       advancePhase: (newPhase) => set((state) => ({

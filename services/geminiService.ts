@@ -156,17 +156,13 @@ export const generateArchitectResponse = async (
             return { role: h.role, parts };
         });
 
-        // Add a 30s timeout to the request
-        const response = await Promise.race([
-            withRetry(() => ai.models.generateContent({
-                model: 'gemini-3-flash-preview', 
-                contents: contents,
-                config: {
-                    systemInstruction: systemInstruction,
-                }
-            })),
-            new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Architect Timeout")), 30000))
-        ]);
+        const response = await withRetry(() => ai.models.generateContent({
+            model: 'gemini-3-flash-preview', 
+            contents: contents,
+            config: {
+                systemInstruction: systemInstruction,
+            }
+        }));
 
         return response.text || "The connection is flickering... I lost that thought. Say it again?";
     } catch (e) {
@@ -193,14 +189,11 @@ export const extractScenarioFromChat = async (history: { role: 'user' | 'model',
     `;
 
     try {
-        const res = await Promise.race([
-            withRetry(() => ai.models.generateContent({
-                model: 'gemini-3-flash-preview', 
-                contents: [{ role: 'user', parts: [{ text: extractionPrompt }] }],
-                config: { responseMimeType: 'application/json' }
-            })),
-            new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Extraction Timeout")), 30000))
-        ]);
+        const res = await withRetry(() => ai.models.generateContent({
+            model: 'gemini-3-flash-preview', 
+            contents: [{ role: 'user', parts: [{ text: extractionPrompt }] }],
+            config: { responseMimeType: 'application/json' }
+        }));
 
         const concepts = parseScenarioConcepts(res.text || "{}");
         
@@ -670,17 +663,14 @@ EXECUTE THE FOLLOWING EXTRACTION FILTERS:
     const fullParts = [...parts, { text: prompt }];
     const jsonSchema = zodToJsonSchema(SourceAnalysisResultSchema as any, "analysis");
 
-    const res = await Promise.race([
-      withRetry(() => ai.models.generateContent({
+    const res = await withRetry(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview', 
         contents: [{ role: 'user', parts: fullParts }],
         config: { 
             responseMimeType: 'application/json',
             responseSchema: jsonSchema.definitions?.analysis as any
         }
-      })),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Analysis Timeout")), 60000))
-    ]);
+    }));
 
     return parseSourceAnalysis(res.text || "{}");
 };

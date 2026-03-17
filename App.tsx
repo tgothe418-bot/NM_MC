@@ -111,23 +111,23 @@ export default function App() {
         {isInitialized && !showSetup && (
             <div className="flex flex-col lg:flex-row h-screen overflow-hidden relative">
                 {/* LEFT COLUMN: Narrative Log */}
-                <div className="flex-1 flex flex-col relative z-10 h-full overflow-hidden">
+                <div className="flex-1 flex flex-col relative z-10 h-full overflow-hidden lg:pb-16">
                     <SystemGhost 
                         floating={true} 
                         isSystemTyping={isLoading}
                         userInputLength={userInputLength}
-                        className="w-[40vw] h-[40vw] max-w-[500px] max-h-[500px] opacity-10 absolute pointer-events-none z-0" 
+                        className="w-[40vw] h-[40vw] max-w-[500px] max-h-[500px] opacity-10 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0" 
                     />
                     <StoryLog 
                         history={history} 
                         isLoading={isLoading} 
                         currentImage={gameState.location_state.current_environment_image}
-                        className="pb-24 relative z-10" 
+                        className="relative z-10" 
                     />
                 </div>
 
                 {/* RIGHT COLUMN: Input Sidebar */}
-                <div className="w-full lg:w-[450px] xl:w-[500px] border-t lg:border-t-0 lg:border-l border-red-900/30 bg-[#080000] z-20 flex flex-col p-6 shadow-[0_0_50px_rgba(0,0,0,1)] relative pb-24 lg:pb-24">
+                <div className="w-full lg:w-[450px] xl:w-[500px] border-t lg:border-t-0 lg:border-l border-red-900/30 bg-[#080000] z-20 flex flex-col p-6 shadow-[0_0_50px_rgba(0,0,0,1)] relative pb-24 lg:pb-6">
                     <div className="absolute inset-0 pointer-events-none opacity-5 bg-[radial-gradient(circle_at_center,rgba(220,38,38,0.1)_0%,transparent_70%)]" />
                     <InputArea 
                         onSend={(text, files) => sendMessage(text, files)} 

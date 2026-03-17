@@ -25,7 +25,7 @@ export const StatusPanel: React.FC<StatusPanelProps> = ({
   const isDread = mood.valence < 0.4;
 
   return (
-    <div className="fixed bottom-0 left-0 w-full lg:w-auto lg:right-[500px] h-16 bg-black border-t border-gray-800 flex items-center px-6 justify-between z-30">
+    <div className="fixed bottom-0 left-0 w-full lg:w-auto lg:right-[450px] xl:right-[500px] h-16 bg-black border-t border-gray-800 flex items-center px-6 justify-between z-30">
         <div className="flex items-center gap-6">
             <div>
                 <div className="text-[10px] uppercase tracking-widest text-gray-500">Location</div>

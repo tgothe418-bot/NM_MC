@@ -140,7 +140,9 @@ export const useGameEngine = () => {
     // Core Game Data (Reducer)
     const [gameState, dispatch] = useReducer(gameReducer, DEFAULT_GAME_STATE);
     
-    const [history, setHistory] = useState<ChatMessage[]>([]);
+    // Use persisted chat history from the Architect Store
+    const history = useArchitectStore(state => state.messages);
+    const setHistory = useArchitectStore(state => state.setMessages);
 
     // UI/Process State
     const [isLoading, setIsLoading] = useState(false);
