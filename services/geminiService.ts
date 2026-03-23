@@ -125,25 +125,30 @@ export const classifyUserIntent = async (userInput: string): Promise<'NARRATIVE_
         }));
         const parsed = JSON.parse(res.text || "{}");
         return parsed.intent || 'NARRATIVE_ACTION';
-    } catch (e) {
+    } catch (e: any) {
+        console.error("Error in classifyUserIntent:", e);
+        if (e?.status === 429 || e?.message?.includes('429') || e?.message?.includes('Rate Limit') || e?.message?.includes('quota')) {
+            throw new Error("RATE_LIMIT_EXCEEDED");
+        }
         return 'NARRATIVE_ACTION';
     }
 };
 
 export const generateArchitectResponse = async (
     history: { role: 'user' | 'model', text: string, imageBase64?: string }[], 
-    systemInstruction: string
+    systemInstruction: string,
+    gameState?: GameState,
+    architectMemory?: any
 ): Promise<string> => {
     const ai = getAI();
     try {
         // [OPTIMIZATION] Prune history to last 10 turns to prevent context bloat
         const prunedHistory = history.slice(-10);
 
-        // Map history to Gemini "Content" format, handling mixed media
-        const contents = prunedHistory.map(h => {
+        // Ensure alternating roles starting with 'user'
+        const contents: any[] = [];
+        for (const h of prunedHistory) {
             const parts: Part[] = [{ text: h.text || "..." }];
-            
-            // If this message has an image attached, add it to the payload
             if (h.imageBase64) {
                 const cleanBase64 = h.imageBase64.split(',')[1] || h.imageBase64;
                 parts.push({
@@ -153,14 +158,43 @@ export const generateArchitectResponse = async (
                     }
                 });
             }
-            return { role: h.role, parts };
-        });
+            
+            if (contents.length === 0) {
+                if (h.role === 'model') {
+                    // Gemini requires starting with user, so we prepend a dummy user message or skip
+                    continue;
+                }
+                contents.push({ role: h.role, parts });
+            } else {
+                const lastContent = contents[contents.length - 1];
+                if (lastContent.role === h.role) {
+                    // Collapse consecutive messages of the same role
+                    lastContent.parts.push({ text: '\n\n' });
+                    lastContent.parts.push(...parts);
+                } else {
+                    contents.push({ role: h.role, parts });
+                }
+            }
+        }
+        
+        // If contents is empty after filtering, add a default user message
+        if (contents.length === 0) {
+            contents.push({ role: 'user', parts: [{ text: 'Hello' }] });
+        }
+
+        let fullInstruction = systemInstruction;
+        if (gameState) {
+            fullInstruction += `\n\n[TNM LOCAL MEMORY]:\n- Current Phase: ${gameState.meta.narrative_phase || 'Unknown'}\n- Active Cluster: ${gameState.meta.active_cluster}\n- Narrative Summary: ${gameState.narrative.past_summary || 'None'}`;
+        }
+        if (architectMemory) {
+            fullInstruction += `\n\n[ARCHITECT MEMORY]:\n- User Name: ${architectMemory.userName || 'Unknown'}\n- Known Facts: ${architectMemory.facts.join(', ') || 'None'}`;
+        }
 
         const response = await withRetry(() => ai.models.generateContent({
             model: 'gemini-3-flash-preview', 
             contents: contents,
             config: {
-                systemInstruction: systemInstruction,
+                systemInstruction: fullInstruction,
             }
         }));
 
@@ -307,6 +341,7 @@ export const processGameTurn = async (
   currentState: GameState, 
   metronome: { currentPhase: string; turnCount: number },
   userAction: string, 
+  history: ChatMessage[] = [],
   files: File[] = [],
   onStreamLogic?: (chunk: string, phase: 'logic' | 'narrative') => void
 ): Promise<{ stateCommands: any[], narrativeMetadata: any, storyText: string, imagePromise?: Promise<string | undefined> }> => {
@@ -361,9 +396,14 @@ export const processGameTurn = async (
   const locationManifesto = constructLocationManifesto(currentState.location_state);
   const roomRules = constructRoomGenerationRules(currentState);
 
+  const recentHistory = history.slice(-5).map(h => `${h.role.toUpperCase()}: ${h.text}`).join('\n');
+
   const contextBlock = `
   ${JSON.stringify(focusState)}
   [PRIOR NARRATIVE SUMMARY]: ${currentState.narrative.past_summary || "None"}
+  [RECENT HISTORY]:
+  ${recentHistory}
+  
   ${sensoryManifesto}
   ${voiceManifesto}
   ${locationManifesto}
@@ -427,8 +467,11 @@ export const processGameTurn = async (
           );
       }
 
-  } catch (e) {
+  } catch (e: any) {
       console.error("Single Pass Engine Error:", e);
+      if (e?.message === "RATE_LIMIT_EXCEEDED" || e?.status === 429 || e?.message?.includes('429') || e?.message?.includes('Rate Limit') || e?.message?.includes('quota')) {
+          throw e;
+      }
       finalStoryText = "The machine screams in binary. (Engine Failure)";
   }
   
@@ -452,7 +495,11 @@ export const generateAutoPlayerAction = async (state: GameState): Promise<string
             config: { systemInstruction: PLAYER_SYSTEM_INSTRUCTION }
         }));
         return res.text || "Wait and watch.";
-    } catch (e) {
+    } catch (e: any) {
+        console.error("Error in generateAutoPlayerAction:", e);
+        if (e?.status === 429 || e?.message?.includes('429') || e?.message?.includes('Rate Limit') || e?.message?.includes('quota')) {
+            throw new Error("RATE_LIMIT_EXCEEDED");
+        }
         return "Wait.";
     }
 };

@@ -30,7 +30,7 @@ export const updateNpcMemories = (
       turn: gameState.meta.turn,
       description: chat.role === 'user' 
         ? `Player said/did: "${chat.text.slice(0, 100)}..."` 
-        : `I acted/said: "${chat.text.slice(0, 100)}..."`,
+        : `Observation: "${chat.text.slice(0, 100)}..."`,
       emotional_impact: 1, // Default impact, can be enhanced with sentiment analysis later
       involved_actors: ['Player']
     }));

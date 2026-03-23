@@ -156,6 +156,7 @@ export const useGameEngine = () => {
     // Refs for safety (avoid stale closures in timeouts)
     const processingRef = useRef(false);
     const turnRef = useRef(gameState.meta.turn);
+    const isSummarizing = useRef<boolean>(false);
 
     // Sync turnRef with state
     useEffect(() => {
@@ -283,32 +284,38 @@ export const useGameEngine = () => {
         setNarrativeStream("");
         setStreamPhase('logic');
 
-        // Phase 1: Intent Routing
-        const intent = await classifyUserIntent(text);
-        if (intent === 'SYSTEM_COMMAND' || intent === 'OOC_CLARIFICATION') {
-            const architectResponse = await generateArchitectResponse(history.concat({ role: 'user', text, timestamp: Date.now() }), "You are the Architect, a helpful AI companion.");
-            setHistory(prev => [...prev, { role: 'user', text, timestamp: Date.now() }, { role: 'model', text: architectResponse, timestamp: Date.now() }]);
-            setIsLoading(false);
-            processingRef.current = false;
-            return;
-        }
-
-        // --- NARRATIVE METRONOME (Step 1 & 3) ---
-        const { narrative: metronome, incrementTurnCount, advancePhase } = useArchitectStore.getState();
-        incrementTurnCount();
-        
-        // Get updated metronome state (for CURRENT turn context)
-        const updatedMetronome = useArchitectStore.getState().narrative;
-
-        if (!text.includes("BEGIN SIMULATION")) {
-            setHistory(prev => [...prev, { role: 'user', text, timestamp: Date.now() }]);
-        }
-
-        const currentState = overrideState || gameState;
-        
         try {
+            // Phase 1: Intent Routing
+            const intent = await classifyUserIntent(text);
+            if (intent === 'SYSTEM_COMMAND' || intent === 'OOC_CLARIFICATION') {
+                const architectMemory = useArchitectStore.getState().memory;
+                const architectResponse = await generateArchitectResponse(
+                    history.concat({ role: 'user', text, timestamp: Date.now() }), 
+                    "You are the Architect, a helpful AI companion.",
+                    overrideState || gameState,
+                    architectMemory
+                );
+                setHistory(prev => [...prev, { role: 'user', text, timestamp: Date.now() }, { role: 'model', text: architectResponse, timestamp: Date.now() }]);
+                setIsLoading(false);
+                processingRef.current = false;
+                return;
+            }
+
+            // --- NARRATIVE METRONOME (Step 1 & 3) ---
+            const { narrative: metronome, incrementTurnCount, advancePhase } = useArchitectStore.getState();
+            incrementTurnCount();
+            
+            // Get updated metronome state (for CURRENT turn context)
+            const updatedMetronome = useArchitectStore.getState().narrative;
+
+            if (!text.includes("BEGIN SIMULATION")) {
+                setHistory(prev => [...prev, { role: 'user', text, timestamp: Date.now() }]);
+            }
+
+            const currentState = overrideState || gameState;
+            
             // processGameTurn now returns { stateCommands, narrativeMetadata, storyText, imagePromise }
-            const result = await processGameTurn(currentState, updatedMetronome, text, files, (chunk, phase) => {
+            const result = await processGameTurn(currentState, updatedMetronome, text, history, files, (chunk, phase) => {
                 setStreamPhase(phase);
                 if (phase === 'logic') setLogicStream(prev => prev + chunk);
                 else setNarrativeStream(prev => prev + chunk);
@@ -364,7 +371,7 @@ export const useGameEngine = () => {
                             // --- EPISODIC COMPRESSION (Step 4) ---
                             if (nextPhase === 'Act3_Climax') {
                                 console.log("[NARRATIVE ARCHITECT]: Executing Episodic Compression for Climax...");
-                                const historyToSummarize = [...history];
+                                const historyToSummarize = [...history, userMessage, newMessage];
                                 const summarizedTimestamps = historyToSummarize.map(msg => msg.timestamp);
                                 const summary = await summarizeHistory(historyToSummarize);
                                 if (summary) {
@@ -377,7 +384,7 @@ export const useGameEngine = () => {
                                 }
                             }
 
-                            advancePhase(nextPhase);
+                            advancePhase(nextPhase as NarrativePhase);
                         }
                     }).catch(err => console.error("Narrative evaluation failed", err));
                 }
@@ -388,7 +395,8 @@ export const useGameEngine = () => {
             
             // CONTEXT WINDOW HYGIENE (Rolling Summary)
             // If history gets too long (e.g. > 20 turns), trim it and summarize the oldest chunk.
-            if (history.length > 20) {
+            if (history.length > 20 && !isSummarizing.current) {
+                isSummarizing.current = true;
                 const PRUNE_COUNT = 10;
                 const historyToSummarize = history.slice(0, PRUNE_COUNT);
                 
@@ -404,7 +412,9 @@ export const useGameEngine = () => {
                         // Filter the state history against these specific timestamps
                         setHistory(prev => prev.filter(msg => !summarizedTimestamps.includes(msg.timestamp)));
                     }
-                }).catch(err => console.error("Summary failed", err));
+                }).catch(err => console.error("Summary failed", err)).finally(() => {
+                    isSummarizing.current = false;
+                });
 
             } else {
                 setHistory(prev => [...prev, newMessage]);
@@ -421,11 +431,16 @@ export const useGameEngine = () => {
                 }).catch(err => console.error("Background Image Generation Failed", err));
             }
 
-        } catch (e) {
+        } catch (e: any) {
             console.error("Game Loop Error:", e);
+            
+            const isRateLimit = e?.message === "RATE_LIMIT_EXCEEDED" || e?.status === 429 || e?.message?.includes('429') || e?.message?.includes('Rate Limit') || e?.message?.includes('quota');
+            
             setHistory(prev => [...prev, { 
                 role: 'model', 
-                text: "CRITICAL FAILURE: Simulation Desync.", 
+                text: isRateLimit 
+                    ? "SYSTEM HALT: Cognitive Overload (Rate Limit Exceeded). Please wait before continuing." 
+                    : "CRITICAL FAILURE: Simulation Desync.", 
                 timestamp: Date.now() 
             }]);
             setIsLoading(false);
