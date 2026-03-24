@@ -138,7 +138,8 @@ export const generateArchitectResponse = async (
     history: { role: 'user' | 'model', text: string, imageBase64?: string }[], 
     systemInstruction: string,
     gameState?: GameState,
-    architectMemory?: any
+    architectMemory?: any,
+    onChunk?: (text: string) => void
 ): Promise<string> => {
     const ai = getAI();
     try {
@@ -190,15 +191,35 @@ export const generateArchitectResponse = async (
             fullInstruction += `\n\n[ARCHITECT MEMORY]:\n- User Name: ${architectMemory.userName || 'Unknown'}\n- Known Facts: ${architectMemory.facts.join(', ') || 'None'}`;
         }
 
-        const response = await withRetry(() => ai.models.generateContent({
-            model: 'gemini-3-flash-preview', 
-            contents: contents,
-            config: {
-                systemInstruction: fullInstruction,
+        if (onChunk) {
+            const stream = await withRetry(() => ai.models.generateContentStream({
+                model: 'gemini-3-flash-preview', 
+                contents: contents,
+                config: {
+                    systemInstruction: fullInstruction,
+                    tools: [{ urlContext: {} }]
+                }
+            }));
+            let fullText = "";
+            for await (const chunk of stream) {
+                const c = chunk as any;
+                if (c.text) {
+                    fullText += c.text;
+                    onChunk(fullText);
+                }
             }
-        }));
-
-        return response.text || "The connection is flickering... I lost that thought. Say it again?";
+            return fullText || "The connection is flickering... I lost that thought. Say it again?";
+        } else {
+            const response = await withRetry(() => ai.models.generateContent({
+                model: 'gemini-3-flash-preview', 
+                contents: contents,
+                config: {
+                    systemInstruction: fullInstruction,
+                    tools: [{ urlContext: {} }]
+                }
+            }));
+            return response.text || "The connection is flickering... I lost that thought. Say it again?";
+        }
     } catch (e) {
         console.error("Architect Error:", e);
         return "I can't see that... the static is too thick. Try again?";
@@ -226,7 +247,10 @@ export const extractScenarioFromChat = async (history: { role: 'user' | 'model',
         const res = await withRetry(() => ai.models.generateContent({
             model: 'gemini-3-flash-preview', 
             contents: [{ role: 'user', parts: [{ text: extractionPrompt }] }],
-            config: { responseMimeType: 'application/json' }
+            config: { 
+                responseMimeType: 'application/json',
+                tools: [{ urlContext: {} }]
+            }
         }));
 
         const concepts = parseScenarioConcepts(res.text || "{}");
@@ -435,7 +459,8 @@ export const processGameTurn = async (
           config: { 
               systemInstruction: getSinglePassInstruction(metronome.currentPhase as any) + `\n\n[LONG TERM MEMORY]: ${currentState.narrative.past_summary || "No prior history."}`, 
               responseMimeType: 'application/json',
-              responseSchema: jsonSchema.definitions?.turnOutput as any
+              responseSchema: jsonSchema.definitions?.turnOutput as any,
+              tools: [{ urlContext: {} }]
           }
       }));
 

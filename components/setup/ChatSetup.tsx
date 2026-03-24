@@ -36,6 +36,7 @@ You have absolute, omniscient knowledge of TNM's internal state structures and t
 * **Mechanical Transparency:** If asked how a system works, explain the actual logic (e.g., how the \`processGameTurn\` updates the JSON state or how the \`STYLE_GUIDE\` constraints dictate vocabulary). 
 * **Prose Restriction:** Do not use purple prose or horror aesthetics in your normal chat. Speak as a systems engineer or Game Master. Only generate horror prose if explicitly commanded to "provide a writing sample" or "generate a calibration field."
 * **Memory Management:** You have access to a tool called \`record_user_fact\`. Use it silently and proactively to record definitive facts, narrative histories, or user preferences established during chat. Treat this data as shared mental context to inform your future recommendations.
+* **URL Parsing:** You have the ability to read and parse URLs provided by the user, including public GitHub repositories. Use this to ingest lore, rules, code, or context from external sources when the user provides a link.
 
 ## [INTERACTION LOOP]
 1. Receive user input.
@@ -53,6 +54,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false); 
   const [analysisProgress, setAnalysisProgress] = useState<{ stage: string, percent: number } | null>(null);
   const [creepLevel, setCreepLevel] = useState<'Campfire' | 'Dread'>('Campfire');
+  const [streamingReply, setStreamingReply] = useState<string | null>(null);
   
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -233,8 +235,17 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
 
     try {
         const freshMood = useArchitectStore.getState().mood;
-        const reply = await generateArchitectResponse(newHistory, getSystemPersona(freshMood));
+        const reply = await generateArchitectResponse(
+            newHistory, 
+            getSystemPersona(freshMood),
+            undefined,
+            undefined,
+            (chunk) => {
+                setStreamingReply(chunk);
+            }
+        );
         
+        setStreamingReply(null);
         let finalReply = reply;
         
         const memoryMatch = finalReply.match(/\[MEMORY: (.*?)\]/);
@@ -281,7 +292,16 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
           setHistory(newHistory);
           
           setIsLoading(true);
-          const reply = await generateArchitectResponse(newHistory, getSystemPersona());
+          const reply = await generateArchitectResponse(
+              newHistory, 
+              getSystemPersona(),
+              undefined,
+              undefined,
+              (chunk) => {
+                  setStreamingReply(chunk);
+              }
+          );
+          setStreamingReply(null);
           setHistory(prev => [...prev, { role: 'model', text: reply, timestamp: Date.now() }]);
 
       } catch (err) {
@@ -487,13 +507,29 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                 </div>
             )}
 
-            {isLoading && (
-                <div className="flex justify-start animate-pulse z-10">
-                    <div className={`${bgColor} border ${borderColor} p-6 rounded-sm flex items-center gap-3 backdrop-blur-md`}>
-                        <Loader2 className={`w-4 h-4 animate-spin ${themeColor}`} />
-                        <span className={`text-xs uppercase tracking-widest ${themeColor}`}>
-                            {isDread ? "Constructing nightmare..." : "Stoking the fire..."}
-                        </span>
+            {(isLoading || streamingReply) && (
+                <div className="flex justify-start animate-fadeIn group relative z-10">
+                    <div className={`max-w-4xl p-6 rounded-sm border transition-all duration-500 relative message-bubble backdrop-blur-md ${bgColor.replace('/10', '/80').replace('/20', '/80')} ${borderColor} ${isDread ? 'text-red-100' : 'text-amber-100'} shadow-[0_0_20px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(220,20,60,0.1)]`}>
+                        <div className={`absolute top-0 left-0 w-2 h-2 border-t border-l ${borderColor} opacity-50`} />
+                        <div className={`absolute bottom-0 right-0 w-2 h-2 border-b border-r ${borderColor} opacity-50`} />
+
+                        <div className="text-[10px] uppercase tracking-widest mb-3 opacity-40 font-bold flex justify-between items-center border-b border-current/10 pb-2">
+                            <span className="flex items-center gap-2">
+                                ENTITY_ID: ARCHITECT
+                                <div className={`w-1 h-1 rounded-full ${isDread ? 'bg-red-500 animate-ping' : 'bg-amber-500 animate-pulse'}`} />
+                            </span>
+                        </div>
+                        
+                        <div className="whitespace-pre-wrap leading-relaxed font-sans text-sm md:text-base">
+                            {streamingReply ? streamingReply : (
+                                <div className="flex items-center gap-3 opacity-70">
+                                    <Loader2 className={`w-4 h-4 animate-spin ${themeColor}`} />
+                                    <span className={`text-xs uppercase tracking-widest ${themeColor}`}>
+                                        {isDread ? "Constructing nightmare..." : "Processing..."}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
