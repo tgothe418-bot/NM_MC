@@ -62,28 +62,33 @@ export const ManualCharacterSection: React.FC<Props> = ({ loadingFields, setLoad
 
   const isVillain = mode.includes('Antagonist') || mode.includes('Predator');
 
+  const fieldActions: Record<string, { setter: (v: string) => void, value: string }> = {
+      'Entity Name': { setter: setVillainName, value: villainName },
+      'Form & Appearance': { setter: setVillainAppearance, value: villainAppearance },
+      'Modus Operandi': { setter: setVillainMethods, value: villainMethods },
+      'Specimen Targets': { setter: setVictimDescription, value: victimDescription },
+      'Companion Profiles': { setter: setVictimDescription, value: victimDescription },
+      'Primary Objective': { setter: setPrimaryGoal, value: primaryGoal },
+      'Identity Name': { setter: setSurvivorName, value: survivorName },
+      'Backstory': { setter: setSurvivorBackground, value: survivorBackground },
+      'Traits & Flaws': { setter: setSurvivorTraits, value: survivorTraits }
+  };
+
   const handleGenerate = async (field: string, useNotes = false) => {
       setLoadingFields(prev => ({ ...prev, [field]: true }));
       try {
-          const val = await generateCalibrationField(field, selectedClusters.join(', '), intensity, undefined, useNotes ? (
-              field === 'Entity Name' ? villainName :
-              field === 'Form & Appearance' ? villainAppearance :
-              field === 'Modus Operandi' ? villainMethods :
-              field === 'Specimen Targets' || field === 'Companion Profiles' ? victimDescription :
-              field === 'Primary Objective' ? primaryGoal :
-              field === 'Identity Name' ? survivorName :
-              field === 'Backstory' ? survivorBackground :
-              field === 'Traits & Flaws' ? survivorTraits : ''
-          ) : undefined);
-
-          if (field === 'Entity Name') setVillainName(val);
-          else if (field === 'Form & Appearance') setVillainAppearance(val);
-          else if (field === 'Modus Operandi') setVillainMethods(val);
-          else if (field === 'Specimen Targets' || field === 'Companion Profiles') setVictimDescription(val);
-          else if (field === 'Primary Objective') setPrimaryGoal(val);
-          else if (field === 'Identity Name') setSurvivorName(val);
-          else if (field === 'Backstory') setSurvivorBackground(val);
-          else if (field === 'Traits & Flaws') setSurvivorTraits(val);
+          const action = fieldActions[field];
+          if (!action) return; // Fail fast on unknown fields
+          
+          const contextValue = useNotes ? action.value : undefined;
+          const val = await generateCalibrationField(
+              field, 
+              selectedClusters.join(', '), 
+              intensity, 
+              undefined, 
+              contextValue
+          );
+          action.setter(val);
       } finally {
           setLoadingFields(prev => ({ ...prev, [field]: false }));
       }

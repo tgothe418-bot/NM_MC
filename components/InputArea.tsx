@@ -80,7 +80,7 @@ export const InputArea: React.FC<InputAreaProps> = ({
                value={input}
                onChange={handleInputChange}
                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-               placeholder={isLoading ? "The Machine is processing..." : "What do you do?"}
+               placeholder={isLoading ? "The Machine is thinking..." : "What do you do?"}
                disabled={isLoading}
                className={`flex-1 bg-black border ${isLoading ? 'border-red-900 animate-pulse' : 'border-red-900/50'} p-3 text-red-100 focus:border-red-600 focus:outline-none transition-all font-mono text-sm placeholder-red-900/40`}
            />

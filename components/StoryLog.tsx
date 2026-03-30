@@ -4,20 +4,22 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ChatMessage } from '../types';
 import { Loader2, Upload, Image as ImageIcon } from 'lucide-react';
+import { ThinkingIndicator } from './ThinkingIndicator';
 
 interface StoryLogProps {
   history: ChatMessage[];
   isLoading: boolean;
   currentImage?: string;
   className?: string;
+  error?: string;
 }
 
-export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, currentImage, className = "" }) => {
+export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, currentImage, className = "", error }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [history, isLoading, currentImage]);
+  }, [history, isLoading, currentImage, error]);
 
   return (
     <div className={`flex-1 overflow-y-auto px-6 md:px-12 pt-6 md:pt-12 pb-4 space-y-8 custom-scrollbar ${className}`}>
@@ -63,15 +65,8 @@ export const StoryLog: React.FC<StoryLogProps> = ({ history, isLoading, currentI
       ))}
 
       {isLoading && (
-        <div className="flex justify-start animate-pulse">
-            <div className="bg-black/40 border p-6 rounded-sm flex items-center gap-3"
-                 style={{
-                     borderColor: `rgba(var(--theme-color), calc(0.3 + (var(--ui-intensity) * 0.7)))`,
-                     boxShadow: `0 0 calc(var(--ui-intensity) * 20px) rgba(var(--theme-color), calc(var(--ui-intensity) * 0.2))`
-                 }}>
-                <Loader2 className="w-4 h-4 animate-spin" style={{ color: `rgb(var(--theme-color))` }} />
-                <span className="text-xs uppercase tracking-widest" style={{ color: `rgb(var(--theme-color))` }}>Dreaming...</span>
-            </div>
+        <div className="flex justify-start animate-fadeIn">
+            <ThinkingIndicator error={error} />
         </div>
       )}
       

@@ -314,12 +314,19 @@ export const useGameEngine = () => {
 
             const currentState = overrideState || gameState;
             
-            // processGameTurn now returns { stateCommands, narrativeMetadata, storyText, imagePromise }
-            const result = await processGameTurn(currentState, updatedMetronome, text, history, files, (chunk, phase) => {
-                setStreamPhase(phase);
-                if (phase === 'logic') setLogicStream(prev => prev + chunk);
-                else setNarrativeStream(prev => prev + chunk);
+            const timeoutPromise = new Promise<never>((_, reject) => {
+                setTimeout(() => reject(new Error("TIMEOUT")), 60000); // 60 seconds timeout
             });
+
+            // processGameTurn now returns { stateCommands, narrativeMetadata, storyText, imagePromise }
+            const result = await Promise.race([
+                processGameTurn(currentState, updatedMetronome, text, history, files, (chunk, phase) => {
+                    setStreamPhase(phase);
+                    if (phase === 'logic') setLogicStream(prev => prev + chunk);
+                    else setNarrativeStream(prev => prev + chunk);
+                }),
+                timeoutPromise
+            ]);
             
             // Apply commands
             let newState = applyStateCommands(currentState, result.stateCommands);
@@ -435,11 +442,14 @@ export const useGameEngine = () => {
             console.error("Game Loop Error:", e);
             
             const isRateLimit = e?.message === "RATE_LIMIT_EXCEEDED" || e?.status === 429 || e?.message?.includes('429') || e?.message?.includes('Rate Limit') || e?.message?.includes('quota');
+            const isTimeout = e?.message === "TIMEOUT";
             
             setHistory(prev => [...prev, { 
                 role: 'model', 
                 text: isRateLimit 
                     ? "SYSTEM HALT: Cognitive Overload (Rate Limit Exceeded). Please wait before continuing." 
+                    : isTimeout
+                    ? "SYSTEM HALT: Connection timed out. The machine is unresponsive."
                     : "CRITICAL FAILURE: Simulation Desync.", 
                 timestamp: Date.now() 
             }]);

@@ -36,6 +36,7 @@ export interface GameState {
     mode: 'Survivor' | 'Villain';
     intensity_level: string;
     active_cluster: string;
+    narrative_phase?: string;
     player_profile?: {
         name: string;
         background: string;

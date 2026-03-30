@@ -30,6 +30,12 @@ const INTENSITY_OPTIONS = [
   { id: 'Level 5', label: 'Level 5', desc: 'The Abyssal (Unfiltered)' }
 ];
 
+const isVillainRole = (role: string): boolean => {
+    const keywords = ['antagonist', 'villain', 'monster', 'killer', 'entity', 'computer', 'ai', 'master'];
+    const roleLower = role.toLowerCase();
+    return keywords.some(keyword => roleLower.includes(keyword));
+};
+
 export const ManualSetup: React.FC<Props> = ({ onComplete, onBack }) => {
   const store = useSetupStore();
   const [loadingFields, setLoadingFields] = useState<Record<string, boolean>>({});
@@ -38,32 +44,34 @@ export const ManualSetup: React.FC<Props> = ({ onComplete, onBack }) => {
   const [selectedCharName, setSelectedCharName] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const handleStart = () => {
+  const handleStart = async () => {
       setIsCalibrating(true);
-      setTimeout(() => {
-          onComplete({
-              perspective: store.perspective.split(' (')[0],
-              mode: store.mode.includes('Survivor') ? 'Survivor' : 'Villain',
-              starting_point: store.startingPoint,
-              cluster: store.selectedClusters.join(', '),
-              intensity: store.intensity,
-              cycles: 0,
-              visual_motif: store.visualMotif,
-              location_description: store.locationDescription,
-              villain_name: store.villainName,
-              villain_appearance: store.villainAppearance,
-              villain_methods: store.villainMethods,
-              victim_description: store.victimDescription,
-              primary_goal: store.primaryGoal,
-              victim_count: store.victimCount,
-              survivor_name: store.survivorName,
-              survivor_background: store.survivorBackground,
-              survivor_traits: store.survivorTraits,
-              parsed_characters: store.parsedCharacters,
-              plot_hook: store.plotHook,
-              transition_gate: store.transitionGate,
-          });
-      }, 2000);
+      
+      const configPayload = {
+          perspective: store.perspective.split(' (')[0],
+          mode: store.mode.includes('Survivor') ? 'Survivor' : 'Villain',
+          starting_point: store.startingPoint,
+          cluster: store.selectedClusters.join(', '),
+          intensity: store.intensity,
+          cycles: 0,
+          visual_motif: store.visualMotif,
+          location_description: store.locationDescription,
+          villain_name: store.villainName,
+          villain_appearance: store.villainAppearance,
+          villain_methods: store.villainMethods,
+          victim_description: store.victimDescription,
+          primary_goal: store.primaryGoal,
+          victim_count: store.victimCount,
+          survivor_name: store.survivorName,
+          survivor_background: store.survivorBackground,
+          survivor_traits: store.survivorTraits,
+          parsed_characters: store.parsedCharacters,
+          plot_hook: store.plotHook,
+          transition_gate: store.transitionGate,
+      };
+
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      onComplete(configPayload);
   };
 
   const handleAutoPopulate = async () => {
@@ -107,14 +115,12 @@ export const ManualSetup: React.FC<Props> = ({ onComplete, onBack }) => {
   const handleCharacterSelect = (char: ParsedCharacter) => {
       setSelectedCharName(char.name);
 
-      const roleLower = char.role.toLowerCase();
-      // Expanded keyword check for robustness
-      const isSelectedVillain = roleLower.includes('antagonist') || roleLower.includes('villain') || 
-                                roleLower.includes('monster') || roleLower.includes('killer') || 
-                                roleLower.includes('entity') || roleLower.includes('computer') ||
-                                roleLower.includes('ai') || roleLower.includes('master');
+      const isSelectedVillain = isVillainRole(char.role);
       
       const others = store.parsedCharacters.filter(c => c.name !== char.name);
+
+      const formatCharacterProfile = (c: ParsedCharacter, prefix: string) => 
+          `${prefix}: ${c.name}\nROLE: ${c.role}\nPROFILE: ${c.description}\nTRAITS: ${c.traits}`;
 
       if (isSelectedVillain) {
           // 1. User is playing AS the Villain
@@ -134,10 +140,7 @@ export const ManualSetup: React.FC<Props> = ({ onComplete, onBack }) => {
           // Targets are everyone else
           if (others.length > 0) {
               store.setVictimCount(others.length);
-              const othersDescription = others.map(c => 
-                  `SUBJECT: ${c.name}\nROLE: ${c.role}\nPROFILE: ${c.description}\nTRAITS: ${c.traits}`
-              ).join('\n\n');
-              store.setVictimDescription(othersDescription);
+              store.setVictimDescription(others.map(c => formatCharacterProfile(c, 'SUBJECT')).join('\n\n'));
           }
       } else {
           // 2. User is playing AS a Survivor
@@ -147,11 +150,7 @@ export const ManualSetup: React.FC<Props> = ({ onComplete, onBack }) => {
           store.setSurvivorTraits(char.traits);
 
           // Smart detection: Do we have a designated villain in the remaining list?
-          const detectedVillain = others.find(c => {
-              const r = c.role.toLowerCase();
-              return r.includes('antagonist') || r.includes('villain') || r.includes('monster') || 
-                     r.includes('killer') || r.includes('entity') || r.includes('computer');
-          });
+          const detectedVillain = others.find(c => isVillainRole(c.role));
 
           const companions = others.filter(c => c !== detectedVillain);
 
@@ -166,11 +165,7 @@ export const ManualSetup: React.FC<Props> = ({ onComplete, onBack }) => {
           // Populate companions
           if (companions.length > 0) {
               store.setVictimCount(companions.length);
-              
-              const compDescription = companions.map(c => 
-                  `COMPANION: ${c.name}\nROLE: ${c.role}\nPROFILE: ${c.description}\nTRAITS: ${c.traits}`
-              ).join('\n\n');
-              store.setVictimDescription(compDescription);
+              store.setVictimDescription(companions.map(c => formatCharacterProfile(c, 'COMPANION')).join('\n\n'));
           } else {
               store.setVictimCount(0); 
               store.setVictimDescription('');
