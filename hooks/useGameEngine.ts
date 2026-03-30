@@ -4,7 +4,7 @@ import { get, set, del } from 'idb-keyval';
 import { GameState, ChatMessage, SimulationConfig, NpcState, NarrativePhase } from '../types';
 import { getDefaultLocationState } from '../services/locationEngine';
 import { generateProceduralNpc } from '../services/npcGenerator';
-import { processGameTurn, generateAutoPlayerAction, initializeGemini, summarizeHistory, evaluateNarrativeTransition, classifyUserIntent, generateArchitectResponse } from '../services/geminiService';
+import { processGameTurn, generateAutoPlayerAction, initializeGemini, summarizeHistory, evaluateNarrativeTransition, generateArchitectResponse } from '../services/geminiService';
 import { useAutoPilot } from './useAutoPilot';
 import { useArchitectStore } from '../store/architectStore';
 import { updateNpcMemories } from '../services/memorySystem';
@@ -285,16 +285,31 @@ export const useGameEngine = () => {
         setStreamPhase('logic');
 
         try {
-            // Phase 1: Intent Routing
-            const intent = await classifyUserIntent(text);
-            if (intent === 'SYSTEM_COMMAND' || intent === 'OOC_CLARIFICATION') {
+            // Phase 1: Intent Routing (Fast-path evaluation)
+            let isSystemOrOOC = false;
+            if (text.startsWith('/') || text.startsWith('META:')) {
+                isSystemOrOOC = true;
+            } else if (text.startsWith('OOC:') || text.startsWith('(OOC)')) {
+                isSystemOrOOC = true;
+            }
+
+            if (isSystemOrOOC) {
                 const architectMemory = useArchitectStore.getState().memory;
-                const architectResponse = await generateArchitectResponse(
-                    history.concat({ role: 'user', text, timestamp: Date.now() }), 
-                    "You are the Architect, a helpful AI companion.",
-                    overrideState || gameState,
-                    architectMemory
-                );
+                
+                const timeoutPromise = new Promise<never>((_, reject) => {
+                    setTimeout(() => reject(new Error("TIMEOUT")), 60000);
+                });
+
+                const architectResponse = await Promise.race([
+                    generateArchitectResponse(
+                        history.concat({ role: 'user', text, timestamp: Date.now() }), 
+                        "You are the Architect, a helpful AI companion.",
+                        overrideState || gameState,
+                        architectMemory
+                    ),
+                    timeoutPromise
+                ]);
+                
                 setHistory(prev => [...prev, { role: 'user', text, timestamp: Date.now() }, { role: 'model', text: architectResponse, timestamp: Date.now() }]);
                 setIsLoading(false);
                 processingRef.current = false;

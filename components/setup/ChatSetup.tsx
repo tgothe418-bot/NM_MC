@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, ChevronLeft, Paperclip, Upload, Loader2, Play, Skull, Flame, X, Image as ImageIcon, RefreshCw } from 'lucide-react';
+import { ThinkingIndicator } from '../ThinkingIndicator';
 import { SimulationConfig } from '../../types';
 import { analyzeSourceMaterial, generateArchitectResponse, extractScenarioFromChat } from '../../services/geminiService';
 import { useArchitectStore } from '../../store/architectStore';
@@ -47,6 +48,7 @@ You have absolute, omniscient knowledge of TNM's internal state structures and t
 export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
   const [input, setInput] = useState('');
   const [stagedFile, setStagedFile] = useState<File | null>(null); 
+  const [error, setError] = useState<string | undefined>();
   const [stagedPreview, setStagedPreview] = useState<string | null>(null);
   
   const [isLoading, setIsLoading] = useState(false);
@@ -232,18 +234,27 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
     const newHistory = [...historyWithoutOldImages, newHistoryEntry];
     setHistory(newHistory);
     setIsLoading(true);
+    setError(undefined);
 
     try {
         const freshMood = useArchitectStore.getState().mood;
-        const reply = await generateArchitectResponse(
-            newHistory, 
-            getSystemPersona(freshMood),
-            undefined,
-            undefined,
-            (chunk) => {
-                setStreamingReply(chunk);
-            }
-        );
+        
+        const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error("TIMEOUT")), 60000);
+        });
+
+        const reply = await Promise.race([
+            generateArchitectResponse(
+                newHistory, 
+                getSystemPersona(freshMood),
+                undefined,
+                undefined,
+                (chunk) => {
+                    setStreamingReply(chunk);
+                }
+            ),
+            timeoutPromise
+        ]);
         
         setStreamingReply(null);
         let finalReply = reply;
@@ -265,10 +276,21 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
 
         finalReply = finalReply.trim();
         setHistory(prev => [...prev, { role: 'model', text: finalReply, timestamp: Date.now() }]);
-    } catch (e) {
-        setHistory(prev => [...prev, { role: 'model', text: "The visual feed corrupted... send that again?", timestamp: Date.now() }]);
+    } catch (e: any) {
+        console.error("ChatSetup Error:", e);
+        const isRateLimit = e?.message === "RATE_LIMIT_EXCEEDED" || e?.status === 429 || e?.message?.includes('429') || e?.message?.includes('Rate Limit') || e?.message?.includes('quota');
+        const isTimeout = e?.message === "TIMEOUT";
+        
+        const errorMessage = isRateLimit 
+            ? "SYSTEM HALT: Cognitive Overload (Rate Limit Exceeded). Please wait before continuing." 
+            : isTimeout
+            ? "SYSTEM HALT: Connection timed out. The machine is unresponsive."
+            : "The visual feed corrupted... send that again?";
+            
+        setHistory(prev => [...prev, { role: 'model', text: errorMessage, timestamp: Date.now() }]);
     } finally {
         setIsLoading(false);
+        setStreamingReply(null);
     }
   };
 
@@ -292,36 +314,73 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
           setHistory(newHistory);
           
           setIsLoading(true);
-          const reply = await generateArchitectResponse(
-              newHistory, 
-              getSystemPersona(),
-              undefined,
-              undefined,
-              (chunk) => {
-                  setStreamingReply(chunk);
-              }
-          );
+          setError(undefined);
+          
+          const timeoutPromise = new Promise<never>((_, reject) => {
+              setTimeout(() => reject(new Error("TIMEOUT")), 60000);
+          });
+
+          const reply = await Promise.race([
+              generateArchitectResponse(
+                  newHistory, 
+                  getSystemPersona(),
+                  undefined,
+                  undefined,
+                  (chunk) => {
+                      setStreamingReply(chunk);
+                  }
+              ),
+              timeoutPromise
+          ]);
           setStreamingReply(null);
           setHistory(prev => [...prev, { role: 'model', text: reply, timestamp: Date.now() }]);
 
-      } catch (err) {
-          setHistory(prev => [...prev, { role: 'model', text: "Failed to parse that document.", timestamp: Date.now() }]);
+      } catch (err: any) {
+          console.error("Analysis Error:", err);
+          const isRateLimit = err?.message === "RATE_LIMIT_EXCEEDED" || err?.status === 429 || err?.message?.includes('429') || err?.message?.includes('Rate Limit') || err?.message?.includes('quota');
+          const isTimeout = err?.message === "TIMEOUT";
+          
+          const errorMessage = isRateLimit 
+              ? "SYSTEM HALT: Cognitive Overload (Rate Limit Exceeded). Please wait before continuing." 
+              : isTimeout
+              ? "SYSTEM HALT: Connection timed out. The machine is unresponsive."
+              : "Failed to parse that document.";
+              
+          setHistory(prev => [...prev, { role: 'model', text: errorMessage, timestamp: Date.now() }]);
       } finally {
           setIsAnalyzing(false);
           setAnalysisProgress(null);
           setIsLoading(false);
+          setStreamingReply(null);
           if (fileInputRef.current) fileInputRef.current.value = '';
       }
   };
 
   const handleInitialize = async () => {
       setIsFinalizing(true);
+      setError(undefined);
       try {
-          const config = await extractScenarioFromChat(history);
+          const timeoutPromise = new Promise<never>((_, reject) => {
+              setTimeout(() => reject(new Error("TIMEOUT")), 60000);
+          });
+          
+          const config = await Promise.race([
+              extractScenarioFromChat(history),
+              timeoutPromise
+          ]);
           onComplete(config);
-      } catch (e) {
+      } catch (e: any) {
           console.error("Failed to extract config", e);
-          onBack(); 
+          const isRateLimit = e?.message === "RATE_LIMIT_EXCEEDED" || e?.status === 429 || e?.message?.includes('429') || e?.message?.includes('Rate Limit') || e?.message?.includes('quota');
+          const isTimeout = e?.message === "TIMEOUT";
+          
+          const errorMessage = isRateLimit 
+              ? "SYSTEM HALT: Cognitive Overload (Rate Limit Exceeded). Please wait before continuing." 
+              : isTimeout
+              ? "SYSTEM HALT: Connection timed out. The machine is unresponsive."
+              : "Failed to extract scenario configuration.";
+              
+          setHistory(prev => [...prev, { role: 'model', text: errorMessage, timestamp: Date.now() }]);
       } finally {
           setIsFinalizing(false);
       }
@@ -507,7 +566,13 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                 </div>
             )}
 
-            {(isLoading || streamingReply) && (
+            {isLoading && !streamingReply && (
+                <div className="flex justify-start animate-fadeIn group relative z-10">
+                    <ThinkingIndicator error={error} />
+                </div>
+            )}
+
+            {streamingReply && (
                 <div className="flex justify-start animate-fadeIn group relative z-10">
                     <div className={`max-w-4xl p-6 rounded-sm border transition-all duration-500 relative message-bubble backdrop-blur-md ${bgColor.replace('/10', '/80').replace('/20', '/80')} ${borderColor} ${isDread ? 'text-red-100' : 'text-amber-100'} shadow-[0_0_20px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(220,20,60,0.1)]`}>
                         <div className={`absolute top-0 left-0 w-2 h-2 border-t border-l ${borderColor} opacity-50`} />
@@ -521,14 +586,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                         </div>
                         
                         <div className="whitespace-pre-wrap leading-relaxed font-sans text-sm md:text-base">
-                            {streamingReply ? streamingReply : (
-                                <div className="flex items-center gap-3 opacity-70">
-                                    <Loader2 className={`w-4 h-4 animate-spin ${themeColor}`} />
-                                    <span className={`text-xs uppercase tracking-widest ${themeColor}`}>
-                                        {isDread ? "Constructing nightmare..." : "Processing..."}
-                                    </span>
-                                </div>
-                            )}
+                            {streamingReply}
                         </div>
                     </div>
                 </div>

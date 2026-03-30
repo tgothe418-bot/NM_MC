@@ -31,6 +31,12 @@ import { constructSensoryManifesto } from './sensoryEngine';
 import { constructLocationManifesto, constructRoomGenerationRules } from './locationEngine';
 import { updateNpcMemories } from './memorySystem';
 
+// --- SCHEMA PARSING (Module Scope for Efficiency) ---
+const TURN_OUTPUT_SCHEMA = zodToJsonSchema(GameTurnOutputSchema as any, "turnOutput");
+const SOURCE_ANALYSIS_SCHEMA = zodToJsonSchema(SourceAnalysisResultSchema as any, "analysis");
+const CHARACTER_PROFILE_SCHEMA = zodToJsonSchema(CharacterProfileSchema as any, "profile");
+const SCENARIO_CONCEPTS_SCHEMA = zodToJsonSchema(ScenarioConceptsSchema as any, "concepts");
+
 // --- INITIALIZATION (Singleton Pattern) ---
 let aiInstance: GoogleGenAI | null = null;
 
@@ -81,59 +87,6 @@ const withRetry = async <T>(fn: () => Promise<T>, maxRetries = 3, initialDelay =
 
 import { useArchitectStore } from '../store/architectStore';
 
-const RECORD_FACT_TOOL: FunctionDeclaration = {
-  name: "record_user_fact",
-  description: "Extract a definitive fact, preference, or historical narrative event the user mentions.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      fact: {
-        type: Type.STRING,
-        description: "A concise, 1-sentence summary of the fact (e.g., 'User's previous character died to Militech.')."
-      }
-    },
-    required: ["fact"]
-  }
-};
-
-export const classifyUserIntent = async (userInput: string): Promise<'NARRATIVE_ACTION' | 'SYSTEM_COMMAND' | 'OOC_CLARIFICATION'> => {
-    const ai = getAI();
-    const prompt = `Classify the following user input into one of three categories:
-    - NARRATIVE_ACTION: The user is taking an action in the game world, speaking to a character, or describing their character's behavior.
-    - SYSTEM_COMMAND: The user is asking to change game settings, save/load, or perform a meta-action.
-    - OOC_CLARIFICATION: The user is asking a question out-of-character, asking for clarification about the rules, or talking to the AI directly.
-    
-    User Input: "${userInput}"`;
-
-    try {
-        const res = await withRetry(() => ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            config: {
-                responseMimeType: 'application/json',
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        intent: {
-                            type: Type.STRING,
-                            enum: ['NARRATIVE_ACTION', 'SYSTEM_COMMAND', 'OOC_CLARIFICATION']
-                        }
-                    },
-                    required: ['intent']
-                }
-            }
-        }));
-        const parsed = JSON.parse(res.text || "{}");
-        return parsed.intent || 'NARRATIVE_ACTION';
-    } catch (e: any) {
-        console.error("Error in classifyUserIntent:", e);
-        if (e?.status === 429 || e?.message?.includes('429') || e?.message?.includes('Rate Limit') || e?.message?.includes('quota')) {
-            throw new Error("RATE_LIMIT_EXCEEDED");
-        }
-        return 'NARRATIVE_ACTION';
-    }
-};
-
 export const generateArchitectResponse = async (
     history: { role: 'user' | 'model', text: string, imageBase64?: string }[], 
     systemInstruction: string,
@@ -148,16 +101,22 @@ export const generateArchitectResponse = async (
 
         // Ensure alternating roles starting with 'user'
         const contents: any[] = [];
-        for (const h of prunedHistory) {
+        for (let i = 0; i < prunedHistory.length; i++) {
+            const h = prunedHistory[i];
+            const isLastMessage = i === prunedHistory.length - 1;
             const parts: Part[] = [{ text: h.text || "..." }];
             if (h.imageBase64) {
-                const cleanBase64 = h.imageBase64.split(',')[1] || h.imageBase64;
-                parts.push({
-                    inlineData: {
-                        mimeType: 'image/png',
-                        data: cleanBase64
-                    }
-                });
+                if (isLastMessage) {
+                    const cleanBase64 = h.imageBase64.split(',')[1] || h.imageBase64;
+                    parts.push({
+                        inlineData: {
+                            mimeType: 'image/png',
+                            data: cleanBase64
+                        }
+                    });
+                } else {
+                    parts.push({ text: "\n[Image attached in previous turn]" });
+                }
             }
             
             if (contents.length === 0) {
@@ -444,8 +403,6 @@ export const processGameTurn = async (
   let narrativeMetadata: any = { entities_addressed: [], tension_delta: 0, narrative_escalation: false };
   let imagePromise: Promise<string | undefined> | undefined;
 
-  const jsonSchema = zodToJsonSchema(GameTurnOutputSchema as any, "turnOutput");
-
   try {
       const response = await withRetry(() => ai.models.generateContent({
           model: 'gemini-3-flash-preview',
@@ -459,7 +416,7 @@ export const processGameTurn = async (
           config: { 
               systemInstruction: getSinglePassInstruction(metronome.currentPhase as any) + `\n\n[LONG TERM MEMORY]: ${currentState.narrative.past_summary || "No prior history."}`, 
               responseMimeType: 'application/json',
-              responseSchema: jsonSchema.definitions?.turnOutput as any,
+              responseSchema: TURN_OUTPUT_SCHEMA.definitions?.turnOutput as any,
               tools: [{ urlContext: {} }]
           }
       }));
@@ -628,11 +585,16 @@ export const analyzeSourceMaterial = async (
               chunks.push(textContent.slice(i, i + chunkSize));
           }
           
-          const results: SourceAnalysisResult[] = [];
-          for (let i = 0; i < chunks.length; i++) {
-              if (onProgress) onProgress(`Processing chunk ${i + 1} of ${chunks.length}...`, 45 + Math.floor((i / chunks.length) * 30));
-              const chunkResult = await processSourceChunk([{ text: `[SOURCE MATERIAL CHUNK ${i + 1}/${chunks.length}]\n${chunks[i]}` }]);
-              results.push(chunkResult);
+          const results: SourceAnalysisResult[] = new Array(chunks.length);
+          const limit = 3; // Concurrency limit
+          for (let i = 0; i < chunks.length; i += limit) {
+              const batch = chunks.slice(i, i + limit);
+              const batchResults = await Promise.all(batch.map((chunk, idx) => {
+                  const chunkIndex = i + idx;
+                  return processSourceChunk([{ text: `[SOURCE MATERIAL CHUNK ${chunkIndex + 1}/${chunks.length}]\n${chunk}` }]);
+              }));
+              batchResults.forEach((res, idx) => results[i + idx] = res);
+              if (onProgress) onProgress(`Processed ${Math.min(i + limit, chunks.length)} of ${chunks.length} chunks...`, 45 + Math.floor((Math.min(i + limit, chunks.length) / chunks.length) * 30));
           }
           
           if (onProgress) onProgress("Synthesizing character archetypes and environmental data...", 75);
@@ -733,14 +695,13 @@ EXECUTE THE FOLLOWING EXTRACTION FILTERS:
 14. rpp_primary_vectors: Identify which psychological stats this story targets. Return an array containing any of: "fear", "isolation", "guilt", "paranoia".`;
 
     const fullParts = [...parts, { text: prompt }];
-    const jsonSchema = zodToJsonSchema(SourceAnalysisResultSchema as any, "analysis");
 
     const res = await withRetry(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview', 
         contents: [{ role: 'user', parts: fullParts }],
         config: { 
             responseMimeType: 'application/json',
-            responseSchema: jsonSchema.definitions?.analysis as any
+            responseSchema: SOURCE_ANALYSIS_SCHEMA.definitions?.analysis as any
         }
     }));
 
@@ -838,14 +799,13 @@ export const analyzeImageContext = async (file: File, aspect: string): Promise<s
 
 export const generateCharacterProfile = async (cluster: string, intensity: string, role: string): Promise<CharacterProfile> => {
     const ai = getAI();
-    const jsonSchema = zodToJsonSchema(CharacterProfileSchema as any, "profile");
 
     const res = await withRetry(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview', 
         contents: [{ role: 'user', parts: [{ text: `Generate a horror character profile. Role: ${role}. Cluster: ${cluster}. Intensity: ${intensity}.` }] }],
         config: { 
             responseMimeType: 'application/json',
-            responseSchema: jsonSchema.definitions?.profile as any
+            responseSchema: CHARACTER_PROFILE_SCHEMA.definitions?.profile as any
         }
     }));
     return parseCharacterProfile(res.text || "{}");
@@ -853,14 +813,13 @@ export const generateCharacterProfile = async (cluster: string, intensity: strin
 
 export const generateScenarioConcepts = async (cluster: string, intensity: string, mode: string): Promise<ScenarioConcepts> => {
     const ai = getAI();
-    const jsonSchema = zodToJsonSchema(ScenarioConceptsSchema as any, "concepts");
 
     const res = await withRetry(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview', 
         contents: [{ role: 'user', parts: [{ text: `Generate a full scenario concept JSON object. Cluster: ${cluster}, Mode: ${mode}, Intensity: ${intensity}.` }] }],
         config: {
              responseMimeType: 'application/json',
-             responseSchema: jsonSchema.definitions?.concepts as any
+             responseSchema: SCENARIO_CONCEPTS_SCHEMA.definitions?.concepts as any
         }
     }));
     return parseScenarioConcepts(res.text || "{}");

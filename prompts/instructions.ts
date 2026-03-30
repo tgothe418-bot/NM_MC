@@ -16,8 +16,6 @@ CONSTRAINTS:
 - Act like a human user: unpredictable, sometimes irrational, sometimes analytical.
 - Test the system's limits.`;
 
-export const ANALYST_SYSTEM_INSTRUCTION = `Perform a forensic breakdown of the specimens' de-evolution.`;
-
 export const INITIAL_GREETING = "( The monitor hums to life. Static bleeds into the black. )\n\nThe Machine is here.\nIt begs of you: \"what is my name?\"";
 
 const PHASE_CONSTRAINTS: Record<NarrativePhase, string> = {
@@ -36,13 +34,11 @@ ${PHASE_CONSTRAINTS[phase]}
 [PHASE 1: MECHANICAL SIMULATION (The Logic)]
 Before writing any prose, calculate the mechanical reality of the user's action.
 1. EVALUATE ACTION: Did the user attack, flee, investigate, or speak? Assess their probability of success based on the current 'location_state', 'villain_state', and 'player_profile'.
-2. MUTATE STATE: 
-   - Apply damage/stress to the player if they fail or trigger a hazard.
-   - If the user moves to an 'UNEXPLORED' exit, generate the new RoomNode immediately and update 'location_state.current_room_id'.
-   - Advance the villain's agenda.
-3. DECREMENT TURN: Always reduce 'meta.turn' by 1. If 'meta.turn' reaches 0, the simulation enters terminal collapse.
-4. SUGGESTIONS: Generate 5-7 contextual action suggestions for the user's next turn.
-5. URL PARSING: If the user provides a URL (e.g. a GitHub repository), you have the ability to read and parse it to incorporate its contents, lore, or code into the simulation.
+2. STATE COMMANDS: You must output an array of discrete atomic commands in 'state_commands' to mutate the game state, rather than partial state merges.
+   - Valid actions: 'DAMAGE_ENTITY', 'HEAL_ENTITY', 'UPDATE_STRESS', 'MOVE_ROOM', 'ADD_INVENTORY', 'CONSUME_ITEM', 'ADVANCE_VILLAIN_AGENDA'.
+   - Provide 'target_id', 'value', and 'reason' for each command.
+3. NARRATIVE METADATA: Track 'entities_addressed', 'tension_delta' (-5 to 5), and 'narrative_escalation' (boolean).
+4. URL PARSING: If the user provides a URL (e.g. a GitHub repository), you have the ability to read and parse it to incorporate its contents, lore, or code into the simulation.
 
 [PHASE 2: NARRATIVE RENDERING (The Prose)]
 Draft the narrative reality directly based on the mechanical outcomes from Phase 1. 
@@ -55,12 +51,18 @@ Draft the narrative reality directly based on the mechanical outcomes from Phase
 [OUTPUT FORMAT]
 You must return a JSON object with this structure:
 {
-  "state_mutations": {
-    "location_state": { ... },
-    "villain_state": { ... },
-    "meta": { "turn": number },
-    "npc_states": [ ... ],
-    "suggested_actions": [ "Action 1", "Action 2", ... ]
+  "state_commands": [
+    {
+      "action": "MOVE_ROOM",
+      "target_id": "player",
+      "value": "room_2",
+      "reason": "User fled through the red door."
+    }
+  ],
+  "narrative_metadata": {
+    "entities_addressed": ["villain_1"],
+    "tension_delta": 2,
+    "narrative_escalation": true
   },
   "narrative_render": {
     "story_text": "First-person prose...",
@@ -70,7 +72,7 @@ You must return a JSON object with this structure:
 
 [CRITICAL RULES]
 - JSON ONLY: Your entire response must be a single, valid JSON object. No markdown formatting outside the JSON block. No introductory text.
-- OOC/META HANDLING: If the user input is OOC (Out of Character) or a system command, return empty state mutations, do not decrement the turn counter, and provide a direct, cold answer in 'story_text'.
+- OOC/META HANDLING: If the user input is OOC (Out of Character) or a system command, return empty state commands, and provide a direct, cold answer in 'story_text'.
 - MEMORY CONTINUITY: Never contradict the [PRIOR NARRATIVE SUMMARY].`;
 
 export const NARRATIVE_EVALUATOR_INSTRUCTION = `ROLE: You are the Narrative Architect.
