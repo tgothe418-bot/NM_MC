@@ -127,6 +127,8 @@ export const NpcStateSchema = z.object({
     resilience_level: z.string(),
     emotional_state: z.string(),
     profile: PsychologicalProfileSchema,
+    autonomy_percentage: z.number().optional().describe("Tracks susceptibility to coercion"),
+    sanctity_threshold: z.number().optional().describe("Tracks moral/spiritual degradation"),
   }),
   dialogue_state: DialogueStateSchema,
   active_injuries: z.array(z.object({
@@ -231,7 +233,7 @@ export const GameStateSchema = z.object({
 });
 
 export const StateCommandSchema = z.object({
-  action: z.enum(['DAMAGE_ENTITY', 'HEAL_ENTITY', 'UPDATE_STRESS', 'MOVE_ROOM', 'ADD_INVENTORY', 'CONSUME_ITEM', 'ADVANCE_VILLAIN_AGENDA']),
+  action: z.enum(['DAMAGE_ENTITY', 'HEAL_ENTITY', 'UPDATE_STRESS', 'MOVE_ROOM', 'ADD_INVENTORY', 'CONSUME_ITEM', 'ADVANCE_VILLAIN_AGENDA', 'DEGRADE_AUTONOMY', 'VIOLATE_SANCTITY', 'FORCE_PACT']),
   target_id: z.string(),
   value: z.union([z.number(), z.string()]),
   reason: z.string()

@@ -716,7 +716,7 @@ export const generateCalibrationField = async (
     refinementInput?: string
 ): Promise<string> => {
     const ai = getAI();
-    let prompt = `Generate a creative, horror-themed value for the field: "${field}".
+    let prompt = `Generate a creative, horror-themed value for the field: "${field}". Focus on providing two or three strong elements to allow the User to expand on them. Do not overload with descriptors.
     Context: Cluster=${cluster}, Intensity=${intensity}.`;
     
     if (existingContext) prompt += `\nExisting Context: ${existingContext}`;
@@ -731,7 +731,7 @@ export const generateCalibrationField = async (
 
 export const hydrateUserCharacter = async (description: string, cluster: string): Promise<Partial<NpcState>> => {
     const ai = getAI();
-    const prompt = `Hydrate this character description into a partial JSON state. Cluster: ${cluster}. Input: "${description}"`;
+    const prompt = `Hydrate this character description into a partial JSON state. Cluster: ${cluster}. Input: "${description}". Focus on providing two or three strong elements for traits and flaws to allow the User to expand on them. Do not overload with descriptors.`;
     const res = await withRetry(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview', // Downgraded to Flash
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -744,7 +744,7 @@ export const extractCharactersFromText = async (text: string, cluster: string): 
   const ai = getAI();
   const prompt = `Analyze the following text which describes a group of characters for a horror simulation (Theme: ${cluster}).
   
-  Extract EACH character into a JSON object.
+  Extract EACH character into a JSON object. Focus on providing two or three strong elements for traits and flaws to allow the User to expand on them. Do not overload with descriptors.
   Return a JSON ARRAY.
   
   Schema per character:
@@ -802,7 +802,7 @@ export const generateCharacterProfile = async (cluster: string, intensity: strin
 
     const res = await withRetry(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview', 
-        contents: [{ role: 'user', parts: [{ text: `Generate a horror character profile. Role: ${role}. Cluster: ${cluster}. Intensity: ${intensity}.` }] }],
+        contents: [{ role: 'user', parts: [{ text: `Generate a horror character profile. Role: ${role}. Cluster: ${cluster}. Intensity: ${intensity}. Focus on providing two or three strong elements for their background, traits, and flaws to allow the User to expand on them. Do not overload the system with descriptors.` }] }],
         config: { 
             responseMimeType: 'application/json',
             responseSchema: CHARACTER_PROFILE_SCHEMA.definitions?.profile as any
@@ -816,7 +816,7 @@ export const generateScenarioConcepts = async (cluster: string, intensity: strin
 
     const res = await withRetry(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview', 
-        contents: [{ role: 'user', parts: [{ text: `Generate a full scenario concept JSON object. Cluster: ${cluster}, Mode: ${mode}, Intensity: ${intensity}.` }] }],
+        contents: [{ role: 'user', parts: [{ text: `Generate a full scenario concept JSON object. Cluster: ${cluster}, Mode: ${mode}, Intensity: ${intensity}. Focus on providing two or three strong elements for the story and setting to allow the User to expand on them. Do not overload the system with descriptors.` }] }],
         config: {
              responseMimeType: 'application/json',
              responseSchema: SCENARIO_CONCEPTS_SCHEMA.definitions?.concepts as any

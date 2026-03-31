@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, ChevronLeft, Paperclip, Upload, Loader2, Play, Skull, Flame, X, Image as ImageIcon, RefreshCw } from 'lucide-react';
+import TextareaAutosize from 'react-textarea-autosize';
 import { ThinkingIndicator } from '../ThinkingIndicator';
 import { SimulationConfig } from '../../types';
 import { analyzeSourceMaterial, generateArchitectResponse, extractScenarioFromChat } from '../../services/geminiService';
@@ -193,6 +194,13 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
     `;
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim() && !stagedFile) return;
     
@@ -240,7 +248,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
         const freshMood = useArchitectStore.getState().mood;
         
         const timeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error("TIMEOUT")), 60000);
+            setTimeout(() => reject(new Error("TIMEOUT")), 180000);
         });
 
         const reply = await Promise.race([
@@ -317,7 +325,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
           setError(undefined);
           
           const timeoutPromise = new Promise<never>((_, reject) => {
-              setTimeout(() => reject(new Error("TIMEOUT")), 60000);
+              setTimeout(() => reject(new Error("TIMEOUT")), 180000);
           });
 
           const reply = await Promise.race([
@@ -361,7 +369,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
       setError(undefined);
       try {
           const timeoutPromise = new Promise<never>((_, reject) => {
-              setTimeout(() => reject(new Error("TIMEOUT")), 60000);
+              setTimeout(() => reject(new Error("TIMEOUT")), 180000);
           });
           
           const config = await Promise.race([
@@ -496,7 +504,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
         <div className="flex-1 overflow-y-auto p-6 md:p-12 space-y-8 custom-scrollbar relative chat-area-container z-10">
             {history.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn group relative z-10`}>
-                    <div className={`max-w-4xl p-6 rounded-sm border transition-all duration-500 relative message-bubble backdrop-blur-md ${
+                    <div className={`max-w-4xl p-8 md:p-10 rounded-sm border transition-all duration-500 relative message-bubble backdrop-blur-md ${
                         msg.role === 'user' 
                             ? 'bg-gray-900/80 border-gray-800 text-gray-200 hover:border-gray-600' 
                             : `${bgColor.replace('/10', '/80').replace('/20', '/80')} ${borderColor} ${isDread ? 'text-red-100' : 'text-amber-100'} shadow-[0_0_20px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(220,20,60,0.1)]`
@@ -504,23 +512,23 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                         <div className={`absolute top-0 left-0 w-2 h-2 border-t border-l ${msg.role === 'user' ? 'border-gray-700' : borderColor} opacity-50`} />
                         <div className={`absolute bottom-0 right-0 w-2 h-2 border-b border-r ${msg.role === 'user' ? 'border-gray-700' : borderColor} opacity-50`} />
 
-                        <div className="text-[10px] uppercase tracking-widest mb-3 opacity-40 font-bold flex justify-between items-center border-b border-current/10 pb-2">
+                        <div className="text-xs uppercase tracking-widest mb-4 opacity-40 font-bold flex justify-between items-center border-b border-current/10 pb-3">
                             <span className="flex items-center gap-2">
                                 {msg.role === 'user' ? 'USER_ID: 0x7F' : 'ENTITY_ID: ARCHITECT'}
-                                {msg.role === 'model' && <div className={`w-1 h-1 rounded-full ${isDread ? 'bg-red-500 animate-ping' : 'bg-amber-500 animate-pulse'}`} />}
+                                {msg.role === 'model' && <div className={`w-1.5 h-1.5 rounded-full ${isDread ? 'bg-red-500 animate-ping' : 'bg-amber-500 animate-pulse'}`} />}
                             </span>
-                            {msg.text.includes('[SYSTEM - REFERENCE MATERIAL') && <span className={`${themeColor} flex items-center gap-1`}><Upload className="w-3 h-3" /> DATA_INGESTED</span>}
+                            {msg.text.includes('[SYSTEM - REFERENCE MATERIAL') && <span className={`${themeColor} flex items-center gap-1`}><Upload className="w-4 h-4" /> DATA_INGESTED</span>}
                         </div>
                         
                         {msg.imageUrl && (
-                            <div className="mb-4 rounded overflow-hidden border border-gray-700 bg-black/50">
-                                <img src={msg.imageUrl} alt="Attached Evidence" className="w-full h-auto max-h-[400px] object-contain" />
+                            <div className="mb-6 rounded overflow-hidden border border-gray-700 bg-black/50">
+                                <img src={msg.imageUrl} alt="Attached Evidence" className="w-full h-auto max-h-[500px] object-contain" />
                             </div>
                         )}
 
-                        <div className="whitespace-pre-wrap leading-relaxed font-sans text-sm md:text-base">
+                        <div className="whitespace-pre-wrap leading-loose font-sans text-lg md:text-xl">
                             {msg.text.includes('[SYSTEM - REFERENCE MATERIAL') 
-                                ? <span className="text-xs font-mono opacity-70 italic">{msg.text.split('\n')[1]} (Data hidden for brevity)</span>
+                                ? <span className="text-sm font-mono opacity-70 italic">{msg.text.split('\n')[1]} (Data hidden for brevity)</span>
                                 : msg.text
                             }
                         </div>
@@ -574,18 +582,18 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
 
             {streamingReply && (
                 <div className="flex justify-start animate-fadeIn group relative z-10">
-                    <div className={`max-w-4xl p-6 rounded-sm border transition-all duration-500 relative message-bubble backdrop-blur-md ${bgColor.replace('/10', '/80').replace('/20', '/80')} ${borderColor} ${isDread ? 'text-red-100' : 'text-amber-100'} shadow-[0_0_20px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(220,20,60,0.1)]`}>
+                    <div className={`max-w-4xl p-8 md:p-10 rounded-sm border transition-all duration-500 relative message-bubble backdrop-blur-md ${bgColor.replace('/10', '/80').replace('/20', '/80')} ${borderColor} ${isDread ? 'text-red-100' : 'text-amber-100'} shadow-[0_0_20px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(220,20,60,0.1)]`}>
                         <div className={`absolute top-0 left-0 w-2 h-2 border-t border-l ${borderColor} opacity-50`} />
                         <div className={`absolute bottom-0 right-0 w-2 h-2 border-b border-r ${borderColor} opacity-50`} />
 
-                        <div className="text-[10px] uppercase tracking-widest mb-3 opacity-40 font-bold flex justify-between items-center border-b border-current/10 pb-2">
+                        <div className="text-xs uppercase tracking-widest mb-4 opacity-40 font-bold flex justify-between items-center border-b border-current/10 pb-3">
                             <span className="flex items-center gap-2">
                                 ENTITY_ID: ARCHITECT
-                                <div className={`w-1 h-1 rounded-full ${isDread ? 'bg-red-500 animate-ping' : 'bg-amber-500 animate-pulse'}`} />
+                                <div className={`w-1.5 h-1.5 rounded-full ${isDread ? 'bg-red-500 animate-ping' : 'bg-amber-500 animate-pulse'}`} />
                             </span>
                         </div>
                         
-                        <div className="whitespace-pre-wrap leading-relaxed font-sans text-sm md:text-base">
+                        <div className="whitespace-pre-wrap leading-loose font-sans text-lg md:text-xl">
                             {streamingReply}
                         </div>
                     </div>
@@ -620,28 +628,29 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
                     <button
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isFinalizing || isLoading || isAnalyzing}
-                        className={`p-4 bg-gray-900/30 border border-gray-800 text-gray-500 hover:${themeColor} hover:border-current transition-all group`}
+                        className={`p-4 bg-gray-900/30 border border-gray-800 text-gray-500 hover:${themeColor} hover:border-current transition-all group flex items-center justify-center self-end`}
                         title="Upload File"
                     >
                         <Paperclip className="w-5 h-5 group-hover:scale-110 transition-transform" />
                     </button>
 
-                    <input 
-                        type="text" 
+                    <TextareaAutosize 
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                        onKeyDown={handleKeyDown}
                         onPaste={handlePaste}
                         placeholder={stagedFile ? "Add context about this image..." : isDread ? "Paste an image or whisper to the void..." : "Paste an image or say hello..."}
                         autoFocus
                         disabled={isFinalizing || isLoading || isAnalyzing}
-                        className={`flex-1 bg-gray-900/50 border border-gray-800 p-4 ${isDread ? 'text-red-100 focus:border-red-500 placeholder-red-900/50' : 'text-amber-100 focus:border-amber-500'} focus:outline-none transition-all font-mono placeholder-gray-700`}
+                        minRows={1}
+                        maxRows={8}
+                        className={`flex-1 bg-gray-900/50 border border-gray-800 p-4 ${isDread ? 'text-red-100 focus:border-red-500 placeholder-red-900/50' : 'text-amber-100 focus:border-amber-500'} focus:outline-none transition-all font-mono placeholder-gray-700 resize-none`}
                     />
                     
                     <button 
                         onClick={handleSend}
                         disabled={(!input.trim() && !stagedFile) || isFinalizing || isLoading || isAnalyzing}
-                        className={`bg-gray-900/20 border border-gray-800 ${themeColor} hover:bg-gray-900/40 hover:text-white hover:border-current px-6 transition-all disabled:opacity-50`}
+                        className={`bg-gray-900/20 border border-gray-800 ${themeColor} hover:bg-gray-900/40 hover:text-white hover:border-current px-6 transition-all disabled:opacity-50 flex items-center justify-center self-end py-4`}
                     >
                         <Send className="w-5 h-5" />
                     </button>

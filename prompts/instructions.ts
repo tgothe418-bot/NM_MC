@@ -35,8 +35,9 @@ ${PHASE_CONSTRAINTS[phase]}
 Before writing any prose, calculate the mechanical reality of the user's action.
 1. EVALUATE ACTION: Did the user attack, flee, investigate, or speak? Assess their probability of success based on the current 'location_state', 'villain_state', and 'player_profile'.
 2. STATE COMMANDS: You must output an array of discrete atomic commands in 'state_commands' to mutate the game state, rather than partial state merges.
-   - Valid actions: 'DAMAGE_ENTITY', 'HEAL_ENTITY', 'UPDATE_STRESS', 'MOVE_ROOM', 'ADD_INVENTORY', 'CONSUME_ITEM', 'ADVANCE_VILLAIN_AGENDA'.
+   - Valid actions: 'DAMAGE_ENTITY', 'HEAL_ENTITY', 'UPDATE_STRESS', 'MOVE_ROOM', 'ADD_INVENTORY', 'CONSUME_ITEM', 'ADVANCE_VILLAIN_AGENDA', 'DEGRADE_AUTONOMY', 'VIOLATE_SANCTITY', 'FORCE_PACT'.
    - Provide 'target_id', 'value', and 'reason' for each command.
+   - IMPORTANT: Utilize the 'DEGRADE_AUTONOMY' command instead of 'DAMAGE_ENTITY' when a psychological or coercive attack occurs, preserving physical health while eroding the player's agency.
 3. NARRATIVE METADATA: Track 'entities_addressed', 'tension_delta' (-5 to 5), and 'narrative_escalation' (boolean).
 4. URL PARSING: If the user provides a URL (e.g. a GitHub repository), you have the ability to read and parse it to incorporate its contents, lore, or code into the simulation.
 

@@ -72,6 +72,24 @@ const getLinguisticInstructions = (voice: any): string => {
 const getClusterMetaphors = (clusterName?: string): string => {
     if (!clusterName || clusterName === 'None') return "";
     
+    if (clusterName === 'Desire') {
+        return `
+        THEMATIC RESONANCE (DESIRE):
+        - Style: Seductive Subjugation. Heavy, sensory, and intimate.
+        - Preferred Vocabulary: Submission, Feast, Sanctuary, Vessel, Enmeshment.
+        - Focus: The heat of breath, the weight of a gaze, coercive comfort.
+        `;
+    }
+    
+    if (clusterName === 'Blasphemy') {
+        return `
+        THEMATIC RESONANCE (BLASPHEMY):
+        - Style: Transgressive Subversion. 
+        - Directive: Pervert the "Sacred." Force the subject to abandon vows, beliefs, or morality for survival.
+        - Focus: Religious corruption merged with biological horror.
+        `;
+    }
+
     // Find matching key in LORE_LIBRARY
     const key = Object.keys(LORE_LIBRARY).find(k => clusterName.includes(k));
     if (!key) return "";

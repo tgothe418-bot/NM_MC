@@ -121,6 +121,30 @@ const applyStateCommands = (currentState: GameState, commands: any[]): GameState
             case 'ADVANCE_VILLAIN_AGENDA':
                 newState.villain_state = { ...newState.villain_state, threat_scale: newState.villain_state.threat_scale + Number(value) };
                 break;
+            case 'DEGRADE_AUTONOMY':
+                if (targetNpc && targetNpc.psychology) {
+                    targetNpc.psychology = {
+                        ...targetNpc.psychology,
+                        autonomy_percentage: Math.max(0, (targetNpc.psychology.autonomy_percentage || 100) - Number(value))
+                    };
+                }
+                break;
+            case 'VIOLATE_SANCTITY':
+                if (targetNpc && targetNpc.psychology) {
+                    targetNpc.psychology = {
+                        ...targetNpc.psychology,
+                        sanctity_threshold: Math.max(0, (targetNpc.psychology.sanctity_threshold || 100) - Number(value))
+                    };
+                }
+                break;
+            case 'FORCE_PACT':
+                if (targetNpc) {
+                    targetNpc.psychology = {
+                        ...targetNpc.psychology,
+                        current_thought: `Forced Pact: ${String(value)}`
+                    };
+                }
+                break;
             default:
                 console.warn(`Unknown command action: ${action} for target ${target_id}`);
         }
@@ -297,7 +321,7 @@ export const useGameEngine = () => {
                 const architectMemory = useArchitectStore.getState().memory;
                 
                 const timeoutPromise = new Promise<never>((_, reject) => {
-                    setTimeout(() => reject(new Error("TIMEOUT")), 60000);
+                    setTimeout(() => reject(new Error("TIMEOUT")), 300000);
                 });
 
                 const architectResponse = await Promise.race([
@@ -330,7 +354,7 @@ export const useGameEngine = () => {
             const currentState = overrideState || gameState;
             
             const timeoutPromise = new Promise<never>((_, reject) => {
-                setTimeout(() => reject(new Error("TIMEOUT")), 60000); // 60 seconds timeout
+                setTimeout(() => reject(new Error("TIMEOUT")), 300000); // 5 minutes timeout
             });
 
             // processGameTurn now returns { stateCommands, narrativeMetadata, storyText, imagePromise }
