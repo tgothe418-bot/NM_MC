@@ -7,7 +7,7 @@ import {
   LoreContext
 } from '../types';
 import { getDefaultDialogueState } from './dialogueEngine';
-import { hydrateUserCharacter } from './geminiService';
+import { hydrateUserCharacter } from './aiOrchestrator';
 
 /**
  * NPC GENERATOR ENGINE V8.1 (ANTI-COLLISION & UNIQUE ROLES)

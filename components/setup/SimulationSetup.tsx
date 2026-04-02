@@ -5,7 +5,7 @@ import { SimulationConfig, ParsedCharacter } from '../../types';
 import { useSetupStore } from './store';
 import { SourceUploader } from './SourceUploader';
 import { ManualCharacterSection } from './ManualCharacterSection';
-import { generateCalibrationField, generateScenarioConcepts, analyzeImageContext } from '../../services/geminiService';
+import { generateCalibrationField, generateScenarioConcepts, analyzeImageContext } from '../../services/aiOrchestrator';
 
 const CLUSTER_OPTIONS = [
   { id: 'Flesh', label: 'THE FLESH', desc: 'Body Horror', color: 'border-red-900 text-red-500' },

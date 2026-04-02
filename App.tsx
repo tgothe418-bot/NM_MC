@@ -12,6 +12,7 @@ import { NpcState } from './types';
 import { SystemGhost } from './components/setup/SystemGhost';
 
 import { useArchitectStore } from './store/architectStore';
+import { ApiKeyModal } from './components/ApiKeyModal';
 
 export default function App() {
   const [showSetup, setShowSetup] = useState(false);
@@ -86,6 +87,7 @@ export default function App() {
   
   return (
     <div style={dynamicStyles} className={`theme-wrapper min-h-screen bg-[#050505] text-gray-200 font-sans relative overflow-hidden transition-colors duration-1000 cluster-${gameState.meta.active_cluster.toLowerCase()}`}>
+        <ApiKeyModal />
         <div className="scanlines" />
         
         {(!isInitialized || showSetup) && (

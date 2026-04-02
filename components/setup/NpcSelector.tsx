@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Users, RefreshCw, Check, AlertCircle, Play, User, Edit2, Save, X, Target, MapPin } from 'lucide-react';
 import { SimulationConfig, NpcState } from '../../types';
 import { createNpcFactory } from '../../services/npcGenerator';
-import { extractCharactersFromText, hydrateUserCharacter } from '../../services/geminiService';
+import { extractCharactersFromText, hydrateUserCharacter } from '../../services/aiOrchestrator';
 
 interface NpcSelectorProps {
   config: SimulationConfig;

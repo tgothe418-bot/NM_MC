@@ -4,7 +4,7 @@ import { get, set, del } from 'idb-keyval';
 import { GameState, ChatMessage, SimulationConfig, NpcState, NarrativePhase } from '../types';
 import { getDefaultLocationState } from '../services/locationEngine';
 import { generateProceduralNpc } from '../services/npcGenerator';
-import { processGameTurn, generateAutoPlayerAction, initializeGemini, summarizeHistory, evaluateNarrativeTransition, generateArchitectResponse } from '../services/geminiService';
+import { processGameTurn, generateAutoPlayerAction, initializeGemini, initializeAnthropic, summarizeHistory, evaluateNarrativeTransition, generateArchitectResponse } from '../services/aiOrchestrator';
 import { useAutoPilot } from './useAutoPilot';
 import { useArchitectStore } from '../store/architectStore';
 import { updateNpcMemories } from '../services/memorySystem';
@@ -190,8 +190,11 @@ export const useGameEngine = () => {
     // Initialize Service immediately
     useEffect(() => {
         // Use GEMINI_API_KEY as primary, fallback to API_KEY (selected via dialog)
-        const key = process.env.GEMINI_API_KEY || process.env.API_KEY || "";
-        initializeGemini(key);
+        const geminiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || "";
+        initializeGemini(geminiKey);
+        
+        const anthropicKey = import.meta.env.VITE_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || "";
+        initializeAnthropic(anthropicKey);
     }, []);
 
     // --- ACTIONS ---

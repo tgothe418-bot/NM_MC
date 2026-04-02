@@ -2,7 +2,7 @@
 import React from 'react';
 import { Target, Skull, Wand2, Users, UserCheck, StickyNote, Fingerprint, Loader2, UserPlus } from 'lucide-react';
 import { useSetupStore } from './store';
-import { generateCalibrationField, generateCharacterProfile } from '../../services/geminiService';
+import { generateCalibrationField, generateCharacterProfile } from '../../services/aiOrchestrator';
 
 interface Props {
   loadingFields: Record<string, boolean>;

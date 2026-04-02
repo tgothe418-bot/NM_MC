@@ -3,7 +3,7 @@ import { Send, ChevronLeft, Paperclip, Upload, Loader2, Play, Skull, Flame, X, I
 import TextareaAutosize from 'react-textarea-autosize';
 import { ThinkingIndicator } from '../ThinkingIndicator';
 import { SimulationConfig } from '../../types';
-import { analyzeSourceMaterial, generateArchitectResponse, extractScenarioFromChat } from '../../services/geminiService';
+import { analyzeSourceMaterial, generateArchitectResponse, extractScenarioFromChat } from '../../services/aiOrchestrator';
 import { useArchitectStore } from '../../store/architectStore';
 
 interface ChatSetupProps {

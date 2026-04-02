@@ -1,7 +1,7 @@
 
 import React, { useRef, useState } from 'react';
 import { FileUp, Loader2, FileText, X } from 'lucide-react';
-import { analyzeSourceMaterial } from '../../services/geminiService';
+import { analyzeSourceMaterial } from '../../services/aiOrchestrator';
 import { useSetupStore } from './store';
 
 const MAX_SOURCE_FILES = 5;

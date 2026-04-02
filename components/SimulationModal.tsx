@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Play, Loader2, Target, Skull, Wand2, Sparkles, Activity, ShieldAlert } from 'lucide-react';
 import { VillainState, SimulationConfig } from '../types';
-import { generateCalibrationField } from '../services/geminiService';
+import { generateCalibrationField } from '../services/aiOrchestrator';
 
 interface SimulationModalProps {
   isOpen: boolean;

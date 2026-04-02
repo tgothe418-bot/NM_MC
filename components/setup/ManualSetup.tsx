@@ -5,7 +5,7 @@ import { useSetupStore } from './store';
 import { SimulationConfig, ParsedCharacter } from '../../types';
 import { SourceUploader } from './SourceUploader';
 import { ManualCharacterSection } from './ManualCharacterSection';
-import { generateCalibrationField, generateScenarioConcepts, analyzeImageContext } from '../../services/geminiService';
+import { generateCalibrationField, generateScenarioConcepts, analyzeImageContext } from '../../services/aiOrchestrator';
 
 interface Props {
   onComplete: (config: SimulationConfig) => void;

@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import { ChevronRight, Image, Loader2, Eye, Clapperboard, Activity, Cpu, Ghost, Fingerprint, Zap, Radio, Flame, UserCheck, Skull, Wand2 } from 'lucide-react';
 import { useSetupStore } from './store';
 import { GuidedQuestion } from './types';
-import { analyzeImageContext, generateCharacterProfile, generateCalibrationField } from '../../services/geminiService';
+import { analyzeImageContext, generateCharacterProfile, generateCalibrationField } from '../../services/aiOrchestrator';
 import { SimulationConfig } from '../../types';
 
 interface Props {
