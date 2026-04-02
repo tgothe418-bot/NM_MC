@@ -187,19 +187,34 @@ export const generateArchitectResponse = async (
             messages.push({ role: 'user', content: [{ type: "text", text: 'Hello' }] });
         }
 
-        let fullInstruction = systemInstruction;
+        const systemBlocks: any[] = [
+            {
+                type: "text",
+                text: systemInstruction,
+                cache_control: { type: "ephemeral" }
+            }
+        ];
+
+        let dynamicInstruction = "";
         if (gameState) {
-            fullInstruction += `\n\n[TNM LOCAL MEMORY]:\n- Current Phase: ${gameState.meta.narrative_phase || 'Unknown'}\n- Active Cluster: ${gameState.meta.active_cluster}\n- Narrative Summary: ${gameState.narrative.past_summary || 'None'}`;
+            dynamicInstruction += `\n\n[TNM LOCAL MEMORY]:\n- Current Phase: ${gameState.meta.narrative_phase || 'Unknown'}\n- Active Cluster: ${gameState.meta.active_cluster}\n- Narrative Summary: ${gameState.narrative.past_summary || 'None'}`;
         }
         if (architectMemory) {
-            fullInstruction += `\n\n[ARCHITECT MEMORY]:\n- User Name: ${architectMemory.userName || 'Unknown'}\n- Known Facts: ${architectMemory.facts.join(', ') || 'None'}`;
+            dynamicInstruction += `\n\n[ARCHITECT MEMORY]:\n- User Name: ${architectMemory.userName || 'Unknown'}\n- Known Facts: ${architectMemory.facts.join(', ') || 'None'}`;
+        }
+
+        if (dynamicInstruction) {
+            systemBlocks.push({
+                type: "text",
+                text: dynamicInstruction
+            });
         }
 
         if (onChunk) {
             const stream = await withRetry(() => anthropic.messages.create({
                 model: 'claude-3-5-sonnet-latest',
                 max_tokens: 4000,
-                system: fullInstruction,
+                system: systemBlocks,
                 messages: messages,
                 stream: true
             }));
@@ -215,7 +230,7 @@ export const generateArchitectResponse = async (
             const response = await withRetry(() => anthropic.messages.create({
                 model: 'claude-3-5-sonnet-latest',
                 max_tokens: 4000,
-                system: fullInstruction,
+                system: systemBlocks,
                 messages: messages
             }));
             const textContent = response.content.find(c => c.type === 'text');
@@ -462,16 +477,18 @@ export const processGameTurn = async (
   INSTRUCTION: You must output an array of discrete atomic commands in 'state_commands' to mutate the game state, rather than partial state merges.
   `;
 
-  const systemInstruction = `
+  const staticSystemInstruction = `
   ${getSinglePassInstruction(metronome.currentPhase as any)}
-  
-  [LONG TERM MEMORY]: ${currentState.narrative.past_summary || "No prior history."}
   
   [WORLD BUILDING RULES]
   ${sensoryManifesto}
   ${voiceManifesto}
   ${locationManifesto}
   ${roomRules}
+  `;
+
+  const dynamicSystemInstruction = `
+  [LONG TERM MEMORY]: ${currentState.narrative.past_summary || "No prior history."}
   `;
 
   // 2. SINGLE PASS GENERATION
@@ -486,7 +503,17 @@ export const processGameTurn = async (
       const response = await withRetry(() => anthropic.messages.create({
           model: 'claude-3-5-sonnet-latest',
           max_tokens: 4000,
-          system: systemInstruction,
+          system: [
+              {
+                  type: "text",
+                  text: staticSystemInstruction,
+                  cache_control: { type: "ephemeral" }
+              },
+              {
+                  type: "text",
+                  text: dynamicSystemInstruction
+              }
+          ],
           messages: [{
               role: 'user',
               content: `${contextBlock}\n\nUSER ACTION: "${userAction}"`
@@ -811,11 +838,17 @@ EXECUTE THE FOLLOWING EXTRACTION FILTERS:
             });
         }
     }
-    content.push({ type: "text", text: prompt });
 
     const res = await withRetry(() => anthropic.messages.create({
         model: 'claude-3-5-sonnet-latest',
         max_tokens: 4000,
+        system: [
+            {
+                type: "text",
+                text: prompt,
+                cache_control: { type: "ephemeral" }
+            }
+        ],
         messages: [{ role: 'user', content }],
         tools: [{
             name: "analyze_source",
