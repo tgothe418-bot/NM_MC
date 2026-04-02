@@ -56,7 +56,7 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false); 
   const [analysisProgress, setAnalysisProgress] = useState<{ stage: string, percent: number } | null>(null);
-  const [creepLevel, setCreepLevel] = useState<'Campfire' | 'Dread'>('Campfire');
+  const [creepLevel, setCreepLevel] = useState<number>(0);
   const [streamingReply, setStreamingReply] = useState<string | null>(null);
   
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -181,12 +181,18 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
       Valid Vibes: Helpful, Glitchy, Predatory, Melancholy, Analytical.
     `;
 
+    const getToneMode = (level: number) => {
+        if (level < 33) return 'Campfire';
+        if (level < 66) return 'Tense';
+        return 'Dread';
+    };
+
     return `
     ${memoryBlock}
     ${moodBlock}
     ${SYSTEM_INSTRUCTION}
     
-    [Current Tone Mode: ${creepLevel}]
+    [Current Tone Mode: ${getToneMode(creepLevel)} (${creepLevel}% Intensity)]
 
     CRITICAL OUTPUT RULES:
     1. If you learn a NEW fact, append: [MEMORY: User loves sci-fi]
@@ -394,11 +400,10 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
       }
   };
 
-  const isDread = creepLevel === 'Dread';
+  const isDread = creepLevel >= 50;
   const themeColor = isDread ? 'text-red-500' : 'text-amber-500';
   const borderColor = isDread ? 'border-red-900/50' : 'border-amber-500/30';
   const bgColor = isDread ? 'bg-red-950/10' : 'bg-amber-950/10';
-  const buttonInactive = 'text-gray-500 border-transparent hover:text-gray-300';
 
   return (
     // Note: The UI is completely transparent now (`bg-transparent` vs `bg-[#050505]`) 
@@ -461,20 +466,18 @@ export const ChatSetup: React.FC<ChatSetupProps> = ({ onComplete, onBack }) => {
 
             {/* Vibe Setting Toggle */}
             <div className="flex flex-col items-center gap-1">
-                <span className="text-[9px] uppercase tracking-[0.2em] text-gray-600 font-bold">Vibe Setting</span>
-                <div className="flex bg-black border border-gray-800 rounded-sm p-1 gap-1">
-                    <button 
-                        onClick={() => setCreepLevel('Campfire')}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-[10px] uppercase font-bold tracking-wider transition-all border ${creepLevel === 'Campfire' ? 'bg-amber-900/30 text-amber-500 border-amber-500/30' : buttonInactive}`}
-                    >
-                        <Flame className="w-3 h-3" /> Fun Spooky
-                    </button>
-                    <button 
-                        onClick={() => setCreepLevel('Dread')}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-[10px] uppercase font-bold tracking-wider transition-all border ${creepLevel === 'Dread' ? 'bg-red-900/30 text-red-500 border-red-500/30 shadow-[0_0_10px_rgba(220,38,38,0.2)]' : buttonInactive}`}
-                    >
-                        <Skull className="w-3 h-3" /> Existential
-                    </button>
+                <span className="text-[9px] uppercase tracking-[0.2em] text-gray-600 font-bold">Vibe Setting: {creepLevel < 33 ? 'Campfire' : creepLevel < 66 ? 'Tense' : 'Dread'}</span>
+                <div className="flex bg-black border border-gray-800 rounded-sm p-2 gap-3 items-center w-48">
+                    <Flame className={`w-3 h-3 ${creepLevel < 50 ? 'text-amber-500' : 'text-gray-600'}`} />
+                    <input 
+                        type="range" 
+                        min="0" 
+                        max="100" 
+                        value={creepLevel}
+                        onChange={(e) => setCreepLevel(Number(e.target.value))}
+                        className="flex-1 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-red-500"
+                    />
+                    <Skull className={`w-3 h-3 ${creepLevel >= 50 ? 'text-red-500' : 'text-gray-600'}`} />
                 </div>
             </div>
 

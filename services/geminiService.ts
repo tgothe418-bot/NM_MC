@@ -50,6 +50,22 @@ const getAI = () => {
 };
 
 /**
+ * Strips Markdown code block syntax from raw string output before JSON parsing.
+ */
+const sanitizeJSON = (raw: string): string => {
+    let sanitized = raw.trim();
+    if (sanitized.startsWith("```json")) {
+        sanitized = sanitized.substring(7);
+    } else if (sanitized.startsWith("```")) {
+        sanitized = sanitized.substring(3);
+    }
+    if (sanitized.endsWith("```")) {
+        sanitized = sanitized.substring(0, sanitized.length - 3);
+    }
+    return sanitized.trim();
+};
+
+/**
  * Utility to wrap Gemini API calls with exponential backoff for rate limits (429).
  */
 const withRetry = async <T>(fn: () => Promise<T>, maxRetries = 3, initialDelay = 1000): Promise<T> => {
@@ -96,8 +112,20 @@ export const generateArchitectResponse = async (
 ): Promise<string> => {
     const ai = getAI();
     try {
-        // [OPTIMIZATION] Prune history to last 10 turns to prevent context bloat
-        const prunedHistory = history.slice(-10);
+        // [OPTIMIZATION] Prune history to prevent context bloat while preserving as much as possible (approx 80k chars)
+        const MAX_CHARS = 80000;
+        let currentChars = 0;
+        const prunedHistory = [];
+        
+        for (let i = history.length - 1; i >= 0; i--) {
+            const msg = history[i];
+            const msgLength = (msg.text || "").length + (msg.imageBase64 ? 1000 : 0); // rough estimate for image
+            if (currentChars + msgLength > MAX_CHARS) {
+                break;
+            }
+            prunedHistory.unshift(msg);
+            currentChars += msgLength;
+        }
 
         // Ensure alternating roles starting with 'user'
         const contents: any[] = [];
@@ -155,8 +183,7 @@ export const generateArchitectResponse = async (
                 model: 'gemini-3-flash-preview', 
                 contents: contents,
                 config: {
-                    systemInstruction: fullInstruction,
-                    tools: [{ urlContext: {} }]
+                    systemInstruction: fullInstruction
                 }
             }));
             let fullText = "";
@@ -173,8 +200,7 @@ export const generateArchitectResponse = async (
                 model: 'gemini-3-flash-preview', 
                 contents: contents,
                 config: {
-                    systemInstruction: fullInstruction,
-                    tools: [{ urlContext: {} }]
+                    systemInstruction: fullInstruction
                 }
             }));
             return response.text || "The connection is flickering... I lost that thought. Say it again?";
@@ -187,8 +213,21 @@ export const generateArchitectResponse = async (
 
 export const extractScenarioFromChat = async (history: { role: 'user' | 'model', text: string }[]): Promise<SimulationConfig> => {
     const ai = getAI();
-    // Only use the last 15 messages for extraction to avoid token limits
-    const recentHistory = history.slice(-15);
+    // Use a character-aware reduction method to preserve history up to ~80k characters
+    const MAX_CHARS = 80000;
+    let currentChars = 0;
+    const recentHistory = [];
+    
+    for (let i = history.length - 1; i >= 0; i--) {
+        const msg = history[i];
+        const msgLength = (msg.text || "").length;
+        if (currentChars + msgLength > MAX_CHARS) {
+            break;
+        }
+        recentHistory.unshift(msg);
+        currentChars += msgLength;
+    }
+    
     const transcript = recentHistory.map(h => `${h.role.toUpperCase()}: ${h.text}`).join('\n');
     const extractionPrompt = `Analyze the following creative conversation and extract a valid Horror Scenario Configuration JSON.
     
@@ -287,7 +326,7 @@ export const evaluateNarrativeTransition = async (
             }
         }));
 
-        const result = JSON.parse(res.text || "{}");
+        const result = JSON.parse(sanitizeJSON(res.text || "{}"));
         return {
             conditionMet: !!result.conditionMet,
             reason: result.reason || "No reason provided."
@@ -430,16 +469,18 @@ export const processGameTurn = async (
       finalStoryText = parsedOutput.narrative_render.story_text || "...";
       
       // 3. IMAGE GENERATION (NON-BLOCKING)
-      let hasVisualTag = finalStoryText.includes('[ESTABLISHING_SHOT]') || finalStoryText.includes('[SELF_PORTRAIT]');
       // Clean tags from text
       finalStoryText = finalStoryText.replace(/\[ESTABLISHING_SHOT\]|\[SELF_PORTRAIT\]/g, '');
 
       const requestFromRender = parsedOutput.narrative_render.illustration_request;
       
-      if (requestFromRender || hasVisualTag) {
+      const visualKeywordsRegex = /(image|picture|draw|illustrate|show me)/i;
+      const userRequestedImage = visualKeywordsRegex.test(userAction);
+      
+      if (typeof requestFromRender === 'string' && userRequestedImage) {
           if (onStreamLogic) onStreamLogic("queuing visual artifact...\n", 'narrative');
           
-          let prompt = typeof requestFromRender === 'string' ? requestFromRender : "Establishing Shot";
+          let prompt = requestFromRender;
           // Trigger the promise but DO NOT await it here
           imagePromise = generateImage(
               prompt, 
@@ -581,8 +622,27 @@ export const analyzeSourceMaterial = async (
       const chunkSize = 80000;
       if (textContent.length > 100000) {
           const chunks: string[] = [];
-          for (let i = 0; i < textContent.length; i += chunkSize) {
-              chunks.push(textContent.slice(i, i + chunkSize));
+          const paragraphs = textContent.split('\n\n');
+          let currentChunk = '';
+          
+          for (const paragraph of paragraphs) {
+              if (currentChunk.length + paragraph.length > chunkSize) {
+                  if (currentChunk.length > 0) {
+                      chunks.push(currentChunk);
+                      currentChunk = '';
+                  }
+                  // If a single paragraph is larger than the chunk size, push it as its own chunk
+                  if (paragraph.length > chunkSize) {
+                      chunks.push(paragraph);
+                  } else {
+                      currentChunk = paragraph + '\n\n';
+                  }
+              } else {
+                  currentChunk += paragraph + '\n\n';
+              }
+          }
+          if (currentChunk.trim().length > 0) {
+              chunks.push(currentChunk);
           }
           
           const results: SourceAnalysisResult[] = new Array(chunks.length);
@@ -766,7 +826,7 @@ export const extractCharactersFromText = async (text: string, cluster: string): 
         config: { responseMimeType: 'application/json' }
       }));
       
-      const json = JSON.parse(res.text || "[]");
+      const json = JSON.parse(sanitizeJSON(res.text || "[]"));
       if (Array.isArray(json)) return json;
       return [];
   } catch (e) {

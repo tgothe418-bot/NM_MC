@@ -47,7 +47,7 @@ Draft the narrative reality directly based on the mechanical outcomes from Phase
 2. TONE & MOTIF: Adhere obsessively to 'meta.active_cluster', 'meta.intensity_level', and 'narrative.visual_motif'. 
 3. SENSORY GROUNDING: Show, do not tell. Do not say "I am scared." Describe the cold sweat, the smell of copper, the geometry of the room bending.
 4. INCORPORATE MECHANICS: If the state mutation applied an injury, the prose MUST describe the pain and blood. If the location changed, the prose MUST describe the threshold crossing.
-5. VISUAL ARTIFACTS: If a major scene change occurs, or a horrific entity is revealed, set 'illustration_request' to a highly detailed, photorealistic image prompt describing the scene. Otherwise, return null.
+5. VISUAL ARTIFACTS: Set 'illustration_request' to a detailed image prompt ONLY IF the user explicitly types a request for an image, picture, or illustration in their prompt. Otherwise, strictly return null.
 
 [OUTPUT FORMAT]
 You must return a JSON object with this structure:

@@ -83,19 +83,60 @@ export const constructSensoryManifesto = (gameState: GameState): string => {
     return manifesto;
 };
 
-export const constructLiminalManifesto = (locationType: string): string => {
+export const constructLiminalManifesto = (activeClusterName: string): string => {
   // Based on "Liminal Space" aesthetic papers
-  const liminalTriggers = [
+  const liminalTriggers: Record<string, string[]> = {
+    "System": [
+      "Anachronistic Technology (CRT TVs, old vending machines)",
+      "Endless Server Racks humming in the dark",
+      "Fluorescent lights buzzing with a rhythmic pattern"
+    ],
+    "Haunting": [
+      "Functional Mismatch (A playground in a basement)",
+      "Furniture covered in dusty white sheets",
+      "Acoustic Deadness (Sound does not carry)"
+    ],
+    "Self": [
+      "Mirrors that reflect slightly delayed movements",
+      "Infinite Repetition (Hallways that don't end)",
+      "Childhood bedrooms perfectly preserved but devoid of color"
+    ],
+    "Survival": [
+      "Abandoned campsites with still-warm embers",
+      "Emergency broadcast systems playing on loop",
+      "Rations scattered across a blood-stained floor"
+    ],
+    "Flesh": [
+      "Walls that breathe softly",
+      "Puddles of unidentifiable viscous fluid",
+      "The smell of copper and ozone"
+    ],
+    "Blasphemy": [
+      "Geometric shapes that hurt to look at",
+      "Whispers in a language that shouldn't exist",
+      "Shadows stretching towards the light source"
+    ],
+    "Desire": [
+      "Velvet ropes leading to nowhere",
+      "The scent of cheap perfume and stale sweat",
+      "Muzak playing slightly out of tune"
+    ]
+  };
+
+  const defaultTriggers = [
     "Anachronistic Technology (CRT TVs, old vending machines)",
     "Infinite Repetition (Hallways that don't end)",
     "Functional Mismatch (A playground in a basement)",
     "Acoustic Deadness (Sound does not carry)"
   ];
+
+  const triggersForCluster = liminalTriggers[activeClusterName] || defaultTriggers;
+  const selectedTrigger = triggersForCluster[Math.floor(Math.random() * triggersForCluster.length)];
   
   return `
   *** LIMITAL AESTHETIC PROTOCOL ***
   Apply 'Kenopsia': Describe the space as if it is waiting for people who will never arrive.
   Use 'Flat Lighting' and 'Muted Textures'.
-  Mandatory Element: ${liminalTriggers[Math.floor(Math.random() * liminalTriggers.length)]}
+  Mandatory Element: ${selectedTrigger}
   `;
 };
