@@ -48,7 +48,12 @@ export const initializeGemini = (apiKey: string) => {
 
 export const initializeAnthropic = (apiKey: string) => {
     // We must set dangerouslyAllowBrowser to true since this is a client-side app
-    anthropicInstance = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
+    anthropicInstance = new Anthropic({ 
+        apiKey, 
+        dangerouslyAllowBrowser: true,
+        maxRetries: 3,
+        timeout: 60000 // 60 second timeout
+    });
 };
 
 const getAI = () => {
@@ -89,17 +94,23 @@ const withRetry = async <T>(fn: () => Promise<T>, maxRetries = 3, initialDelay =
             lastError = error;
             
             // [FIX: Directive 3] Implement proper type narrowing
-            let isRateLimit = false;
+            let isRetryable = false;
             if (error instanceof Error) {
-                isRateLimit = error.message.includes('429');
+                isRetryable = error.message.includes('429') || 
+                              error.message.includes('529') || 
+                              error.name === 'APITimeoutError' || 
+                              error.name === 'APIConnectionError';
             } else if (typeof error === 'object' && error !== null) {
                 const e = error as Record<string, unknown>;
-                isRateLimit = String(e.message || '').includes('429') || 
-                             e.status === 'RESOURCE_EXHAUSTED' ||
-                             e.code === 429;
+                isRetryable = String(e.message || '').includes('429') || 
+                              String(e.message || '').includes('529') ||
+                              e.status === 429 || 
+                              e.status === 529 ||
+                              e.code === 429 ||
+                              e.status === 'RESOURCE_EXHAUSTED';
             }
             
-            if (isRateLimit && i < maxRetries - 1) {
+            if (isRetryable && i < maxRetries - 1) {
                 const delay = initialDelay * Math.pow(2, i);
                 console.warn(`Gemini Rate Limit Hit. Retrying in ${delay}ms... (Attempt ${i + 1}/${maxRetries})`);
                 await new Promise(resolve => setTimeout(resolve, delay));
@@ -187,13 +198,20 @@ export const generateArchitectResponse = async (
             messages.push({ role: 'user', content: [{ type: "text", text: 'Hello' }] });
         }
 
-        const systemBlocks: any[] = [
-            {
+        const systemBlocks: any[] = [];
+        
+        if (systemInstruction.length > 4500) {
+            systemBlocks.push({
                 type: "text",
                 text: systemInstruction,
                 cache_control: { type: "ephemeral" }
-            }
-        ];
+            });
+        } else {
+            systemBlocks.push({
+                type: "text",
+                text: systemInstruction
+            });
+        }
 
         let dynamicInstruction = "";
         if (gameState) {
@@ -211,21 +229,26 @@ export const generateArchitectResponse = async (
         }
 
         if (onChunk) {
-            const stream = await withRetry(() => anthropic.messages.create({
-                model: 'claude-3-5-sonnet-latest',
-                max_tokens: 4000,
-                system: systemBlocks,
-                messages: messages,
-                stream: true
-            }));
-            let fullText = "";
-            for await (const chunk of stream) {
-                if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-                    fullText += chunk.delta.text;
-                    onChunk(fullText);
+            try {
+                const stream = await withRetry(() => anthropic.messages.create({
+                    model: 'claude-3-5-sonnet-latest',
+                    max_tokens: 4000,
+                    system: systemBlocks,
+                    messages: messages,
+                    stream: true
+                }));
+                let fullText = "";
+                for await (const chunk of stream) {
+                    if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+                        fullText += chunk.delta.text;
+                        onChunk(fullText);
+                    }
                 }
+                return fullText || "The connection is flickering... I lost that thought. Say it again?";
+            } catch (streamError: any) {
+                console.error("Stream Error:", streamError);
+                return `STREAM ERROR: ${streamError.message || String(streamError)}`;
             }
-            return fullText || "The connection is flickering... I lost that thought. Say it again?";
         } else {
             const response = await withRetry(() => anthropic.messages.create({
                 model: 'claude-3-5-sonnet-latest',
@@ -236,9 +259,9 @@ export const generateArchitectResponse = async (
             const textContent = response.content.find(c => c.type === 'text');
             return textContent && textContent.type === 'text' ? textContent.text : "The connection is flickering... I lost that thought. Say it again?";
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error("Architect Error:", e);
-        return "I can't see that... the static is too thick. Try again?";
+        return `ERROR: ${e.message || String(e)}`;
     }
 };
 
@@ -499,21 +522,32 @@ export const processGameTurn = async (
   let narrativeMetadata: any = { entities_addressed: [], tension_delta: 0, narrative_escalation: false };
   let imagePromise: Promise<string | undefined> | undefined;
 
+  const systemBlocks: any[] = [];
+  if (staticSystemInstruction.length > 4500) {
+      systemBlocks.push({
+          type: "text",
+          text: staticSystemInstruction,
+          cache_control: { type: "ephemeral" }
+      });
+  } else {
+      systemBlocks.push({
+          type: "text",
+          text: staticSystemInstruction
+      });
+  }
+  
+  if (dynamicSystemInstruction.trim()) {
+      systemBlocks.push({
+          type: "text",
+          text: dynamicSystemInstruction
+      });
+  }
+
   try {
       const response = await withRetry(() => anthropic.messages.create({
           model: 'claude-3-5-sonnet-latest',
           max_tokens: 4000,
-          system: [
-              {
-                  type: "text",
-                  text: staticSystemInstruction,
-                  cache_control: { type: "ephemeral" }
-              },
-              {
-                  type: "text",
-                  text: dynamicSystemInstruction
-              }
-          ],
+          system: systemBlocks,
           messages: [{
               role: 'user',
               content: `${contextBlock}\n\nUSER ACTION: "${userAction}"`
@@ -714,16 +748,11 @@ export const analyzeSourceMaterial = async (
               chunks.push(currentChunk);
           }
           
-          const results: SourceAnalysisResult[] = new Array(chunks.length);
-          const limit = 3; // Concurrency limit
-          for (let i = 0; i < chunks.length; i += limit) {
-              const batch = chunks.slice(i, i + limit);
-              const batchResults = await Promise.all(batch.map((chunk, idx) => {
-                  const chunkIndex = i + idx;
-                  return processSourceChunk([{ text: `[SOURCE MATERIAL CHUNK ${chunkIndex + 1}/${chunks.length}]\n${chunk}` }]);
-              }));
-              batchResults.forEach((res, idx) => results[i + idx] = res);
-              if (onProgress) onProgress(`Processed ${Math.min(i + limit, chunks.length)} of ${chunks.length} chunks...`, 45 + Math.floor((Math.min(i + limit, chunks.length) / chunks.length) * 30));
+          const results: SourceAnalysisResult[] = [];
+          for (let i = 0; i < chunks.length; i++) {
+              const res = await processSourceChunk([{ text: `[SOURCE MATERIAL CHUNK ${i + 1}/${chunks.length}]\n${chunks[i]}` }]);
+              results.push(res);
+              if (onProgress) onProgress(`Processed ${i + 1} of ${chunks.length} chunks...`, 45 + Math.floor(((i + 1) / chunks.length) * 30));
           }
           
           if (onProgress) onProgress("Synthesizing character archetypes and environmental data...", 75);
@@ -839,16 +868,24 @@ EXECUTE THE FOLLOWING EXTRACTION FILTERS:
         }
     }
 
+    const systemBlocks: any[] = [];
+    if (prompt.length > 4500) {
+        systemBlocks.push({
+            type: "text",
+            text: prompt,
+            cache_control: { type: "ephemeral" }
+        });
+    } else {
+        systemBlocks.push({
+            type: "text",
+            text: prompt
+        });
+    }
+
     const res = await withRetry(() => anthropic.messages.create({
         model: 'claude-3-5-sonnet-latest',
         max_tokens: 4000,
-        system: [
-            {
-                type: "text",
-                text: prompt,
-                cache_control: { type: "ephemeral" }
-            }
-        ],
+        system: systemBlocks,
         messages: [{ role: 'user', content }],
         tools: [{
             name: "analyze_source",
