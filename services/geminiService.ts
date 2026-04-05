@@ -1,6 +1,5 @@
 
 import { GoogleGenAI, Part, FunctionDeclaration, Type } from "@google/genai";
-import Anthropic from "@anthropic-ai/sdk";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { 
   GameStateSchema, 
@@ -33,40 +32,21 @@ import { constructLocationManifesto, constructRoomGenerationRules } from './loca
 import { updateNpcMemories } from './memorySystem';
 
 // --- SCHEMA PARSING (Module Scope for Efficiency) ---
-const TURN_OUTPUT_SCHEMA = zodToJsonSchema(GameTurnOutputSchema, "turnOutput");
-const SOURCE_ANALYSIS_SCHEMA = zodToJsonSchema(SourceAnalysisResultSchema, "analysis");
-const CHARACTER_PROFILE_SCHEMA = zodToJsonSchema(CharacterProfileSchema, "profile");
-const SCENARIO_CONCEPTS_SCHEMA = zodToJsonSchema(ScenarioConceptsSchema, "concepts");
+const TURN_OUTPUT_SCHEMA = zodToJsonSchema(GameTurnOutputSchema as any, "turnOutput");
+const SOURCE_ANALYSIS_SCHEMA = zodToJsonSchema(SourceAnalysisResultSchema as any, "analysis");
+const CHARACTER_PROFILE_SCHEMA = zodToJsonSchema(CharacterProfileSchema as any, "profile");
+const SCENARIO_CONCEPTS_SCHEMA = zodToJsonSchema(ScenarioConceptsSchema as any, "concepts");
 
 // --- INITIALIZATION (Singleton Pattern) ---
 let aiInstance: GoogleGenAI | null = null;
-let anthropicInstance: Anthropic | null = null;
 
 export const initializeGemini = (apiKey: string) => {
     aiInstance = new GoogleGenAI({ apiKey });
 };
 
-export const initializeAnthropic = (apiKey: string) => {
-    // We must set dangerouslyAllowBrowser to true since this is a client-side app
-    anthropicInstance = new Anthropic({ 
-        apiKey, 
-        dangerouslyAllowBrowser: true,
-        maxRetries: 3,
-        timeout: 60000, // 60 second timeout
-        defaultHeaders: {
-            'anthropic-beta': 'prompt-caching-2024-07-31'
-        }
-    });
-};
-
 const getAI = () => {
     if (!aiInstance) throw new Error("Gemini Client not initialized.");
     return aiInstance;
-};
-
-const getAnthropic = () => {
-    if (!anthropicInstance) throw new Error("Anthropic Client not initialized.");
-    return anthropicInstance;
 };
 
 /**
@@ -97,23 +77,17 @@ const withRetry = async <T>(fn: () => Promise<T>, maxRetries = 3, initialDelay =
             lastError = error;
             
             // [FIX: Directive 3] Implement proper type narrowing
-            let isRetryable = false;
+            let isRateLimit = false;
             if (error instanceof Error) {
-                isRetryable = error.message.includes('429') || 
-                              error.message.includes('529') || 
-                              error.name === 'APITimeoutError' || 
-                              error.name === 'APIConnectionError';
+                isRateLimit = error.message.includes('429');
             } else if (typeof error === 'object' && error !== null) {
                 const e = error as Record<string, unknown>;
-                isRetryable = String(e.message || '').includes('429') || 
-                              String(e.message || '').includes('529') ||
-                              e.status === 429 || 
-                              e.status === 529 ||
-                              e.code === 429 ||
-                              e.status === 'RESOURCE_EXHAUSTED';
+                isRateLimit = String(e.message || '').includes('429') || 
+                             e.status === 'RESOURCE_EXHAUSTED' ||
+                             e.code === 429;
             }
             
-            if (isRetryable && i < maxRetries - 1) {
+            if (isRateLimit && i < maxRetries - 1) {
                 const delay = initialDelay * Math.pow(2, i);
                 console.warn(`Gemini Rate Limit Hit. Retrying in ${delay}ms... (Attempt ${i + 1}/${maxRetries})`);
                 await new Promise(resolve => setTimeout(resolve, delay));
@@ -136,9 +110,9 @@ export const generateArchitectResponse = async (
     architectMemory?: any,
     onChunk?: (text: string) => void
 ): Promise<string> => {
-    const anthropic = getAnthropic();
+    const ai = getAI();
     try {
-        // [OPTIMIZATION] Prune history to prevent context bloat while preserving as much as possible
+        // [OPTIMIZATION] Prune history to prevent context bloat while preserving as much as possible (approx 8000 chars)
         const MAX_CHARS = 8000;
         let currentChars = 0;
         const prunedHistory = [];
@@ -154,125 +128,92 @@ export const generateArchitectResponse = async (
         }
 
         // Ensure alternating roles starting with 'user'
-        const messages: any[] = [];
+        const contents: any[] = [];
         for (let i = 0; i < prunedHistory.length; i++) {
             const h = prunedHistory[i];
             const isLastMessage = i === prunedHistory.length - 1;
-            const content: any[] = [{ type: "text", text: h.text || "..." }];
-            
+            const parts: Part[] = [{ text: h.text || "..." }];
             if (h.imageBase64) {
                 if (isLastMessage) {
                     const cleanBase64 = h.imageBase64.split(',')[1] || h.imageBase64;
-                    content.unshift({
-                        type: "image",
-                        source: {
-                            type: "base64",
-                            media_type: "image/png",
+                    parts.push({
+                        inlineData: {
+                            mimeType: 'image/png',
                             data: cleanBase64
                         }
                     });
                 } else {
-                    content.push({ type: "text", text: "\n[Image attached in previous turn]" });
+                    parts.push({ text: "\n[Image attached in previous turn]" });
                 }
             }
             
-            const role = h.role === 'model' ? 'assistant' : 'user';
-            
-            if (messages.length === 0) {
-                if (role === 'assistant') {
-                    // Anthropic requires starting with user, so we prepend a dummy user message or skip
+            if (contents.length === 0) {
+                if (h.role === 'model') {
+                    // Gemini requires starting with user, so we prepend a dummy user message or skip
                     continue;
                 }
-                messages.push({ role, content });
+                contents.push({ role: h.role, parts });
             } else {
-                const lastMessage = messages[messages.length - 1];
-                if (lastMessage.role === role) {
+                const lastContent = contents[contents.length - 1];
+                if (lastContent.role === h.role) {
                     // Collapse consecutive messages of the same role
-                    lastMessage.content.push({ type: "text", text: '\n\n' });
-                    lastMessage.content.push(...content);
+                    lastContent.parts.push({ text: '\n\n' });
+                    lastContent.parts.push(...parts);
                 } else {
-                    messages.push({ role, content });
+                    contents.push({ role: h.role, parts });
                 }
             }
         }
         
-        // If messages is empty after filtering, add a default user message
-        if (messages.length === 0) {
-            messages.push({ role: 'user', content: [{ type: "text", text: 'Hello' }] });
-        } else if (messages[messages.length - 1].role === 'assistant') {
-            messages.push({ role: 'user', content: [{ type: "text", text: 'Continue.' }] });
+        // If contents is empty after filtering, add a default user message
+        if (contents.length === 0) {
+            contents.push({ role: 'user', parts: [{ text: 'Hello' }] });
         }
 
-        const systemBlocks: any[] = [];
-        
-        if (systemInstruction.length > 8000) {
-            systemBlocks.push({
-                type: "text",
-                text: systemInstruction,
-                cache_control: { type: "ephemeral" }
-            });
-        } else {
-            systemBlocks.push({
-                type: "text",
-                text: systemInstruction
-            });
-        }
-
-        let dynamicInstruction = "";
+        let fullInstruction = systemInstruction;
         if (gameState) {
-            dynamicInstruction += `\n\n[TNM LOCAL MEMORY]:\n- Current Phase: ${gameState.meta.narrative_phase || 'Unknown'}\n- Active Cluster: ${gameState.meta.active_cluster}\n- Narrative Summary: ${gameState.narrative.past_summary || 'None'}`;
+            fullInstruction += `\n\n[TNM LOCAL MEMORY]:\n- Current Phase: ${gameState.meta.narrative_phase || 'Unknown'}\n- Active Cluster: ${gameState.meta.active_cluster}\n- Narrative Summary: ${gameState.narrative.past_summary || 'None'}`;
         }
         if (architectMemory) {
-            dynamicInstruction += `\n\n[ARCHITECT MEMORY]:\n- User Name: ${architectMemory.userName || 'Unknown'}\n- Known Facts: ${architectMemory.facts.join(', ') || 'None'}`;
-        }
-
-        if (dynamicInstruction) {
-            systemBlocks.push({
-                type: "text",
-                text: dynamicInstruction
-            });
+            fullInstruction += `\n\n[ARCHITECT MEMORY]:\n- User Name: ${architectMemory.userName || 'Unknown'}\n- Known Facts: ${architectMemory.facts.join(', ') || 'None'}`;
         }
 
         if (onChunk) {
-            try {
-                const stream = await withRetry(() => anthropic.messages.create({
-                    model: 'claude-3-5-sonnet-20240620',
-                    max_tokens: 4000,
-                    system: systemBlocks,
-                    messages: messages,
-                    stream: true
-                }));
-                let fullText = "";
-                for await (const chunk of stream) {
-                    if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-                        fullText += chunk.delta.text;
-                        onChunk(fullText);
-                    }
+            const stream = await withRetry(() => ai.models.generateContentStream({
+                model: 'gemini-3-flash-preview', 
+                contents: contents,
+                config: {
+                    systemInstruction: fullInstruction
                 }
-                return fullText || "The connection is flickering... I lost that thought. Say it again?";
-            } catch (streamError: any) {
-                console.error("Stream Error:", streamError);
-                return `STREAM ERROR: ${streamError.message || String(streamError)}`;
-            }
-        } else {
-            const response = await withRetry(() => anthropic.messages.create({
-                model: 'claude-3-5-sonnet-20240620',
-                max_tokens: 4000,
-                system: systemBlocks,
-                messages: messages
             }));
-            const textContent = response.content.find(c => c.type === 'text');
-            return textContent && textContent.type === 'text' ? textContent.text : "The connection is flickering... I lost that thought. Say it again?";
+            let fullText = "";
+            for await (const chunk of stream) {
+                const c = chunk as any;
+                if (c.text) {
+                    fullText += c.text;
+                    onChunk(fullText);
+                }
+            }
+            return fullText || "The connection is flickering... I lost that thought. Say it again?";
+        } else {
+            const response = await withRetry(() => ai.models.generateContent({
+                model: 'gemini-3-flash-preview', 
+                contents: contents,
+                config: {
+                    systemInstruction: fullInstruction
+                }
+            }));
+            return response.text || "The connection is flickering... I lost that thought. Say it again?";
         }
-    } catch (e: any) {
+    } catch (e) {
         console.error("Architect Error:", e);
-        return `ERROR: ${e.message || String(e)}`;
+        return "I can't see that... the static is too thick. Try again?";
     }
 };
 
 export const extractScenarioFromChat = async (history: { role: 'user' | 'model', text: string }[]): Promise<SimulationConfig> => {
-    const anthropic = getAnthropic();
-    // Use a character-aware reduction method to preserve history up to ~80k characters
+    const ai = getAI();
+    // Use a character-aware reduction method to preserve history up to ~8000 characters
     const MAX_CHARS = 8000;
     let currentChars = 0;
     const recentHistory = [];
@@ -293,6 +234,7 @@ export const extractScenarioFromChat = async (history: { role: 'user' | 'model',
     Transcript:
     ${transcript}
     
+    Return JSON matching ScenarioConceptsSchema. 
     Infer any missing fields with creative defaults based on the tone of the chat.
     Mode should be 'Survivor' or 'Villain'.
     Intensity should be 'Level 3' if unspecified.
@@ -300,20 +242,16 @@ export const extractScenarioFromChat = async (history: { role: 'user' | 'model',
     `;
 
     try {
-        const res = await withRetry(() => anthropic.messages.create({
-            model: 'claude-3-5-sonnet-20240620',
-            max_tokens: 4000,
-            messages: [{ role: 'user', content: extractionPrompt }],
-            tools: [{
-                name: "extract_scenario",
-                description: "Extract scenario concepts",
-                input_schema: SCENARIO_CONCEPTS_SCHEMA.definitions?.concepts as any
-            }],
-            tool_choice: { type: "tool", name: "extract_scenario" }
+        const res = await withRetry(() => ai.models.generateContent({
+            model: 'gemini-3-flash-preview', 
+            contents: [{ role: 'user', parts: [{ text: extractionPrompt }] }],
+            config: { 
+                responseMimeType: 'application/json',
+                tools: [{ urlContext: {} }]
+            }
         }));
 
-        const toolCall = res.content.find(c => c.type === 'tool_use');
-        const concepts = parseScenarioConcepts(JSON.stringify(toolCall && toolCall.type === 'tool_use' ? toolCall.input : {}));
+        const concepts = parseScenarioConcepts(res.text || "{}");
         
         return {
             perspective: 'First Person',
@@ -345,7 +283,7 @@ export const extractScenarioFromChat = async (history: { role: 'user' | 'model',
 
 // [OPTIMIZATION C] Context Summarization
 export const summarizeHistory = async (history: { role: 'user' | 'model', text: string }[]): Promise<string> => {
-    const anthropic = getAnthropic();
+    const ai = getAI();
     // Only summarize if history is long
     if (history.length < 10) return "";
 
@@ -353,13 +291,11 @@ export const summarizeHistory = async (history: { role: 'user' | 'model', text: 
     const prompt = `Summarize the following narrative arc into a single detailed paragraph. Preserve key facts, injuries, and current objectives.\n\n${transcript}`;
 
     try {
-        const res = await anthropic.messages.create({
-            model: 'claude-3-5-sonnet-20240620',
-            max_tokens: 500,
-            messages: [{ role: 'user', content: prompt }]
+        const res = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview', 
+            contents: { parts: [{ text: prompt }] }
         });
-        const textContent = res.content.find(c => c.type === 'text');
-        return textContent && textContent.type === 'text' ? textContent.text : "";
+        return res.text || "";
     } catch (e) {
         return "";
     }
@@ -369,7 +305,7 @@ export const evaluateNarrativeTransition = async (
     history: ChatMessage[],
     condition: string
 ): Promise<{ conditionMet: boolean; reason: string }> => {
-    const anthropic = getAnthropic();
+    const ai = getAI();
     const lastMessages = history.slice(-6); // Last 3 turns (user + model)
     const transcript = lastMessages.map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n');
     
@@ -381,28 +317,16 @@ export const evaluateNarrativeTransition = async (
     Does the transcript show that the condition has been met? Respond in JSON.`;
 
     try {
-        const res = await withRetry(() => anthropic.messages.create({
-            model: 'claude-3-5-sonnet-20240620',
-            max_tokens: 500,
-            system: NARRATIVE_EVALUATOR_INSTRUCTION,
-            messages: [{ role: 'user', content: prompt }],
-            tools: [{
-                name: "evaluate_transition",
-                description: "Evaluate narrative transition",
-                input_schema: {
-                    type: "object",
-                    properties: {
-                        conditionMet: { type: "boolean" },
-                        reason: { type: "string" }
-                    },
-                    required: ["conditionMet", "reason"]
-                }
-            }],
-            tool_choice: { type: "tool", name: "evaluate_transition" }
+        const res = await withRetry(() => ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            config: { 
+                systemInstruction: NARRATIVE_EVALUATOR_INSTRUCTION,
+                responseMimeType: 'application/json' 
+            }
         }));
 
-        const toolCall = res.content.find(c => c.type === 'tool_use');
-        const result = toolCall && toolCall.type === 'tool_use' ? toolCall.input as any : {};
+        const result = JSON.parse(sanitizeJSON(res.text || "{}"));
         return {
             conditionMet: !!result.conditionMet,
             reason: result.reason || "No reason provided."
@@ -443,7 +367,7 @@ export const processGameTurn = async (
   files: File[] = [],
   onStreamLogic?: (chunk: string, phase: 'logic' | 'narrative') => void
 ): Promise<{ stateCommands: any[], narrativeMetadata: any, storyText: string, imagePromise?: Promise<string | undefined> }> => {
-  const anthropic = getAnthropic();
+  const ai = getAI();
 
   // Find Player NPC to include in the Slim State
   const playerNpc = currentState.npc_states.find(n => n.name === currentState.meta.player_profile?.name) 
@@ -505,20 +429,6 @@ export const processGameTurn = async (
   INSTRUCTION: You must output an array of discrete atomic commands in 'state_commands' to mutate the game state, rather than partial state merges.
   `;
 
-  const staticSystemInstruction = `
-  ${getSinglePassInstruction(metronome.currentPhase as any)}
-  
-  [WORLD BUILDING RULES]
-  ${sensoryManifesto}
-  ${voiceManifesto}
-  ${locationManifesto}
-  ${roomRules}
-  `;
-
-  const dynamicSystemInstruction = `
-  [LONG TERM MEMORY]: ${currentState.narrative.past_summary || "No prior history."}
-  `;
-
   // 2. SINGLE PASS GENERATION
   if (onStreamLogic) onStreamLogic("processing neural turn...\n", 'logic');
 
@@ -527,46 +437,25 @@ export const processGameTurn = async (
   let narrativeMetadata: any = { entities_addressed: [], tension_delta: 0, narrative_escalation: false };
   let imagePromise: Promise<string | undefined> | undefined;
 
-  const systemBlocks: any[] = [];
-  if (staticSystemInstruction.length > 8000) {
-      systemBlocks.push({
-          type: "text",
-          text: staticSystemInstruction,
-          cache_control: { type: "ephemeral" }
-      });
-  } else {
-      systemBlocks.push({
-          type: "text",
-          text: staticSystemInstruction
-      });
-  }
-  
-  if (dynamicSystemInstruction.trim()) {
-      systemBlocks.push({
-          type: "text",
-          text: dynamicSystemInstruction
-      });
-  }
-
   try {
-      const response = await withRetry(() => anthropic.messages.create({
-          model: 'claude-3-5-sonnet-20240620',
-          max_tokens: 4000,
-          system: systemBlocks,
-          messages: [{
+      const response = await withRetry(() => ai.models.generateContent({
+          model: 'gemini-3-flash-preview',
+          contents: [{
               role: 'user',
-              content: `${contextBlock}\n\nUSER ACTION: "${userAction}"`
+              parts: [
+                  { text: contextBlock },
+                  { text: `USER ACTION: "${userAction}"` }
+              ]
           }],
-          tools: [{
-              name: "process_turn",
-              description: "Process the game turn and return the output",
-              input_schema: TURN_OUTPUT_SCHEMA.definitions?.turnOutput as any
-          }],
-          tool_choice: { type: "tool", name: "process_turn" }
+          config: { 
+              systemInstruction: getSinglePassInstruction(metronome.currentPhase as any) + `\n\n[WORLD BUILDING RULES]:\n${sensoryManifesto}\n${voiceManifesto}\n${locationManifesto}\n${roomRules}\n\n[LONG TERM MEMORY]: ${currentState.narrative.past_summary || "No prior history."}`, 
+              responseMimeType: 'application/json',
+              responseSchema: TURN_OUTPUT_SCHEMA.definitions?.turnOutput as any,
+              tools: [{ urlContext: {} }]
+          }
       }));
 
-      const toolCall = response.content.find(c => c.type === 'tool_use');
-      const rawText = JSON.stringify(toolCall && toolCall.type === 'tool_use' ? toolCall.input : {});
+      const rawText = response.text || "{}";
       const parsedOutput = parseGameTurnOutput(rawText);
       
       stateCommands = parsedOutput.state_commands || [];
@@ -615,17 +504,15 @@ export const processGameTurn = async (
 // --- HELPER FUNCTIONS ---
 
 export const generateAutoPlayerAction = async (state: GameState): Promise<string> => {
-    const anthropic = getAnthropic();
+    const ai = getAI();
     try {
         const prompt = `Current Situation: ${state.narrative.illustration_request || "Survival situation"}\nLast Narrative: (Implicit)\nGenerate a single sentence action for the player.`;
-        const res = await withRetry(() => anthropic.messages.create({
-            model: 'claude-3-5-sonnet-20240620',
-            max_tokens: 100,
-            system: PLAYER_SYSTEM_INSTRUCTION,
-            messages: [{ role: 'user', content: `${JSON.stringify(state)}\n\n${prompt}` }]
+        const res = await withRetry(() => ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: [{ role: 'user', parts: [{ text: JSON.stringify(state) }, { text: prompt }] }],
+            config: { systemInstruction: PLAYER_SYSTEM_INSTRUCTION }
         }));
-        const textContent = res.content.find(c => c.type === 'text');
-        return textContent && textContent.type === 'text' ? textContent.text : "Wait and watch.";
+        return res.text || "Wait and watch.";
     } catch (e: any) {
         console.error("Error in generateAutoPlayerAction:", e);
         if (e?.status === 429 || e?.message?.includes('429') || e?.message?.includes('Rate Limit') || e?.message?.includes('quota')) {
@@ -650,7 +537,7 @@ export const generateImage = async (
     
     try {
         const res = await ai.models.generateContent({
-            model: 'gemini-3.1-flash-image-preview',
+            model: 'gemini-3-pro-image-preview', // Upgraded to Pro Image
             contents: { parts: [{ text: fullPrompt }] },
             config: {
                 imageConfig: {
@@ -753,11 +640,16 @@ export const analyzeSourceMaterial = async (
               chunks.push(currentChunk);
           }
           
-          const results: SourceAnalysisResult[] = [];
-          for (let i = 0; i < chunks.length; i++) {
-              const res = await processSourceChunk([{ text: `[SOURCE MATERIAL CHUNK ${i + 1}/${chunks.length}]\n${chunks[i]}` }]);
-              results.push(res);
-              if (onProgress) onProgress(`Processed ${i + 1} of ${chunks.length} chunks...`, 45 + Math.floor(((i + 1) / chunks.length) * 30));
+          const results: SourceAnalysisResult[] = new Array(chunks.length);
+          const limit = 3; // Concurrency limit
+          for (let i = 0; i < chunks.length; i += limit) {
+              const batch = chunks.slice(i, i + limit);
+              const batchResults = await Promise.all(batch.map((chunk, idx) => {
+                  const chunkIndex = i + idx;
+                  return processSourceChunk([{ text: `[SOURCE MATERIAL CHUNK ${chunkIndex + 1}/${chunks.length}]\n${chunk}` }]);
+              }));
+              batchResults.forEach((res, idx) => results[i + idx] = res);
+              if (onProgress) onProgress(`Processed ${Math.min(i + limit, chunks.length)} of ${chunks.length} chunks...`, 45 + Math.floor((Math.min(i + limit, chunks.length) / chunks.length) * 30));
           }
           
           if (onProgress) onProgress("Synthesizing character archetypes and environmental data...", 75);
@@ -836,8 +728,8 @@ export const analyzeSourceMaterial = async (
   }
 };
 
-const processSourceChunk = async (parts: any[], onProgress?: (stage: string, percent: number) => void): Promise<SourceAnalysisResult> => {
-    const anthropic = getAnthropic();
+const processSourceChunk = async (parts: Part[], onProgress?: (stage: string, percent: number) => void): Promise<SourceAnalysisResult> => {
+    const ai = getAI();
     const prompt = `You are the Reference Processing Protocol (RPP) for The Nightmare Machine. 
 Analyze the following source material and extract its narrative architecture into strictly formatted JSON.
 
@@ -857,51 +749,18 @@ EXECUTE THE FOLLOWING EXTRACTION FILTERS:
 13. rpp_voice_manifesto: Define the author's prose style, pacing, and how the syntax should degrade as the climax approaches.
 14. rpp_primary_vectors: Identify which psychological stats this story targets. Return an array containing any of: "fear", "isolation", "guilt", "paranoia".`;
 
-    const content: any[] = [];
-    for (const part of parts) {
-        if (part.text) {
-            content.push({ type: "text", text: part.text });
-        } else if (part.inlineData) {
-            content.push({
-                type: "image",
-                source: {
-                    type: "base64",
-                    media_type: part.inlineData.mimeType,
-                    data: part.inlineData.data
-                }
-            });
+    const fullParts = [...parts, { text: prompt }];
+
+    const res = await withRetry(() => ai.models.generateContent({
+        model: 'gemini-3-flash-preview', 
+        contents: [{ role: 'user', parts: fullParts }],
+        config: { 
+            responseMimeType: 'application/json',
+            responseSchema: SOURCE_ANALYSIS_SCHEMA.definitions?.analysis as any
         }
-    }
-
-    const systemBlocks: any[] = [];
-    if (prompt.length > 8000) {
-        systemBlocks.push({
-            type: "text",
-            text: prompt,
-            cache_control: { type: "ephemeral" }
-        });
-    } else {
-        systemBlocks.push({
-            type: "text",
-            text: prompt
-        });
-    }
-
-    const res = await withRetry(() => anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20240620',
-        max_tokens: 4000,
-        system: systemBlocks,
-        messages: [{ role: 'user', content }],
-        tools: [{
-            name: "analyze_source",
-            description: "Analyze source material",
-            input_schema: SOURCE_ANALYSIS_SCHEMA.definitions?.analysis as any
-        }],
-        tool_choice: { type: "tool", name: "analyze_source" }
     }));
 
-    const toolCall = res.content.find(c => c.type === 'tool_use');
-    return parseSourceAnalysis(JSON.stringify(toolCall && toolCall.type === 'tool_use' ? toolCall.input : {}));
+    return parseSourceAnalysis(res.text || "{}");
 };
 
 export const generateCalibrationField = async (
@@ -911,43 +770,33 @@ export const generateCalibrationField = async (
     existingContext?: string, 
     refinementInput?: string
 ): Promise<string> => {
-    const anthropic = getAnthropic();
+    const ai = getAI();
     let prompt = `Generate a creative, horror-themed value for the field: "${field}". Focus on providing two or three strong elements to allow the User to expand on them. Do not overload with descriptors.
     Context: Cluster=${cluster}, Intensity=${intensity}.`;
     
     if (existingContext) prompt += `\nExisting Context: ${existingContext}`;
     if (refinementInput) prompt += `\nRefine this existing value: "${refinementInput}"`;
     
-    const res = await withRetry(() => anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20240620',
-        max_tokens: 500,
-        messages: [{ role: 'user', content: prompt }]
+    const res = await withRetry(() => ai.models.generateContent({
+        model: 'gemini-3-flash-preview', // Downgraded to Flash
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
     }));
-    const textContent = res.content.find(c => c.type === 'text');
-    return textContent && textContent.type === 'text' ? textContent.text.trim() : "";
+    return res.text?.trim() || "";
 };
 
 export const hydrateUserCharacter = async (description: string, cluster: string): Promise<Partial<NpcState>> => {
-    const anthropic = getAnthropic();
+    const ai = getAI();
     const prompt = `Hydrate this character description into a partial JSON state. Cluster: ${cluster}. Input: "${description}". Focus on providing two or three strong elements for traits and flaws to allow the User to expand on them. Do not overload with descriptors.`;
-    const NPC_SCHEMA = zodToJsonSchema(NpcStateSchema, "npc");
-    const res = await withRetry(() => anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20240620',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }],
-        tools: [{
-            name: "hydrate_character",
-            description: "Hydrate character description",
-            input_schema: NPC_SCHEMA.definitions?.npc as any
-        }],
-        tool_choice: { type: "tool", name: "hydrate_character" }
+    const res = await withRetry(() => ai.models.generateContent({
+        model: 'gemini-3-flash-preview', // Downgraded to Flash
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: { responseMimeType: 'application/json' }
     }));
-    const toolCall = res.content.find(c => c.type === 'tool_use');
-    return parseHydratedCharacter(JSON.stringify(toolCall && toolCall.type === 'tool_use' ? toolCall.input : {}));
+    return parseHydratedCharacter(res.text || "{}");
 };
 
 export const extractCharactersFromText = async (text: string, cluster: string): Promise<Partial<NpcState>[]> => {
-  const anthropic = getAnthropic();
+  const ai = getAI();
   const prompt = `Analyze the following text which describes a group of characters for a horror simulation (Theme: ${cluster}).
   
   Extract EACH character into a JSON object. Focus on providing two or three strong elements for traits and flaws to allow the User to expand on them. Do not overload with descriptors.
@@ -966,15 +815,13 @@ export const extractCharactersFromText = async (text: string, cluster: string): 
   "${text}"`;
 
   try {
-      const res = await withRetry(() => anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20240620',
-        max_tokens: 4000,
-        messages: [{ role: 'user', content: prompt }]
+      const res = await withRetry(() => ai.models.generateContent({
+        model: 'gemini-3-flash-preview', // Downgraded to Flash
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: { responseMimeType: 'application/json' }
       }));
       
-      const textContent = res.content.find(c => c.type === 'text');
-      const jsonStr = textContent && textContent.type === 'text' ? textContent.text : "[]";
-      const json = JSON.parse(sanitizeJSON(jsonStr));
+      const json = JSON.parse(sanitizeJSON(res.text || "[]"));
       if (Array.isArray(json)) return json;
       return [];
   } catch (e) {
@@ -1006,39 +853,31 @@ export const analyzeImageContext = async (file: File, aspect: string): Promise<s
 };
 
 export const generateCharacterProfile = async (cluster: string, intensity: string, role: string): Promise<CharacterProfile> => {
-    const anthropic = getAnthropic();
+    const ai = getAI();
 
-    const res = await withRetry(() => anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20240620',
-        max_tokens: 2000,
-        messages: [{ role: 'user', content: `Generate a horror character profile. Role: ${role}. Cluster: ${cluster}. Intensity: ${intensity}. Focus on providing two or three strong elements for their background, traits, and flaws to allow the User to expand on them. Do not overload the system with descriptors.` }],
-        tools: [{
-            name: "generate_profile",
-            description: "Generate character profile",
-            input_schema: CHARACTER_PROFILE_SCHEMA.definitions?.profile as any
-        }],
-        tool_choice: { type: "tool", name: "generate_profile" }
+    const res = await withRetry(() => ai.models.generateContent({
+        model: 'gemini-3-flash-preview', 
+        contents: [{ role: 'user', parts: [{ text: `Generate a horror character profile. Role: ${role}. Cluster: ${cluster}. Intensity: ${intensity}. Focus on providing two or three strong elements for their background, traits, and flaws to allow the User to expand on them. Do not overload the system with descriptors.` }] }],
+        config: { 
+            responseMimeType: 'application/json',
+            responseSchema: CHARACTER_PROFILE_SCHEMA.definitions?.profile as any
+        }
     }));
-    const toolCall = res.content.find(c => c.type === 'tool_use');
-    return parseCharacterProfile(JSON.stringify(toolCall && toolCall.type === 'tool_use' ? toolCall.input : {}));
+    return parseCharacterProfile(res.text || "{}");
 };
 
 export const generateScenarioConcepts = async (cluster: string, intensity: string, mode: string): Promise<ScenarioConcepts> => {
-    const anthropic = getAnthropic();
+    const ai = getAI();
 
-    const res = await withRetry(() => anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20240620',
-        max_tokens: 4000,
-        messages: [{ role: 'user', content: `Generate a full scenario concept JSON object. Cluster: ${cluster}, Mode: ${mode}, Intensity: ${intensity}. Focus on providing two or three strong elements for the story and setting to allow the User to expand on them. Do not overload the system with descriptors.` }],
-        tools: [{
-            name: "generate_scenario",
-            description: "Generate scenario concepts",
-            input_schema: SCENARIO_CONCEPTS_SCHEMA.definitions?.concepts as any
-        }],
-        tool_choice: { type: "tool", name: "generate_scenario" }
+    const res = await withRetry(() => ai.models.generateContent({
+        model: 'gemini-3-flash-preview', 
+        contents: [{ role: 'user', parts: [{ text: `Generate a full scenario concept JSON object. Cluster: ${cluster}, Mode: ${mode}, Intensity: ${intensity}. Focus on providing two or three strong elements for the story and setting to allow the User to expand on them. Do not overload the system with descriptors.` }] }],
+        config: {
+             responseMimeType: 'application/json',
+             responseSchema: SCENARIO_CONCEPTS_SCHEMA.definitions?.concepts as any
+        }
     }));
-    const toolCall = res.content.find(c => c.type === 'tool_use');
-    return parseScenarioConcepts(JSON.stringify(toolCall && toolCall.type === 'tool_use' ? toolCall.input : {}));
+    return parseScenarioConcepts(res.text || "{}");
 };
 
 // Utils
