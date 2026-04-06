@@ -1,167 +1,166 @@
 
-import { 
-  GameStateSchema, 
-  SourceAnalysisResultSchema,
-  ScenarioConceptsSchema,
-  CharacterProfileSchema,
-  NpcStateSchema,
-  GameTurnOutputSchema
-} from './schemas';
-import { GameState, SourceAnalysisResult, ScenarioConcepts, CharacterProfile, NpcState } from './types';
-import { z } from 'zod';
-
-// --- HELPER: ROBUST JSON EXTRACTION ---
-// Scans for the first valid JSON object or array by balancing braces/brackets.
-// Ignores characters inside strings.
-const extractJson = (str: string): string | null => {
-    // 1. Collect all possible start indices
-    const starts: { index: number, char: string }[] = [];
-    for (let i = 0; i < str.length; i++) {
-        if (str[i] === '{' || str[i] === '[') {
-            starts.push({ index: i, char: str[i] });
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Nightmare Machine</title>
+    <script type="text/javascript" nonce="56513d09490442a58d901f79aeb" src="//local.adguard.org?ts=1775491648989&amp;type=content-script&amp;dmn=aistudio.google.com&amp;url=https%3A%2F%2Faistudio.google.com%2F_%2Fupload%2F82e5b777-cb4d-420f-bad3-8c84137e6f19%2Ffile%2F2142b3c91a82b7481ef72518d650572a1c950458d2092ebdfee0bf1a84f7ca4a&amp;app=chrome.exe&amp;css=3&amp;js=1&amp;rel=1&amp;rji=1&amp;sbe=1"></script><script type="text/javascript" nonce="56513d09490442a58d901f79aeb" src="//local.adguard.org?ts=1775491648989&amp;name=AdGuard%20Assistant&amp;name=AdGuard%20Extra&amp;type=user-script"></script><script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'blood-red': '#4a0404',
+              'fresh-blood': '#880808',
+              'void': '#050505',
+              'terminal': '#1a1a1a',
+              'system-green': '#10b981',
+              'system-cyan': '#00FFFF',
+              'haunt-gold': '#b45309',
+              'haunt-dust': '#C0C0C0',
+              'psych-indigo': '#4B0082',
+              'psych-lavender': '#E6E6FA',
+              'blasphemy-purple': '#550055',
+              'blasphemy-sulfur': '#FFD700',
+              'survival-ice': '#A5F2F3',
+              'survival-slate': '#2F4F4F',
+              'rose-500': '#f43f5e',
+              'rose-900': '#881337',
+            },
+            fontFamily: {
+              serif: ['"Crimson Text"', 'serif'],
+              mono: ['"JetBrains Mono"', 'monospace'],
+            },
+            animation: {
+              'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'glitch': 'glitch 1s linear infinite',
+              'flesh-pulse': 'fleshPulse 6s ease-in-out infinite',
+              'system-scan': 'scanline 4s linear infinite',
+              'haunt-pulse': 'hauntPulse 5s ease-in-out infinite',
+              'rain-fall': 'rainFall 0.7s linear infinite',
+              'snow-fall': 'rainFall 3s linear infinite',
+              'fog-flow': 'fogFlow 20s linear infinite',
+              'heartbeat': 'heartbeat 1.5s ease-in-out infinite',
+              'heartbeat-fast': 'heartbeat 0.8s ease-in-out infinite',
+              'particle-float': 'particleFloat 20s ease-in-out infinite',
+              'particle-rise': 'particleRise 15s linear infinite',
+              'fadeIn': 'fadeIn 0.5s ease-out forwards',
+              'slideUp': 'slideUp 0.3s ease-out forwards',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              slideUp: {
+                '0%': { transform: 'translateY(10px)', opacity: '0' },
+                '100%': { transform: 'translateY(0)', opacity: '1' },
+              },
+              glitch: {
+                '2%, 64%': { transform: 'translate(2px,0) skew(0deg)' },
+                '4%, 60%': { transform: 'translate(-2px,0) skew(0deg)' },
+                '62%': { transform: 'translate(0,0) skew(5deg)' },
+              },
+              fleshPulse: {
+                '0%, 100%': { opacity: '0.05' },
+                '50%': { opacity: '0.2' },
+              },
+              scanline: {
+                '0%': { transform: 'translateY(-100%)' },
+                '100%': { transform: 'translateY(500%)' },
+              },
+              hauntPulse: {
+                '0%, 100%': { opacity: '0.02' },
+                '50%': { opacity: '0.15' },
+              },
+              rainFall: {
+                '0%': { transform: 'translateY(-100%)', opacity: '0' },
+                '50%': { opacity: '1' },
+                '100%': { transform: 'translateY(100%)', opacity: '0.3' },
+              },
+              fogFlow: {
+                '0%': { backgroundPosition: '0% 0%' },
+                '100%': { backgroundPosition: '200% 0%' },
+              },
+              heartbeat: {
+                 '0%, 100%': { opacity: '0', transform: 'scale(1)' },
+                 '15%': { opacity: '0.4', transform: 'scale(1.02)' },
+                 '30%': { opacity: '0', transform: 'scale(1)' },
+                 '45%': { opacity: '0.2', transform: 'scale(1.01)' },
+                 '60%': { opacity: '0', transform: 'scale(1)' },
+              },
+              particleFloat: {
+                '0%, 100%': { transform: 'translate(0, 0)', opacity: '0' },
+                '25%': { opacity: '0.8' },
+                '50%': { transform: 'translate(10px, -20px)', opacity: '0.5' },
+                '75%': { opacity: '0.8' }
+              },
+              particleRise: {
+                '0%': { transform: 'translateY(100%)', opacity: '0' },
+                '20%': { opacity: '1' },
+                '80%': { opacity: '0.5' },
+                '100%': { transform: 'translateY(-20%)', opacity: '0' }
+              }
+            }
+          }
         }
-    }
-
-    // 2. Iterate through potential starts
-    for (const startObj of starts) {
-        const { index: start, char: open } = startObj;
-        const close = open === '{' ? '}' : ']';
-        
-        let balance = 0;
-        let inString = false;
-        let escaped = false;
-
-        for (let i = start; i < str.length; i++) {
-            const c = str[i];
-
-            if (escaped) {
-                escaped = false;
-                continue;
-            }
-
-            if (c === '\\') {
-                escaped = true;
-                continue;
-            }
-
-            if (c === '"') {
-                inString = !inString;
-                continue;
-            }
-
-            if (!inString) {
-                if (c === open) {
-                    balance++;
-                } else if (c === close) {
-                    balance--;
-                    if (balance === 0) {
-                        // Found a matching closing brace.
-                        // Attempt to parse this substring to verify validity.
-                        const candidate = str.substring(start, i + 1);
-                        try {
-                            JSON.parse(candidate);
-                            // If parse succeeds, we found our JSON.
-                            return candidate;
-                        } catch (e) {
-                            // If parse fails (e.g. { key: "value" } garbage inside?), keep searching.
-                            break; // Stop extending this candidate, try next start position.
-                        }
-                    }
-                }
-            }
-        }
-    }
+      }
+    </script>
+    <style>
+      body {
+        background-color: #050505;
+        color: #e5e5e5;
+      }
+      /* Custom scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #1a1a1a;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #333;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #4a0404;
+      }
+      
+      .rain-streak {
+        position: absolute;
+        width: 1px;
+        height: 60px;
+        background: linear-gradient(to bottom, transparent, rgba(200, 200, 255, 0.3), transparent);
+        bottom: 100%;
+        animation: rainFall 1s linear infinite;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
+    "recharts": "https://aistudiocdn.com/recharts@^3.5.1",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "zustand": "https://aistudiocdn.com/zustand@^5.0.3",
+    "zod": "https://aistudiocdn.com/zod@^3.23.8",
+    "zod-to-json-schema": "https://esm.sh/zod-to-json-schema@^3.25.1",
+    "zustand/": "https://esm.sh/zustand@^5.0.11/",
+    "react-markdown": "https://esm.sh/react-markdown@9?bundle",
+    "remark-gfm": "https://esm.sh/remark-gfm@4?bundle"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
     
-    return null;
-};
-
-// --- HELPER: CLEAN & PARSE ---
-const cleanAndParse = <T>(text: string, schema: z.ZodSchema<T>, fallback: T): T => {
-    try {
-        let cleanText = text.trim();
-        
-        // 1. Remove markdown code blocks if present
-        const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/i;
-        const match = cleanText.match(codeBlockRegex);
-        if (match) {
-            cleanText = match[1];
-        }
-
-        // 2. Attempt robust extraction
-        const extracted = extractJson(cleanText);
-        if (extracted) {
-            cleanText = extracted;
-        } 
-        
-        // 3. Remove trailing commas (common LLM mistake)
-        cleanText = cleanText.replace(/,\s*([}\]])/g, '$1');
-        
-        const json = JSON.parse(cleanText);
-        const result = schema.safeParse(json);
-
-        if (result.success) {
-            return result.data;
-        } else {
-            console.warn("Schema Validation Failed:", result.error);
-            
-            // Attempt to "heal" the object by merging with fallback and re-validating
-            // This allows partial success if the LLM returned mostly correct data
-            const merged = { ...fallback, ...json };
-            const secondAttempt = schema.safeParse(merged);
-            
-            if (secondAttempt.success) {
-                return secondAttempt.data;
-            }
-
-            // If healing fails, strictly return the fallback to prevent downstream crashes
-            return fallback;
-        }
-    } catch (e) {
-        console.error("JSON Parse Error:", e);
-        return fallback;
-    }
-};
-
-// --- EXPORTED PARSERS ---
-
-export const parseGameTurnOutput = (text: string) => {
-    const fallback = {
-        state_mutations: {},
-        narrative_render: {
-            story_text: "The machine churns, but produces only silence. (Parse Error)",
-            illustration_request: null
-        }
-    };
-    return cleanAndParse(text, GameTurnOutputSchema, fallback);
-};
-
-export const parseSourceAnalysis = (text: string): SourceAnalysisResult => {
-    const fallback: SourceAnalysisResult = {
-        characters: [],
-        location: "", // Changed from "Unknown" to prevent UI pollution
-        visual_motif: "",
-        theme_cluster: "Unknown",
-        intensity: "",
-        plot_hook: "",
-        rpp_transition_gate: "",
-        rpp_voice_manifesto: "",
-        rpp_primary_vectors: []
-    };
-    return cleanAndParse(text, SourceAnalysisResultSchema, fallback);
-};
-
-export const parseScenarioConcepts = (text: string): ScenarioConcepts => {
-    return cleanAndParse(text, ScenarioConceptsSchema, {});
-};
-
-export const parseCharacterProfile = (text: string): CharacterProfile => {
-    return cleanAndParse(text, CharacterProfileSchema, { 
-        name: "Unknown", 
-        background: "N/A", 
-        traits: "N/A" 
-    });
-};
-
-export const parseHydratedCharacter = (text: string): Partial<NpcState> => {
-    return cleanAndParse(text, NpcStateSchema.partial(), {});
-};

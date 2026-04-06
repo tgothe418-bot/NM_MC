@@ -1,188 +1,301 @@
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { useArchitectStore } from '../../store/architectStore';
 
-import { z } from 'zod';
-import { 
-  GameStateSchema, 
-  NpcStateSchema,
-  VillainStateSchema,
-  LocationStateSchema,
-  HiddenAgendaSchema,
-  DialogueEntrySchema,
-  MemoryEpisodeSchema,
-  DialogueMemorySchema,
-  VoiceSignatureSchema,
-  DialogueStateSchema,
-  PsychologicalProfileSchema,
-  ClusterResonanceSchema,
-  RoomExitSchema,
-  RoomNodeSchema,
-  SocialManeuverSchema,
-  ParsedCharacterSchema,
-  SourceAnalysisResultSchema,
-  ScenarioConceptsSchema,
-  CharacterProfileSchema,
-  TileTypeSchema,
-  GridCellSchema,
-  GridLayoutSchema,
-  LoreContextSchema,
-  NarrativePhaseSchema,
-  NarrativeStateSchema
-} from './schemas';
+interface SystemGhostProps {
+  className?: string;
+  floating?: boolean;
+  active?: boolean;
+  isSystemTyping?: boolean;
+  userInputLength?: number;
+}
 
-// Re-export Schema-Derived Types
-export interface GameState {
-  meta: {
-    turn: number;
-    perspective: string;
-    mode: 'Survivor' | 'Villain';
-    intensity_level: string;
-    active_cluster: string;
-    narrative_phase?: string;
-    player_profile?: {
-        name: string;
-        background: string;
-        traits: string | string[];
-        fracture_state?: number;
+export const SystemGhost: React.FC<SystemGhostProps> = ({ 
+  className = "", 
+  floating = true, 
+  active = false,
+  isSystemTyping = false,
+  userInputLength = 0
+}) => {
+  // The Ghost is now self-aware. It pulls its own mood from the global store.
+  const { mood } = useArchitectStore();
+  const { current_vibe: vibe, arousal } = mood;
+
+  // 1. Determine Colors based on Vibe
+  let coreColor = "#3b82f6"; // Default Blue (Helpful)
+  let glowColor = "rgba(59, 130, 246, 0.5)";
+
+  switch (vibe) {
+    case 'Glitchy':
+      coreColor = "#10b981"; // Toxic Green
+      glowColor = "rgba(16, 185, 129, 0.6)";
+      break;
+    case 'Predatory':
+      coreColor = "#ef4444"; // Blood Red
+      glowColor = "rgba(239, 68, 68, 0.8)";
+      break;
+    case 'Melancholy':
+      coreColor = "#8b5cf6"; // Deep Purple
+      glowColor = "rgba(139, 92, 246, 0.3)";
+      break;
+    case 'Analytical':
+      coreColor = "#f59e0b"; // Amber/Gold
+      glowColor = "rgba(245, 158, 11, 0.4)";
+      break;
+  }
+
+  // 2. Determine Animation Speed based on Dynamic Arousal
+  let dynamicArousal = arousal;
+  if (isSystemTyping) {
+    dynamicArousal += 0.4;
+  }
+  if (userInputLength > 0) {
+    dynamicArousal += Math.min(userInputLength / 100, 0.3);
+  }
+  dynamicArousal = Math.max(0, Math.min(1, dynamicArousal));
+
+  const speedBoost = active ? 2 : 1;
+  const floatDuration = Math.max(0.5, (4 - (dynamicArousal * 3)) / speedBoost) + "s";
+  const tailDuration = Math.max(0.2, (2 - (dynamicArousal * 1.5)) / speedBoost) + "s";
+  const wanderDuration = (active ? 10 : 20) + "s";
+  
+  // 3. Determine Eye/Mouth Shape based on Vibe
+  const isHostile = vibe === 'Predatory' || vibe === 'Glitchy';
+  const isSad = vibe === 'Melancholy';
+
+  const baseClasses = 'pointer-events-none z-0';
+  const positionClass = className.includes('absolute') || className.includes('fixed') || className.includes('relative') ? '' : 'relative overflow-visible';
+
+  // --- Procedural Blinking ---
+  const [blinkScale, setBlinkScale] = useState(1);
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    let innerTimeoutId: NodeJS.Timeout;
+    const triggerBlink = () => {
+      const nextBlink = Math.random() * 4000 + 2000; // 2000ms to 6000ms
+      timeoutId = setTimeout(() => {
+        setBlinkScale(0);
+        innerTimeoutId = setTimeout(() => {
+          setBlinkScale(1);
+          triggerBlink();
+        }, 100);
+      }, nextBlink);
     };
-  };
-  lore_context?: LoreContext;
-  villain_state: VillainState;
-  npc_states: NpcState[];
-  location_state: LocationState;
-  narrative: {
-    visual_motif: string;
-    illustration_request: string | null;
-    past_summary: string;
-    transition_gate?: string;
-  };
-  suggested_actions: string[];
-}
-export type NpcState = z.infer<typeof NpcStateSchema>;
-export type VillainState = z.infer<typeof VillainStateSchema>;
-export type LocationState = z.infer<typeof LocationStateSchema>;
-export type HiddenAgenda = z.infer<typeof HiddenAgendaSchema>;
-export type DialogueEntry = z.infer<typeof DialogueEntrySchema>;
-export type MemoryEpisode = z.infer<typeof MemoryEpisodeSchema>;
-export type DialogueMemory = z.infer<typeof DialogueMemorySchema>;
-export type VoiceSignature = z.infer<typeof VoiceSignatureSchema>;
-export type DialogueState = z.infer<typeof DialogueStateSchema>;
-export type PsychologicalProfile = z.infer<typeof PsychologicalProfileSchema>;
-export type ClusterResonance = z.infer<typeof ClusterResonanceSchema>;
-export type RoomExit = z.infer<typeof RoomExitSchema>;
-export type RoomNode = z.infer<typeof RoomNodeSchema>;
-export type SocialManeuver = z.infer<typeof SocialManeuverSchema>;
-export type ParsedCharacter = z.infer<typeof ParsedCharacterSchema>;
-export type SourceAnalysisResult = z.infer<typeof SourceAnalysisResultSchema>;
-export type ScenarioConcepts = z.infer<typeof ScenarioConceptsSchema>;
-export type CharacterProfile = z.infer<typeof CharacterProfileSchema>;
-export type LoreContext = z.infer<typeof LoreContextSchema>;
-export type NarrativePhase = z.infer<typeof NarrativePhaseSchema>;
-export type NarrativeState = z.infer<typeof NarrativeStateSchema>;
+    triggerBlink();
+    return () => {
+      clearTimeout(timeoutId);
+      clearTimeout(innerTimeoutId);
+    };
+  }, []);
 
-// Spatial Types
-export type TileType = z.infer<typeof TileTypeSchema>;
-export type GridCell = z.infer<typeof GridCellSchema>;
-export type GridLayout = z.infer<typeof GridLayoutSchema>;
+  // --- Procedural Gaze (No Mouse Tracking) ---
+  const [pupilOffsetX, setPupilOffsetX] = useState(0);
+  const [pupilOffsetY, setPupilOffsetY] = useState(0);
 
-// Types NOT covered by Schema (Configuration, UI, etc.)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPupilOffsetX(Math.random() * 4 - 2);
+      setPupilOffsetY(Math.random() * 4 - 2);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
-export interface ClusterWeights {
-  [key: string]: string;
-}
+  const baseLeftPupilX = isSad ? 59 : 61;
+  const baseRightPupilX = isSad ? 79 : 81;
+  const basePupilY = isHostile ? 40 : 41;
 
-export interface SimulationConfig {
-  perspective: string;
-  mode: string;
-  starting_point: string; 
-  cluster: string;
-  intensity: string;
-  cycles: number;
-  victim_count?: number; 
-  visual_motif?: string; 
-  location_description?: string; 
-  debug_mode_enabled?: boolean;
-  villain_name?: string;
-  villain_appearance?: string;
-  villain_methods?: string;
-  primary_goal?: string;
-  victim_description?: string;
-  // Survivor Fields
-  survivor_name?: string;
-  survivor_background?: string;
-  survivor_traits?: string;
-  // New: Pre-selected NPCs from setup
-  pre_generated_npcs?: NpcState[];
-  parsed_characters?: ParsedCharacter[];
-  plot_hook?: string;
-  transition_gate?: string;
-  // Phase 1: Context Injection
-  lore_context?: LoreContext;
-}
+  const leftPupilCx = baseLeftPupilX + pupilOffsetX;
+  const rightPupilCx = baseRightPupilX + pupilOffsetX;
+  const pupilCy = basePupilY + pupilOffsetY;
 
-export interface KnowledgeNode {
-  topic: string;
-  details: string;
-  is_secret: boolean;
-}
+  // --- Asymmetrical Rendering for Glitchy Vibe ---
+  const [glitchOffset, setGlitchOffset] = useState(0);
+  useEffect(() => {
+    if (vibe === 'Glitchy') {
+      const interval = setInterval(() => {
+        setGlitchOffset(Math.random() * 4 - 2); // Random offset between -2 and 2
+      }, 200);
+      return () => clearInterval(interval);
+    } else {
+      setGlitchOffset(0);
+    }
+  }, [vibe]);
 
-export interface NpcTraits {
-  [key: string]: any;
-}
+  const eyeRx = isHostile ? 4 : 5;
+  const baseEyeRy = isHostile ? 3 : 6;
+  const rightEyeRy = vibe === 'Glitchy' ? baseEyeRy + glitchOffset : baseEyeRy;
 
-export interface ChatMessage {
-  role: 'user' | 'model';
-  text: string;
-  gameState?: GameState;
-  imageUrl?: string; 
-  imageBase64?: string;
-  timestamp: number;
-}
+  const leftEyebrowD = isHostile 
+    ? (vibe === 'Glitchy' ? "M 55 35 L 65 39" : "M 55 33 L 65 37")
+    : (isSad ? "M 55 37 L 65 33" : "");
+  const rightEyebrowD = isHostile
+    ? (vibe === 'Glitchy' ? "M 85 31 L 75 35" : "M 85 33 L 75 37")
+    : (isSad ? "M 85 37 L 75 33" : "");
 
-export interface NarrativeEvent {
-  name: string;
-  description: string;
-  effects: any[];
-}
+  // --- Dynamic Mouth Amplitude ---
+  const [mouthD, setMouthD] = useState("");
 
-export interface ClusterLore {
-  id: string;
-  displayName: string;
-  philosophy: string;
-  coreAxiom: string;
-  mood: string;
-  villains: any[];
-  environments: any[];
-  sensoryInjectors: {
-    smell: string[];
-    sound: string[];
-    touch: string[];
-    taste: string[];
-  };
-  npcArchetypes: any[];
-}
+  useEffect(() => {
+    if (isSystemTyping) {
+      let toggle = false;
+      const interval = setInterval(() => {
+        toggle = !toggle;
+        setMouthD(toggle ? "M 65 50 Q 70 55 75 50" : "M 65 50 Q 70 45 75 50");
+      }, 120);
+      return () => clearInterval(interval);
+    } else {
+      if (isHostile) {
+        const qY = 50 - (dynamicArousal * 8); 
+        setMouthD(`M 65 52 Q 70 ${qY} 75 52`);
+      } else if (isSad) {
+        const qY = 48 - (dynamicArousal * 5); 
+        setMouthD(`M 65 52 Q 70 ${qY} 75 52`);
+      } else {
+        const qY = 55 + (dynamicArousal * 10); 
+        setMouthD(`M 65 50 Q 70 ${qY} 75 50`);
+      }
+    }
+  }, [isSystemTyping, isHostile, isSad, dynamicArousal]);
 
-export interface ArchivedCharacter {
-  character_id: string;
-  name: string;
-  origin_story: string;
-  archetype: string;
-  fracture_state: number;
-  permanent_traits: string[];
-  fracture_vectors: {
-    fear: number;
-    isolation: number;
-    guilt: number;
-    paranoia: number;
-  };
-  narrative_role: string;
-  behavioral_loop: string;
-  dialogue_sample: {
-    greeting: string;
-    warning: string;
-    farewell: string;
-  };
-  resources_held: string[];
-  special_conditions: {
-    trigger: string;
-    effect: string;
-  };
-}
+  const springTransition = { type: "spring" as const, stiffness: 100, damping: 10 };
+
+  return (
+    <div className={`${baseClasses} ${positionClass} flex items-center justify-center ${className}`}>
+      <style>{`
+        @keyframes ghost-float {
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          25% { transform: translateY(-10px) rotate(2deg); }
+          50% { transform: translateY(-5px) rotate(-2deg); }
+          75% { transform: translateY(-15px) rotate(1deg); }
+        }
+        @keyframes ghost-wander {
+          0%, 100% { transform: translate(0px, 0px); }
+          25% { transform: translate(80px, -60px); }
+          50% { transform: translate(-60px, 80px); }
+          75% { transform: translate(40px, -40px); }
+        }
+        @keyframes ghost-orbit {
+          0% { transform: translate(0px, 0px) rotate(0deg) translateX(80px) rotate(0deg); }
+          100% { transform: translate(0px, 0px) rotate(360deg) translateX(80px) rotate(-360deg); }
+        }
+        @keyframes tail-wag {
+          0%, 100% { d: path('M 30 80 Q 50 90 70 80 Q 90 70 110 80 L 110 40 L 30 40 Z'); }
+          50% { d: path('M 30 80 Q 50 70 70 80 Q 90 90 110 80 L 110 40 L 30 40 Z'); }
+        }
+        .ghost-animate-float {
+          animation: ghost-float ${floatDuration} ease-in-out infinite;
+        }
+        .ghost-animate-wander {
+          animation: ${active ? `ghost-orbit 4s linear infinite` : `ghost-wander ${wanderDuration} ease-in-out infinite`};
+        }
+        .ghost-animate-tail {
+          animation: tail-wag ${tailDuration} ease-in-out infinite;
+        }
+        ${vibe === 'Glitchy' ? `
+        @keyframes ghost-glitch {
+          0%, 96%, 98%, 100% { transform: translate(0, 0) scale(1); filter: hue-rotate(0deg); }
+          97% { transform: translate(-10px, 10px) scale(1.1) skewX(20deg); filter: hue-rotate(90deg); opacity: 0.5; }
+          99% { transform: translate(10px, -10px) scale(0.9) skewX(-20deg); filter: hue-rotate(-90deg); opacity: 0.5; }
+        }
+        .ghost-animate-float {
+           animation: ghost-float ${floatDuration} ease-in-out infinite, ghost-glitch 2s infinite;
+        }
+        ` : ''}
+      `}</style>
+
+      {/* The Ghost Wrapper for Macro Movements */}
+      <div className={`w-full h-full flex items-center justify-center ${floating ? 'ghost-animate-wander' : ''}`}>
+        {/* The Ghost SVG */}
+        <svg 
+          viewBox="0 0 140 100" 
+          className={`ghost-animate-float w-full h-full drop-shadow-2xl pointer-events-none`}
+          style={{ filter: `drop-shadow(0px 0px 8px ${glowColor})`, transition: 'filter 0.7s' }}
+        >
+        <defs>
+          <linearGradient id="ghostGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor={coreColor} stopOpacity="0.9" />
+            <stop offset="100%" stopColor={coreColor} stopOpacity="0.2" />
+          </linearGradient>
+        </defs>
+
+        <motion.g>
+          <path 
+            className="ghost-animate-tail"
+            fill="url(#ghostGrad)" 
+            d="M 30 80 Q 50 90 70 80 Q 90 70 110 80 L 110 40 L 30 40 Z" 
+            style={{ transition: 'fill 0.7s' }}
+          />
+          <path 
+            fill="url(#ghostGrad)" 
+            d={vibe === 'Predatory' ? "M 30 40 L 70 10 L 110 40 Z" : "M 30 40 C 30 10, 110 10, 110 40 Z"} 
+            className="transition-all duration-700"
+            style={{ transition: 'fill 0.7s, d 0.7s' }}
+          />
+
+          <motion.g stroke="white" strokeWidth="1" animate={{ opacity: 0.1 + (dynamicArousal * 0.4) }} transition={springTransition} fill="none">
+             <path d="M 40 40 L 40 60 L 50 60" />
+             <circle cx="50" cy="60" r="1.5" fill="white" />
+             <path d="M 100 35 L 100 55 L 90 55 L 90 70" />
+             <circle cx="90" cy="70" r="1.5" fill="white" />
+          </motion.g>
+
+          <motion.g>
+            <motion.ellipse 
+              animate={{ cx: 60, cy: 40, rx: eyeRx, ry: baseEyeRy, scaleY: blinkScale }} 
+              transition={springTransition} 
+              fill="white" 
+              style={{ transformOrigin: "60px 40px" }}
+            />
+            <motion.ellipse 
+              animate={{ cx: 80, cy: 40, rx: eyeRx, ry: rightEyeRy, scaleY: blinkScale }} 
+              transition={springTransition} 
+              fill="white" 
+              style={{ transformOrigin: "80px 40px" }}
+            />
+            <motion.circle 
+              animate={{ cx: leftPupilCx, cy: pupilCy }}
+              transition={springTransition}
+              r="2" 
+              fill="#0f172a" 
+            />
+            <motion.circle 
+              animate={{ cx: rightPupilCx, cy: pupilCy }}
+              transition={springTransition}
+              r="2" 
+              fill="#0f172a" 
+            />
+            
+            {(isHostile || isSad) && (
+               <motion.path 
+                 animate={{ d: leftEyebrowD }} 
+                 transition={springTransition}
+                 stroke="white" 
+                 strokeWidth={isHostile ? 2 : 1.5} 
+                 strokeLinecap="round" 
+               />
+            )}
+            {(isHostile || isSad) && (
+               <motion.path 
+                 animate={{ d: rightEyebrowD }} 
+                 transition={springTransition}
+                 stroke="white" 
+                 strokeWidth={isHostile ? 2 : 1.5} 
+                 strokeLinecap="round" 
+               />
+            )}
+          </motion.g>
+
+          <motion.path 
+            animate={{ d: mouthD }} 
+            transition={springTransition}
+            stroke="white" 
+            strokeWidth="2" 
+            fill="none" 
+            strokeLinecap="round"
+          />
+        </motion.g>
+      </svg>
+      </div>
+    </div>
+  );
+};

@@ -1,197 +1,142 @@
 
-import React, { useState } from 'react';
-import { WelcomeScreen } from './components/WelcomeScreen';
-import { SetupOverlay } from './components/setup/SetupOverlay'; 
-import { StatusPanel } from './components/StatusPanel';
-import { StoryLog } from './components/StoryLog';
-import { InputArea } from './components/InputArea';
-import { SimulationModal } from './components/SimulationModal';
-import { SaveLoadModal } from './components/SaveLoadModal';
-import { useGameEngine } from './hooks/useGameEngine';
-import { NpcState } from './types';
-import { SystemGhost } from './components/setup/SystemGhost';
+import { GameState } from '../types';
+import { LORE_LIBRARY } from '../loreLibrary';
+import { STYLE_GUIDE } from './styleGuide';
 
-import { useArchitectStore } from './store/architectStore';
-import { ApiKeyModal } from './components/ApiKeyModal';
+/**
+ * THE SENSORY ENGINE (Sensorium V4.1 - Style Aware)
+ */
 
-export default function App() {
-  const [showSetup, setShowSetup] = useState(false);
-  const [showSimModal, setShowSimModal] = useState(false);
-  const [showSaveLoad, setShowSaveLoad] = useState(false);
-  const [userInputLength, setUserInputLength] = useState(0);
-  
-  const currentPhase = useArchitectStore(state => state.narrative.currentPhase);
+const getRandomElements = (arr: string[], count: number): string[] => {
+    if (!arr || arr.length === 0) return [];
+    const shuffled = [...arr].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, count);
+};
 
-  const {
-      gameState,
-      dispatch,
-      history,
-      isInitialized,
-      isLoading,
-      autoMode,
-      setAutoMode,
-      initializeGame,
-      sendMessage,
-      resetGame,
-      saveSession,
-      loadSession,
-      deleteSave,
-      getSaves
-  } = useGameEngine(); 
+export const constructSensoryManifesto = (gameState: GameState): string => {
+    // 1. Identify Active Cluster
+    const activeClusterName = gameState.meta?.active_cluster || "None";
+    if (activeClusterName === "None") return "";
 
-  const handleUpdateNpc = (npcIndex: number, updates: Partial<NpcState>) => {
-    dispatch({ 
-        type: 'UPDATE_NPC', 
-        payload: { index: npcIndex, updates } 
+    const clusterKey = Object.keys(LORE_LIBRARY).find(key => activeClusterName.includes(key));
+    if (!clusterKey) return "";
+    const lore = LORE_LIBRARY[clusterKey];
+    const style = STYLE_GUIDE.cluster_palettes[clusterKey as keyof typeof STYLE_GUIDE.cluster_palettes] || STYLE_GUIDE.cluster_palettes.Flesh;
+
+    // 2. Determine Intensity
+    const locationState = gameState.location_state?.current_state || 0;
+    const threatLevel = gameState.villain_state?.threat_scale || 0;
+    
+    let intensityDescriptor = "SUBTLE / BACKGROUND";
+    let quantity = 2; // Reduced quantity for better restraint
+
+    if (locationState >= 3 || threatLevel >= 4) {
+        intensityDescriptor = "OVERWHELMING / NIGHTMARE";
+        quantity = 4;
+    } else if (locationState >= 2 || threatLevel >= 3) {
+        intensityDescriptor = "INTENSE / VISCERAL";
+        quantity = 3;
+    }
+
+    // 3. Select Sensory Seeds
+    const smells = getRandomElements(lore.sensoryInjectors.smell, quantity);
+    const sounds = getRandomElements(lore.sensoryInjectors.sound, quantity);
+    const touches = getRandomElements(lore.sensoryInjectors.touch, quantity);
+    const verbs = getRandomElements(style.preferred_verbs, 5); // Inject preferred verbs
+    const concepts = getRandomElements(style.key_concepts, 3);
+
+    // 4. Construct the Manifesto
+    let manifesto = `\n\n*** SENSORY & STYLE MANIFESTO (CLUSTER: ${lore.displayName.toUpperCase()}) ***\n`;
+    manifesto += `AESTHETIC PROTOCOL: ${style.prose_style}\n`;
+    manifesto += `CORE CONCEPTS: ${concepts.join(" | ")}\n`;
+    
+    manifesto += `\nCRITICAL INTEGRATION RULES (STRICT):\n`;
+    STYLE_GUIDE.narrative_rules.forEach(rule => {
+      manifesto += ` - ${rule}\n`;
     });
+
+    manifesto += `\nVOCABULARY BLACKLIST (NEVER USE THESE VERBATIM):\n`;
+    const randomBlacklist = getRandomElements(STYLE_GUIDE.vocabulary_blacklist, 5); 
+    STYLE_GUIDE.vocabulary_blacklist.forEach(word => {
+      manifesto += ` - "${word}"\n`;
+    });
+    
+    manifesto += `\nPREFERRED VERBS (USE THESE TO DRIVE ACTION):\n`;
+    manifesto += ` - ${verbs.join(", ")}\n`;
+
+    manifesto += `\nSENSORY ANCHORS (USE AS CONCEPTUAL SEEDS ONLY):\n`;
+    manifesto += ` - SMELL: ${smells.join(", ")}\n`;
+    manifesto += ` - SOUND: ${sounds.join(", ")}\n`;
+    manifesto += ` - TOUCH: ${touches.join(", ")}\n`;
+    
+    if (gameState.location_state?.weather_state) {
+        manifesto += `\nATMOSPHERE: ${gameState.location_state.weather_state} (Time: ${gameState.location_state.time_of_day})\n`;
+    }
+
+    // Integrated Liminal Logic
+    if (["System", "Self", "Haunting", "Survival"].some(c => activeClusterName.includes(c))) {
+        manifesto += constructLiminalManifesto(activeClusterName);
+    }
+
+    manifesto += `\n*** END MANIFESTO ***\n`;
+
+    return manifesto;
+};
+
+export const constructLiminalManifesto = (activeClusterName: string): string => {
+  // Based on "Liminal Space" aesthetic papers
+  const liminalTriggers: Record<string, string[]> = {
+    "System": [
+      "Anachronistic Technology (CRT TVs, old vending machines)",
+      "Endless Server Racks humming in the dark",
+      "Fluorescent lights buzzing with a rhythmic pattern"
+    ],
+    "Haunting": [
+      "Functional Mismatch (A playground in a basement)",
+      "Furniture covered in dusty white sheets",
+      "Acoustic Deadness (Sound does not carry)"
+    ],
+    "Self": [
+      "Mirrors that reflect slightly delayed movements",
+      "Infinite Repetition (Hallways that don't end)",
+      "Childhood bedrooms perfectly preserved but devoid of color"
+    ],
+    "Survival": [
+      "Abandoned campsites with still-warm embers",
+      "Emergency broadcast systems playing on loop",
+      "Rations scattered across a blood-stained floor"
+    ],
+    "Flesh": [
+      "Walls that breathe softly",
+      "Puddles of unidentifiable viscous fluid",
+      "The smell of copper and ozone"
+    ],
+    "Blasphemy": [
+      "Geometric shapes that hurt to look at",
+      "Whispers in a language that shouldn't exist",
+      "Shadows stretching towards the light source"
+    ],
+    "Desire": [
+      "Velvet ropes leading to nowhere",
+      "The scent of cheap perfume and stale sweat",
+      "Muzak playing slightly out of tune"
+    ]
   };
 
-  const handleReset = () => {
-      if (window.confirm("TERMINATE SESSION?\n\nThis will wipe all narrative progress.")) {
-          resetGame();
-          setShowSetup(false);
-      }
-  };
+  const defaultTriggers = [
+    "Anachronistic Technology (CRT TVs, old vending machines)",
+    "Infinite Repetition (Hallways that don't end)",
+    "Functional Mismatch (A playground in a basement)",
+    "Acoustic Deadness (Sound does not carry)"
+  ];
 
-  // 1. Map Narrative Phase to a scalar multiplier (0.0 to 1.0)
-  const phaseMultiplier = {
-      'Act1_Setup': 0.1,
-      'Act2_RisingAction': 0.5,
-      'Act3_Climax': 1.0,
-      'Resolution': 0.0
-  }[currentPhase || 'Act1_Setup'];
-
-  // 2. Extract Player Stress (if available)
-  const playerNpc = gameState.npc_states.find(n => n.name === gameState.meta.player_profile?.name);
-  const stressLevel = playerNpc ? Math.min(playerNpc.psychology.stress_level / 100, 1.0) : 0;
-
-  // 3. Combine into a global UI Intensity metric
-  // Act III forces high intensity, but high stress in Act I can also trigger it.
-  const uiIntensity = Math.max(phaseMultiplier, stressLevel);
-
-  // 4. Map Clusters to Base Colors
-  const getClusterTheme = (cluster: string) => {
-      if (cluster.includes('Flesh')) return '136, 8, 8'; // Deep Red
-      if (cluster.includes('System')) return '0, 255, 170'; // Toxic Green
-      if (cluster.includes('Haunting')) return '180, 150, 100'; // Desaturated Gold
-      if (cluster.includes('Survival')) return '100, 200, 255'; // Frost Blue
-      return '100, 100, 100'; // Default Ash
-  };
-
-  const dynamicStyles = {
-      '--ui-intensity': uiIntensity,
-      '--theme-color': getClusterTheme(gameState.meta.active_cluster),
-      // We pass the raw RGB values so we can use them with rgba() in CSS
-      '--theme-glow': `rgba(var(--theme-color), calc(var(--ui-intensity) * 0.15))`
-  } as React.CSSProperties;
+  const triggersForCluster = liminalTriggers[activeClusterName] || defaultTriggers;
+  const selectedTrigger = triggersForCluster[Math.floor(Math.random() * triggersForCluster.length)];
   
-  return (
-    <div style={dynamicStyles} className={`theme-wrapper min-h-screen bg-[#050505] text-gray-200 font-sans relative overflow-hidden transition-colors duration-1000 cluster-${gameState.meta.active_cluster.toLowerCase()}`}>
-        <ApiKeyModal />
-        <div className="scanlines" />
-        
-        {(!isInitialized || showSetup) && (
-            <SystemGhost 
-                floating={true} 
-                isSystemTyping={isLoading}
-                userInputLength={userInputLength}
-                className="w-[40vw] h-[40vw] max-w-[500px] max-h-[500px] opacity-20 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0" 
-            />
-        )}
-
-        {!isInitialized && !showSetup && (
-            <WelcomeScreen onStart={() => setShowSetup(true)} />
-        )}
-        
-        {showSetup && (
-            <SetupOverlay onComplete={(config) => {
-                initializeGame(config);
-                setShowSetup(false);
-            }} />
-        )}
-
-        {isInitialized && !showSetup && (
-            <div className="flex flex-col lg:flex-row h-screen overflow-hidden relative">
-                {/* LEFT COLUMN: Narrative Log */}
-                <div className="flex-1 flex flex-col relative z-10 h-full overflow-hidden lg:pb-16">
-                    <SystemGhost 
-                        floating={true} 
-                        isSystemTyping={isLoading}
-                        userInputLength={userInputLength}
-                        className="w-[40vw] h-[40vw] max-w-[500px] max-h-[500px] opacity-10 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0" 
-                    />
-                    <StoryLog 
-                        history={history} 
-                        isLoading={isLoading} 
-                        currentImage={gameState.location_state.current_environment_image}
-                        className="relative z-10" 
-                    />
-                </div>
-
-                {/* RIGHT COLUMN: Input Sidebar */}
-                <div className="w-full lg:w-[450px] xl:w-[500px] border-t lg:border-t-0 lg:border-l border-red-900/30 bg-[#080000] z-20 flex flex-col p-6 shadow-[0_0_50px_rgba(0,0,0,1)] relative pb-24 lg:pb-6">
-                    <div className="absolute inset-0 pointer-events-none opacity-5 bg-[radial-gradient(circle_at_center,rgba(220,38,38,0.1)_0%,transparent_70%)]" />
-                    <InputArea 
-                        onSend={(text, files) => sendMessage(text, files)} 
-                        isLoading={isLoading} 
-                        options={gameState.suggested_actions}
-                        isSidebar={true}
-                        onInputChange={setUserInputLength}
-                    />
-                </div>
-
-                {/* Bottom Status Panel */}
-                <StatusPanel 
-                    gameState={gameState} 
-                    onOpenSimulation={() => setShowSimModal(true)}
-                    isTesting={autoMode.active}
-                    onAbortTest={() => setAutoMode({ active: false, remainingCycles: 0 })}
-                    onUpdateNpc={handleUpdateNpc}
-                    onReset={handleReset}
-                    onOpenSaveLoad={() => setShowSaveLoad(true)}
-                />
-
-                {/* Modals */}
-                <SimulationModal 
-                    isOpen={showSimModal} 
-                    onClose={() => setShowSimModal(false)}
-                    onRunSimulation={(config) => {
-                        setShowSimModal(false);
-                        if (config.cycles > 0) {
-                            setAutoMode({ active: true, remainingCycles: config.cycles });
-                            if (!isInitialized) {
-                               initializeGame(config); 
-                            } else {
-                               const newMeta = {
-                                   ...gameState.meta,
-                                   mode: config.mode as any,
-                                   intensity_level: config.intensity,
-                                   active_cluster: config.cluster,
-                               };
-                               dispatch({ type: 'PATCH_STATE', payload: { meta: newMeta } });
-                            }
-                        }
-                    }}
-                    isTesting={autoMode.active}
-                    simulationReport={null}
-                    initialCluster={gameState.meta.active_cluster}
-                    currentVillainState={gameState.villain_state}
-                />
-
-                <SaveLoadModal 
-                    isOpen={showSaveLoad}
-                    onClose={() => setShowSaveLoad(false)}
-                    onSave={saveSession}
-                    onLoad={(id) => {
-                        const success = loadSession(id);
-                        if (success) setShowSaveLoad(false);
-                        return success;
-                    }}
-                    onDelete={deleteSave}
-                    getSaves={getSaves}
-                />
-            </div>
-        )}
-    </div>
-  );
-}
+  return `
+  *** LIMITAL AESTHETIC PROTOCOL ***
+  Apply 'Kenopsia': Describe the space as if it is waiting for people who will never arrive.
+  Use 'Flat Lighting' and 'Muted Textures'.
+  Mandatory Element: ${selectedTrigger}
+  `;
+};
